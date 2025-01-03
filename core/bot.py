@@ -14,10 +14,12 @@ import threading
 import inspect
 import asyncio
 from abc import ABC, abstractmethod
-from model import Shop
-from model import Monster
-from model import ItemInventory, ItemType
-from handlers import register_quest_task, death_handler_task, aggro_handler_task
+from model.shop import Shop
+from model.monster import Monster
+from model.inventory import ItemInventory, ItemType
+from handlers.aggro_handler import aggro_handler_task
+from handlers.death_handler import death_handler_task
+from handlers.register_quest import register_quest_task
 
 class Bot:
 
