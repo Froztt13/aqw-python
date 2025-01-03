@@ -1,6 +1,6 @@
 from core.bot import Bot
 from abstracts.command import Command
-from model import Monster
+from model.monster import Monster
 import asyncio
 
 class UseSkillCmd(Command):
