@@ -1,6 +1,6 @@
 from core.bot import Bot
 from abstracts.command import Command
-from model import Monster
+from model.monster import Monster
 
 # Command for search monster and auto jump cell to the monster
 class HuntMonsterCmd(Command):
