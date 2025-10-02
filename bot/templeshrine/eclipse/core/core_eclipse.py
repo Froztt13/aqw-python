@@ -4,9 +4,11 @@ import asyncio
 import json
 from collections import deque
 from core.utils import is_valid_json
-from core.command import Command
+from core.command import Command, SkillMode
 from colorama import Fore
 import colorama
+
+from handlers.death_handler import death_handler_task
 
 class AscendEclipseBot:
     def __init__(self, cmd: Command, 
@@ -56,12 +58,14 @@ class AscendEclipseBot:
         self.is_attacking = False
         self.skill_list = [0, 1, 2, 0, 3, 4]
         self.skill_index = 0
+        
+        self.bot_timeleapse = time.monotonic()
 
         # subscribe ke event
-        self.cmd.bot.subscribe(self.handle_message)
+        self.cmd.subscribe(self.handle_message)
 
     def print_debug(self, message, color=Fore.YELLOW):
-        print(color + f"[{datetime.now().strftime('%H:%M:%S')}] [{self.cmd.bot.player.CELL}] {message}" + Fore.RESET)
+        print(color + f"[{datetime.now().strftime('%H:%M:%S')}] [{self.cmd.get_player().CELL}] {message}" + Fore.RESET)
         
     def print_aura(self, message):
         self.print_debug(f"{Fore.RED}You got \"{message}\"{Fore.RESET}")
@@ -69,7 +73,7 @@ class AscendEclipseBot:
     async def prepare_items(self):
         minimalScroll = 50
         if self.cmd.get_quant_item("Scroll of Enrage") < minimalScroll:
-            self.cmd.stop_bot(f"Not enough Scroll of Enrage. Minimum {minimalScroll} required.")
+            self.cmd.stop_bot(f"Not enough Scroll of Enrage. Minimum {minimalScroll} scrolls is required.")
             return
         farm_class = self.cmd.get_farm_class()
         if farm_class:
@@ -78,24 +82,26 @@ class AscendEclipseBot:
         await self.cmd.sleep(3000)
 
     async def go_to_master(self):
-        if self.cmd.bot.follow_player:
-            if not self.cmd.is_player_in_cell(self.cmd.bot.follow_player, self.cmd.bot.player.CELL):
+        if self.cmd.get_followed_player():
+            if not self.cmd.is_player_in_cell(self.cmd.get_followed_player(), self.cmd.get_player().CELL):
                 self.print_debug(f"Going to master's place...")
-                while not self.cmd.is_player_in_cell(self.cmd.bot.follow_player, self.cmd.bot.player.CELL):
-                    await self.cmd.goto_player(self.cmd.bot.follow_player)
-                    if self.cmd.get_player_in_map(self.cmd.bot.follow_player):
+                while not self.cmd.is_player_in_cell(self.cmd.get_followed_player(), self.cmd.get_player().CELL):
+                    await self.cmd.goto_player(self.cmd.get_followed_player())
+                    if self.cmd.get_player_in_map(self.cmd.get_followed_player()):
                         await self.cmd.sleep(200)
                     else:
                         await self.cmd.sleep(1000)
             await self.cmd.sleep(100)
+            if self.cmd.is_in_map("yulgar"):
+                await self.cmd.rest()
         else:
             self.cmd.stop_bot("No master assigned to follow.")
 
     def reset_counters(self):
         self.do_taunt = False
-        self.stop_attack = False
         self.converges_count = 0
         self.light_gather_count = 0
+        self.cmd.get_player().removeAllAuras()
 
     def _should_taunt(self, count: int) -> bool:
         if self.taunt_parity == "odd":
@@ -127,15 +133,10 @@ class AscendEclipseBot:
             return
         for a_item in auras:
             for aura in a_item.get("auras", []):
-                if self.cmd.bot.user_id in a_item.get("tInf", ""):
-                    if aura.get("nam") == "Sun's Heat":
-                        self.print_aura("Sun's Heat")
-                    if aura.get("nam") == "Moonlight Stun":
-                        self.print_aura("Moonlight Stun")
-                    if aura.get("nam") == "Noon of Radiance":
-                        self.print_aura("Noon of Radiance")
-                    if aura.get("nam") == "Midnight of Silence":
-                        self.print_aura("Midnight of Silence")
+                if self.cmd.get_user_id() in a_item.get("tInf", ""):
+                    # Log specific auras for the player
+                    if aura.get("nam") in ["Sun's Heat", "Moonlight Stun", "Noon of Radiance", "Midnight of Silence", "Hollowed Eclipse"]:
+                        self.print_aura(aura.get("nam"))
                     # Create 5 seconds delayed taunt
                     if aura.get("nam") == "Sun's Warmth" and self.sunset_knight_taunter:
                         async def delayed_taunt():
@@ -195,14 +196,10 @@ class AscendEclipseBot:
         await self.cmd.sleep(1000)
         
     async def attack_loop(self):
+        skill_mode = SkillMode.ALL
         while self.cmd.is_still_connected():
             await self.cmd.sleep(200)
             self.reset_counters()
-            
-            if self.cmd.bot.player.CELL == "r3a":
-                self.print_debug("Resting for 10 secs...")
-                await self.cmd.rest()
-                await self.cmd.sleep(10000)
             
             if self.role == "master" and not self.cmd.is_monster_alive():
                 await self.to_next_cell()
@@ -212,12 +209,15 @@ class AscendEclipseBot:
             while not self.cmd.wait_count_player(4):  # ganti 4 sesuai jumlah slave
                 await self.cmd.sleep(100)
 
-            master = self.cmd.get_player_in_map(self.cmd.bot.follow_player)
-            check_master_in_cell = self.role == "master" or (master and master.str_frame == self.cmd.bot.player.CELL)
-            while self.cmd.is_monster_alive() and check_master_in_cell:
+            while self.cmd.is_monster_alive():
                 await self.cmd.sleep(200)
+                
+                master = self.cmd.get_player_in_map(self.cmd.get_followed_player())
+                check_master_in_cell = self.role == "master" or (master and master.str_frame == self.cmd.get_player().CELL)
+                if not check_master_in_cell:
+                    break
 
-                if self.cmd.bot.player.hasAura("Solar Flare"):
+                if self.cmd.get_player().hasAura("Solar Flare"):
                     self.target_monsters = "Blessless Deer"
                 else:
                     self.target_monsters = self.default_target
@@ -235,10 +235,16 @@ class AscendEclipseBot:
                     self.do_taunt = False
                     continue
 
-                if self.cmd.bot.player.hasAura("Sun's Heat"):
-                    continue
+                if self.cmd.get_player().hasAura("Sun's Heat"):
+                    skill_mode = SkillMode.ATTACK_ONLY # dont use heal when having inverted dmg debuff
+                else:
+                    skill_mode = SkillMode.ALL
 
-                await self.cmd.use_skill(self.skill_list[self.skill_index], self.target_monsters)
+                await self.cmd.use_skill(
+                    index = self.skill_list[self.skill_index], 
+                    target_monsters = self.target_monsters, 
+                    skill_mode = skill_mode
+                    )
                 self.skill_index += 1
                 if self.skill_index >= len(self.skill_list):
                     self.skill_index = 0
@@ -255,59 +261,72 @@ class EclipseSlaveBot(AscendEclipseBot):
 class EclipseMasterBot(AscendEclipseBot):
     def __init__(self, cmd: Command, **kwargs):
         super().__init__(cmd, role="master", **kwargs)
-        self.timeleapse = 0
+        self.dungeon_timeleapse = 0
         self.cleared_count = 0
+        self.last_cell = "Enter"
         
     async def to_next_cell(self):
         self.do_taunt = False
-        self.stop_attack = False
         self.converges_count = 0
         self.light_gather_count = 0
 
-        # reset to "Enter"
-        if self.cmd.bot.player.CELL != "Enter":
+        # reset to "Enter" if dead from "r3"
+        if self.last_cell == "r3":
             await self.cmd.jump_cell("Enter", "Spawn")
-            for slave in self.cmd.bot.slaves_player:
+            self.print_debug("Waiting all slaves to be ready...")
+            for slave in self.cmd.get_slaves():
                 player = self.cmd.get_player_in_map(slave)
                 if player:
                     self.print_debug(f"Waiting for:{slave} Cell:{player.str_frame} State:{player.int_state} HP:{player.int_hp}")
-                    while player.str_frame != self.cmd.bot.player.CELL or player.int_state == 0:
+                    while player.str_frame != self.cmd.get_player().CELL or player.int_state != 1:
                         await self.cmd.sleep(100)
                         player = self.cmd.get_player_in_map(slave)
                     await self.cmd.sleep(500)
 
         self.print_debug(f"Checking for monsters...")
-        self.cmd.bot.respawn_cell_pad = []
 
         await self.cmd.jump_cell("Enter", "Spawn")
+        self.last_cell = "Enter"
         if self.cmd.is_monster_alive("Blessless Deer") or self.cmd.is_monster_alive("Fallen Star"):
             return
 
         await self.cmd.jump_cell("r1", "Left")
+        self.last_cell = "r1"
         if self.cmd.is_monster_alive("Suffocated Light") or self.cmd.is_monster_alive("Imprisoned Fairy"):
             return
 
         await self.cmd.jump_cell("r2", "Left")
+        self.last_cell = "r2"
         if self.cmd.is_monster_alive("Sunset Knight") or self.cmd.is_monster_alive("Moon Haze"):
             return
 
         await self.cmd.jump_cell("r3", "Left")
+        self.last_cell = "r3"
         if self.cmd.is_monster_alive("Ascended Midnight") or self.cmd.is_monster_alive("Ascended Solstice"):
-            self.cmd.bot.respawn_cell_pad = ["Enter", "Spawn"]
             return
 
         await self.cmd.jump_cell("r3a", "Left")
-        elapsed_seconds = time.monotonic() - self.timeleapse
+        self.last_cell = "r3a"
+        
+        bot_elapsed_seconds = time.monotonic() - self.bot_timeleapse
+        bot_minutes = int(bot_elapsed_seconds // 60)
+        bot_seconds = int(bot_elapsed_seconds % 60)
+        
+        elapsed_seconds = time.monotonic() - self.dungeon_timeleapse
         minutes = int(elapsed_seconds // 60)
         seconds = int(elapsed_seconds % 60)
+        
         self.cleared_count += 1
-        await self.cmd.send_chat(f"Total time taken: {minutes} minutes and {seconds} seconds.")
-        await self.cmd.sleep(1000)
-        await self.cmd.send_chat(f"Dungeon cleared {self.cleared_count} times.")
+        
+        self.print_debug(f"{Fore.CYAN}Finished in : {minutes} minutes and {seconds} seconds.{Fore.RESET}")
+        self.print_debug(f"{Fore.CYAN}Dungeon cleared {self.cleared_count} times.{Fore.RESET}")
+        self.print_debug(f"{Fore.CYAN}Total time running : {bot_minutes} minutes and {bot_seconds} seconds.{Fore.RESET} ")
 
-        self.print_debug("Entering new queue...")
+        self.print_debug("Rest in yulgar...")
         await self.cmd.join_map("yulgar", roomNumber=999999)
-        await self.cmd.sleep(4000)
+        await self.cmd.rest()
+        await self.cmd.sleep(10000)
+        self.print_debug("Entering new queue...")
         await self.enter_dungeon()
 
     async def setup_party(self):
@@ -319,7 +338,7 @@ class EclipseMasterBot(AscendEclipseBot):
         while not self.cmd.wait_count_player(4):  # ganti 4 sesuai jumlah slave
             await self.cmd.sleep(100)
 
-        for slave in self.cmd.bot.slaves_player:
+        for slave in self.cmd.get_slaves():
             await self.cmd.send_packet(f"%xt%zm%gp%1%pi%{slave}%")
             await self.cmd.sleep(500)
 
@@ -327,7 +346,7 @@ class EclipseMasterBot(AscendEclipseBot):
         await self.enter_dungeon()
 
     async def enter_dungeon(self):
-        self.timeleapse = time.monotonic()
+        self.dungeon_timeleapse = time.monotonic()
         await self.cmd.send_packet("%xt%zm%dungeonQueue%25127%ascendeclipse%")
         while self.cmd.is_not_in_map("ascendeclipse"):
             self.print_debug("Waiting for dungeon queue...")

@@ -61,7 +61,7 @@ class Player:
             "pass": self.PASS
         }
 
-        print(f'Login {self.USER}...')
+        print(f'Login {Fore.BLUE + self.USER.upper() + Fore.RESET}...')
         response = requests.post(url, json=data)
         response_json = response.json()
         # print(json.dumps(response_json))

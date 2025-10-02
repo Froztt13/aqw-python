@@ -21,4 +21,5 @@ async def death_handler_task(bot: 'Bot'):
     bot.player.IS_IN_COMBAT = False
     bot.player.CURRENT_HP = bot.player.MAX_HP
     bot.player.MANA = 100
+    bot.player.removeAllAuras()
     print(f"[{datetime.now().strftime('%H:%M:%S')}] Spawned at cell:", bot.player.CELL, "pad:", bot.player.PAD)

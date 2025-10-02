@@ -37,7 +37,8 @@ class Bot:
             restartOnAFK: bool = True,
             autoAdjustSkillDelay: bool = False,
             respawnCellPad: List[str] = [],
-            muteSpamWarning: bool = False
+            muteSpamWarning: bool = False,
+            antiMod: bool = True
             ):
         self.roomNumber = roomNumber
         self.showLog = showLog
@@ -54,6 +55,7 @@ class Bot:
         self.restart_on_afk = restartOnAFK
         self.respawn_cell_pad = respawnCellPad
         self.mute_spam_warning = muteSpamWarning
+        self.anti_mod = antiMod
 
         self.auto_relogin = False # sementara diset ke False untuk cegah stop_bot() di function read_server_in_background()
         
@@ -158,9 +160,8 @@ class Bot:
     
     def stop_bot(self):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Stopping bot...")
+        self.client_socket.close()
         self.is_client_connected = False
-        if self.client_socket:
-            self.client_socket.close()
 
     def debug(self, *args):
         if not self.showDebug:
@@ -201,7 +202,7 @@ class Bot:
         port = self.server_info[1]
         self.debug(hostname, port)
         host_ip = socket.gethostbyname(hostname)
-        print(f"Connecting to {self.server} server...")
+        print(f"Connecting to {Fore.BLUE + self.server.upper() + Fore.RESET} server...")
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         self.client_socket.connect((host_ip, port))
         self.is_client_connected = True
@@ -274,7 +275,7 @@ class Bot:
             await asyncio.sleep(self.cmdDelay/1000)
     
     def check_user_access_level(self, username: str, access_level: int):
-        if access_level >= 30:
+        if access_level >= 30 and self.anti_mod:
             print(Fore.RED + f"[{datetime.now().strftime('%H:%M:%S')}] You meet {username}, a staff!")
             self.auto_relogin = False
             self.stop_bot()
@@ -805,6 +806,8 @@ class Bot:
                 print(tb_str)
                 if self.is_client_connected == False and self.auto_relogin == False:
                     raise Exception("Connection closed by the server.")
+        if self.client_socket:
+            self.client_socket.close()
     
     async def read_batch_async(self, conn):
         """

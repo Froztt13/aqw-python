@@ -3,7 +3,7 @@ import time
 import json
 from datetime import datetime
 from colorama import Fore
-from core.command import Command
+from core.command import Command, SkillMode
 from core.utils import is_valid_json
 
 
@@ -142,7 +142,7 @@ class CoreTempleBot:
         await self.cmd.sleep(1000)
 
     async def attack_loop(self):
-        buff_only = False
+        skill_mode = SkillMode.ALL
         while self.cmd.is_still_connected():
             if self.role == "master":
                 await self.to_next_cell()
@@ -167,11 +167,15 @@ class CoreTempleBot:
                     await self.cmd.sleep(200)
                     continue
 
-                buff_only = self.cmd.get_player.hasAura("Sun's Heat")
+                if self.cmd.get_player().hasAura("Sun's Heat"):
+                    skill_mode = SkillMode.ATTACK_ONLY # dont use heal when having inverted dmg debuff
+                else:
+                    skill_mode = SkillMode.ALL
+                    
                 await self.cmd.use_skill(
                     self.skill_list[self.skill_index],
                     target_monsters=self.target_monsters,
-                    buff_only=buff_only
+                    skill_mode=skill_mode
                 )
                 self.skill_index = (self.skill_index + 1) % len(self.skill_list)
 
