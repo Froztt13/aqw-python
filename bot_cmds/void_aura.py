@@ -126,7 +126,7 @@ b.add_cmds([
             pad = "Down",
             monster_name = "*"
         ),
-        cmd.TurnInQuestCmd(4432),
+        cmd.TurnInQuestCmd(4432, turn_in_count=5),
         cmd.SleepCmd(1000)
     ])
 
