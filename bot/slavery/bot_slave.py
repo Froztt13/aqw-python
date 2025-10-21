@@ -42,9 +42,12 @@ async def main(cmd: Command):
     cmd.subscribe(handle_message)
     
     async def goto_master():
+        global checking_locked_zone
         print(f"goto master...")
         await cmd.goto_player(follow_player)
         await cmd.sleep(200)
+        if cmd.get_player_in_map(follow_player):
+            checking_locked_zone = False
     
     async def checking_map():
         global checking_locked_zone
@@ -59,8 +62,10 @@ async def main(cmd: Command):
             if cmd.get_player_in_map(follow_player):
                 checking_locked_zone = False
                 break
+        await goto_master()
                 
     while(cmd.is_still_connected()):
+        await cmd.sleep(200)
         if not cmd.is_player_alive():
             continue
         
@@ -76,7 +81,6 @@ async def main(cmd: Command):
             continue
         
         await cmd.use_skill(skills[skill_index])
-        await cmd.sleep(200)
         
         skill_index = skill_index + 1
         if skill_index >= len(skills):
