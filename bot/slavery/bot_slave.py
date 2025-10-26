@@ -1,6 +1,7 @@
 import json
+import sys
 from core.bot import Bot
-from core.command import Command
+from core.command import Command, SkillMode
 from core.utils import is_valid_json
 
 class Slave:
@@ -8,10 +9,9 @@ class Slave:
         self.username = username
         self.password = password
         self.char_class = char_class
-        
+
 server = "Alteon"
 default_room_number = 9099  # For checking Master account is in locked zone map
-follow_player = "user to follow"
 slaves = [
     Slave("user", "pass", "Lord of Order"),
     Slave("user", "pass", "Legion Revenant"),
@@ -39,6 +39,22 @@ async def main(cmd: Command):
             # print(f"message: {message}")
             if "locked zone" in message.lower():
                 checking_locked_zone = True
+                
+        if is_valid_json(message):
+            try:
+                data = json.loads(message)["b"]["o"]
+                cmdData = data["cmd"]
+
+                if cmdData == "pi":
+                    # handle party invitation here
+                    pass
+
+                if cmdData == "ct":
+                    pass
+
+            except Exception:
+                return
+        
     cmd.subscribe(handle_message)
     
     async def goto_master():
@@ -53,14 +69,19 @@ async def main(cmd: Command):
         global checking_locked_zone
         map_to_check = [
             "doomvaultb",
-            "tercessuinotlim"
+            "championdrakath",
+            "tercessuinotlim",
+            "icestormunder"
         ]
         for map_name in map_to_check:
             print(f"checking {map_name}...")
             await cmd.join_map(map_name, roomNumber=default_room_number)
-            await cmd.sleep(500)
+            while cmd.is_not_in_map(map_name):
+                await cmd.sleep(100)
             if cmd.get_player_in_map(follow_player):
+                print(f"stopped at {map_name}...")
                 checking_locked_zone = False
+                await cmd.sleep(1000)
                 break
         await goto_master()
                 
@@ -80,7 +101,17 @@ async def main(cmd: Command):
             await goto_master()
             continue
         
-        await cmd.use_skill(skills[skill_index])
+        targeted_monster = cmd.get_player().getLastTarget()
+        skill_mode = SkillMode.ALL
+        if targeted_monster and targeted_monster.getAura('Counter Attack'):
+            skill_mode = SkillMode.BUFF_ONLY
+            print('buff only mode...')
+        
+        await cmd.use_skill(
+            index=skills[skill_index],
+            target_monsters="*",
+            skill_mode=skill_mode
+            )
         
         skill_index = skill_index + 1
         if skill_index >= len(skills):
@@ -89,10 +120,28 @@ async def main(cmd: Command):
 
 if __name__ == "__main__":
     import asyncio
-    
+
+    # Check for follow_player argument
+    if len(sys.argv) > 1:
+        follow_player = sys.argv[1]
+        print(f"Following player: {follow_player}")
+    else:
+        print("Error: No follow player specified!")
+        print("Usage: python -m bot.slavery.bot_slave <player_name>")
+        sys.exit(1)
+
+    # Handle input that may contain both slave number and follow player
     input_str = input(f"Select your slaves [1-{len(slaves)}] : ")
-    input_int = int(input_str)
-    selected_slave = slaves[input_int - 1]
+    input_parts = input_str.strip().split()
+
+    # The first part should be the slave number
+    try:
+        input_int = int(input_parts[0])
+        selected_slave = slaves[input_int - 1]
+    except (ValueError, IndexError) as e:
+        print(f"Error: Invalid slave selection '{input_str}'")
+        print(f"Please enter a number between 1 and {len(slaves)}")
+        sys.exit(1)
 
     bot = Bot(itemsDropWhiteList=whitelist,
               cmdDelay=500,
@@ -101,7 +150,7 @@ if __name__ == "__main__":
               isScriptable=True,
               followPlayer=follow_player,
               farmClass=selected_slave.char_class)
-    run = Command(bot)     
+    run = Command(bot)
     bot.set_login_info(selected_slave.username, selected_slave.password, server)  # Set login info
 
     asyncio.run(bot.start_bot(main))  # Run the main coroutine

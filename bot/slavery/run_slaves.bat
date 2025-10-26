@@ -9,12 +9,24 @@ echo ==============================
 echo   Slavery Launcher
 echo ==============================
 echo.
+set /p FOLLOW_PLAYER=Enter player name to follow:
+if "%FOLLOW_PLAYER%"=="" (
+    echo Error: No player name specified!
+    pause
+    exit /b 1
+)
+echo.
+
+echo Available slaves:
+call :ExtractSlaveList
+echo.
 echo Input example: 1,3,4
 echo (Separate with commas without spaces)
 echo.
 set /p SLAVES=Enter slave numbers to run:
 
 echo.
+echo Following player: %FOLLOW_PLAYER%
 echo Running slaves: %SLAVES%
 echo.
 
@@ -24,9 +36,9 @@ set CMD_STR=
 :: === Convert comma input to spaces and loop ===
 for %%i in (%SLAVES%) do (
     if not defined CMD_STR (
-        set CMD_STR=wt -w 0 new-tab --title "Slave %%i" cmd /k "cd /d %PROJECT_PATH% && echo %%i ^| py -m %BOT_PATH%"
+        set CMD_STR=wt -w 0 new-tab --title "Slave %%i" cmd /k "cd /d %PROJECT_PATH% && echo %%i %FOLLOW_PLAYER% ^| py -m %BOT_PATH% %FOLLOW_PLAYER%"
     ) else (
-        set CMD_STR=!CMD_STR! ^; new-tab --title "Slave %%i" cmd /k "cd /d %PROJECT_PATH% && echo %%i ^| py -m %BOT_PATH%"
+        set CMD_STR=!CMD_STR! ^; new-tab --title "Slave %%i" cmd /k "cd /d %PROJECT_PATH% && echo %%i %FOLLOW_PLAYER% ^| py -m %BOT_PATH% %FOLLOW_PLAYER%"
     )
 )
 
@@ -38,3 +50,22 @@ if defined CMD_STR (
 ) else (
     echo No slaves selected.
 )
+
+pause
+
+goto :eof
+
+:ExtractSlaveList
+setlocal
+
+:: Use Python to extract slave list dynamically
+py -c "import sys; sys.path.append(r'%PROJECT_PATH%'); from bot.slavery.bot_slave import slaves; [print(f'   {i+1}. {slave.username} ({slave.char_class})') for i, slave in enumerate(slaves)]" 2>nul
+
+:: If Python method fails, show a simple message
+if %errorlevel% neq 0 (
+    echo   Unable to load slave list from bot_slave.py
+    echo   Please check if Python environment is properly configured
+)
+
+endlocal
+goto :eof

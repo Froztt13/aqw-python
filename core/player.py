@@ -250,9 +250,6 @@ class Player:
         return False
     
     def setLastTarget(self, monster: Optional[Monster]):
-        if monster == None:
-            self.last_target = None
-            return
         self.last_target = monster
     
     def getLastTarget(self) -> Optional[Monster]:
