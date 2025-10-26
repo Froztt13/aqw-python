@@ -613,7 +613,7 @@ class Command:
             packet = f"%xt%zm%loadShop%{self.bot.areaId}%{shop_id}%"
             self.bot.write_message(packet)
             await asyncio.sleep(1)
-            await self.buy_item(shop_id, item_name, qty)
+            # await self.buy_item(shop_id, item_name, qty)
 
     @check_alive
     async def ensure_load_shop(self, shop_id: int) -> None:

@@ -11,7 +11,7 @@ class BuyItemCmd(BaseCommand):
         self.qty = qty
     
     async def execute(self, bot: Bot, cmd: Command):  
-        await cmd.buy_item(self.item_name, self.shop_id, self.qty)
+        await cmd.buy_item(item_name=self.item_name, shop_id=self.shop_id, qty=self.qty)
         
     def to_string(self):
         return f"Buy : {self.item_name}"

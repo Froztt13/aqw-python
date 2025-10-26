@@ -746,11 +746,11 @@ class Bot:
                         self.followed_player_cell = cell
                 for player in self.player_in_area[:]:
                     if player.str_username.lower() == username.lower():
-                        player.str_frame = cell
-                        if pad != None:
+                        if cell:
+                            player.str_frame = cell
+                        if pad:
                             player.str_pad = pad
                         break
-                        # self.jump_cell(cell, pad)
             elif "respawnMon" in msg:
                 pass
             elif "chatm" in msg:

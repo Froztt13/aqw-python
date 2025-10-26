@@ -21,7 +21,6 @@ from .label_cmd import LabelCmd
 from .to_label_cmd import ToLabelCmd
 from .buy_item_cmd import BuyItemCmd
 from .sell_item_cmd import SellItemCmd
-from .equip_item_cmd import EquipItemCmd
 from .equip_scroll_cmd import EquipScrollCmd
 from .is_item_equiped_cmd import IsItemEquipedCmd
 from .is_item_not_equiped_cmd import IsItemNotEquipedCmd
