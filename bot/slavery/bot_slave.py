@@ -12,6 +12,7 @@ class Slave:
 
 server = "Alteon"
 default_room_number = 9099  # For checking Master account is in locked zone map
+targets_priority = "Defense Drone,Staff of Inversion"
 slaves = [
     Slave("user", "pass", "Lord of Order"),
     Slave("user", "pass", "Legion Revenant"),
@@ -68,6 +69,7 @@ async def main(cmd: Command):
     async def checking_map():
         global checking_locked_zone
         map_to_check = [
+            "ultraengineer",
             "doomvaultb",
             "championdrakath",
             "tercessuinotlim",
@@ -88,6 +90,7 @@ async def main(cmd: Command):
     while(cmd.is_still_connected()):
         await cmd.sleep(200)
         if not cmd.is_player_alive():
+            await cmd.sleep(200)
             continue
         
         if checking_locked_zone:
@@ -109,7 +112,7 @@ async def main(cmd: Command):
         
         await cmd.use_skill(
             index=skills[skill_index],
-            target_monsters="*",
+            target_monsters=targets_priority,
             skill_mode=skill_mode
             )
         

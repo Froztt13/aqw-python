@@ -9,6 +9,11 @@ echo ==============================
 echo   Slavery Launcher
 echo ==============================
 echo.
+
+echo Bot Configuration:
+call :ShowConfig
+echo.
+
 set /p FOLLOW_PLAYER=Enter player name to follow:
 if "%FOLLOW_PLAYER%"=="" (
     echo Error: No player name specified!
@@ -53,6 +58,21 @@ if defined CMD_STR (
 
 pause
 
+goto :eof
+
+:ShowConfig
+setlocal
+
+:: Use Python to extract configuration values
+py -c "import sys; sys.path.append(r'%PROJECT_PATH%'); from bot.slavery.bot_slave import server, default_room_number, targets_priority, slaves, whitelist; print(f'   Server: {server}'); print(f'   Default Room: {default_room_number}'); print(f'   Targets Priority: {targets_priority}'); print(f'   Total Slaves: {len(slaves)}'); print(f'   Whitelist Items: {len(whitelist)}')" 2>nul
+
+:: If Python method fails, show error message
+if %errorlevel% neq 0 (
+    echo   Unable to load configuration from bot_slave.py
+    echo   Please check if Python environment is properly configured
+)
+
+endlocal
 goto :eof
 
 :ExtractSlaveList
