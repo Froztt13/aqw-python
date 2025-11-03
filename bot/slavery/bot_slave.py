@@ -124,27 +124,29 @@ async def main(cmd: Command):
 if __name__ == "__main__":
     import asyncio
 
-    # Check for follow_player argument
-    if len(sys.argv) > 1:
-        follow_player = sys.argv[1]
-        print(f"Following player: {follow_player}")
-    else:
-        print("Error: No follow player specified!")
-        print("Usage: python -m bot.slavery.bot_slave <player_name>")
-        sys.exit(1)
-
-    # Handle input that may contain both slave number and follow player
+    # Handle input that contains slave number and follow player
     input_str = input(f"Select your slaves [1-{len(slaves)}] : ")
-    input_parts = input_str.strip().split()
+
+    # Extract both slave number and follow player from input
+    input_parts = input_str.strip().split(maxsplit=1)
+
+    # Check if we have both slave number and follow player
+    if len(input_parts) < 2:
+        print("Error: Input format should be: <slave_number> <player_name>")
+        print("Example: 2 cysero")
+        sys.exit(1)
 
     # The first part should be the slave number
     try:
         input_int = int(input_parts[0])
         selected_slave = slaves[input_int - 1]
     except (ValueError, IndexError) as e:
-        print(f"Error: Invalid slave selection '{input_str}'")
+        print(f"Error: Invalid slave selection '{input_parts[0]}'")
         print(f"Please enter a number between 1 and {len(slaves)}")
         sys.exit(1)
+
+    # The second part is the follow player name
+    follow_player = input_parts[1]
 
     bot = Bot(itemsDropWhiteList=whitelist,
               cmdDelay=500,
