@@ -11,7 +11,7 @@ async def main(bot: Bot):
 
     await kill_quest(
         cmd,
-        quest_id=10016,
+        quest_id=10510,
         map_name="battleontown",
         monster_name="Frogzard",
         room_number=99999999

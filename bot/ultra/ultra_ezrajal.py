@@ -74,7 +74,7 @@ def message_handler(message):
                             print("Counter Attack", counter_attack)
             if a:
                 for action in a:
-                    if action.get('cmd') == 'aura--':
+                    if action.get('cmd') == 'aura-':
                         removed_aura = action.get('aura', {}).get('nam')
                         if "Counter Attack" in removed_aura:
                             counter_attack = False

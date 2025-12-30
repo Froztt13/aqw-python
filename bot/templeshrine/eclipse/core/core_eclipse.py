@@ -335,7 +335,7 @@ class EclipseMasterBot(AscendEclipseBot):
         await self.cmd.sleep(4000)
 
         self.print_debug("Waiting for all slaves to be online...")
-        while not self.cmd.wait_count_player(4):  # ganti 4 sesuai jumlah slave
+        while not self.cmd.wait_count_player(4):
             await self.cmd.sleep(100)
 
         for slave in self.cmd.get_slaves():
@@ -351,3 +351,4 @@ class EclipseMasterBot(AscendEclipseBot):
         while self.cmd.is_not_in_map("ascendeclipse"):
             self.print_debug("Waiting for dungeon queue...")
             await self.cmd.sleep(500)
+        await self.cmd.sleep(2000)
