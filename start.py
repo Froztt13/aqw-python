@@ -8,32 +8,36 @@ import asyncio
 username = input("Username: ")
 password = input("Password: ")
 server = input("Server: ")
-bot_path = input(f"Bot path (e.g., {Fore.BLUE}bot.rep.yew_mountain{Fore.RESET}): ")
+bot_path = input(f"Bot path (e.g., {Fore.BLUE}bot.nulgath.larvae{Fore.RESET}): ")
 
 # Initialize bot
 b = Bot(
-    roomNumber=9099, 
+    roomNumber=1, 
     itemsDropWhiteList=[
-        "Astral Ephemerite Essence",
-        "Belrot the Fiend Essence",
-        "Black Knight Essence",
-        "Tiger Leech Essence",
-        "Carnax Essence",
-        "Chaos Vordred Essence",
-        "Dai Tengu Essence",
-        "Unending Avatar Essence",
-        "Void Dragon Essence",
-        "Creature Creation Essence",
+        "Mana Energy for Nulgath",
+        "Gem of Nulgath",
+        "Diamond of Nulgath",
+        "Voucher of Nulgath",
+        "Voucher of Nulgath (non-mem)",
+        "Dark Crystal Shard",
+        "Totem of Nulgath",
+        "Blood Gem of the Archfiend",
+        "Unidentified 13",
+        "Tainted Gem",
+        "Unidentified 10"
         "Void Aura"
     ], 
     showLog=True, 
     showDebug=False,
     showChat=True,
     isScriptable=True,
-    followPlayer=None,
+    followPlayer="",
     slavesPlayer=[],
-    farmClass="Legion Revenant",
-    soloClass="Void HighLord")
+    # farmClass="Legion Revenant",
+    # soloClass="Void HighLord",
+    autoRelogin=True,
+    muteSpamWarning=True
+)
 b.set_login_info(username, password, server)
 
 bot_path = bot_path

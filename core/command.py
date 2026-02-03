@@ -901,38 +901,46 @@ class Command:
         Returns:
             bool: True when the skill can be used safely for the equipped class.
         """
+        
         conditions = {
             "void highlord": {
-                "hp_threshold": 50, # in percentage of current hp from max hp
+                "hp_threshold": 50, 
                 "skills_to_check": [1, 3],
-                "condition": lambda hp, threshold: hp < threshold
+                "condition": lambda hp, threshold: hp > threshold
             },
             "scarlet sorceress": {
                 "hp_threshold": 50,
                 "skills_to_check": [1, 4],
-                "condition": lambda hp, threshold: hp < threshold
+                "condition": lambda hp, threshold: hp > threshold
             },
             "dragon of time": {
                 "hp_threshold": 40,
                 "skills_to_check": [1, 3],
+                "condition": lambda hp, threshold: hp > threshold
+            },
+            "healer": {
+                "hp_threshold": 70,
+                "skills_to_check": [2],
                 "condition": lambda hp, threshold: hp < threshold
             },
             # "archpaladin": {
             #     "hp_threshold": 70,
             #     "skills_to_check": [2],
-            #     "condition": lambda hp, threshold: hp > threshold
+            #     "condition": lambda hp, threshold: hp < threshold
             # },
         }
-        # Get the class and its conditions
+
         equipped_class = self.bot.player.get_equipped_item(ItemType.CLASS)
+        
         if equipped_class:
-            if equipped_class.item_name in conditions:
-                condition = conditions[equipped_class.item_name]
-                current_hp = self.bot.player.CURRENT_HP
-                max_hp = self.bot.player.MAX_HP
-                # Check if the current conditions match
-                if skill in condition["skills_to_check"] and condition["condition"]((current_hp / max_hp) * 100, condition["hp_threshold"]):
-                    return False
+            class_name = equipped_class.item_name.lower()
+            
+            if class_name in conditions:
+                condition_data = conditions[class_name]
+                
+                if skill in condition_data["skills_to_check"]:
+                    current_hp_pct = (self.bot.player.CURRENT_HP / self.bot.player.MAX_HP) * 100
+                    return condition_data["condition"](current_hp_pct, condition_data["hp_threshold"])
         return True
 
     @check_alive

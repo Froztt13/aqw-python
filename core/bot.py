@@ -819,36 +819,53 @@ class Bot:
     def read_batch(self, conn):
         message_builder = ""
         complete_messages = []
-        last_received_time = time.time()
-        while True:
+
+        conn.settimeout(1.0)
+
+        while self.is_client_connected:
             try:
-                conn.settimeout(0.5)
-                buf = conn.recv(1024) 
+                buf = conn.recv(1024)
+
                 if not buf:
-                    print("Connection closed by the server.")
+                    print("Server closed connection (EOF)")
                     self.is_client_connected = False
                     break
-                message_builder += buf.decode('utf-8')
-                last_received_time = time.time()  # Update last activity
+
+                message_builder += buf.decode("utf-8")
+
                 if not message_builder.endswith("\x00"):
                     continue
+
                 messages = message_builder.split("\x00")
-                for i, msg in enumerate(messages):
+                message_builder = ""  # reset buffer
+
+                for msg in messages:
                     msg = msg.strip()
-                    if self.is_valid_json(msg):
+                    if not msg:
+                        continue
+                    if (
+                        self.is_valid_json(msg)
+                        or self.is_valid_xml(msg)
+                        or (msg.startswith("%") and msg.endswith("%"))
+                    ):
                         complete_messages.append(msg)
-                    elif self.is_valid_xml(msg):
-                        complete_messages.append(msg)
-                    elif msg.startswith("%") and msg.endswith("%"):
-                        complete_messages.append(msg)
+
                 if complete_messages:
                     return complete_messages
+
+            except socket.timeout:
+                return []
+
+            except ConnectionResetError:
+                print("Connection reset by peer")
+                self.is_client_connected = False
+                break
+
             except Exception as e:
-                return None
-            finally:
-                if self.is_client_connected == False and self.auto_relogin == False:
-                    raise Exception("Connection closed by the server.")
-        return complete_messages
+                print("Unexpected socket error:", e)
+                return []
+
+        return []
     
     def write_message(self, message):
         # print(f"[{datetime.now().strftime('%H:%M:%S')}] {message}")
