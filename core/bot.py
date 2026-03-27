@@ -198,58 +198,83 @@ class Bot:
             print(f"Error during restarting bot: {e}")
         
     async def connect_client(self):
-        hostname = self.server_info[0] 
-        port = self.server_info[1]
-        self.debug(hostname, port)
+        hostname, port = self.server_info
+        print(f"Connecting to {Fore.GREEN}{self.server.upper()}{Fore.RESET}...")
         host_ip = socket.gethostbyname(hostname)
-        print(f"Connecting to {Fore.BLUE + self.server.upper() + Fore.RESET} server...")
         self.client_socket = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-        self.client_socket.connect((host_ip, port))
-        self.is_client_connected = True
-
-    async def run_commands(self):    
-        if self.is_client_connected:
-            # self.print_commands()
-            print("Running bot commands...")
-        while self.is_client_connected:
-            if self.registered_auto_quest_ids and not self.is_register_quest_task_running:
-                self.run_register_quest_task()
-                self.is_register_quest_task_running = True
-            messages = self.read_batch(self.client_socket)
-            if messages:
-                for msg in messages:
-                    try:
-                        await self.handle_server_response(msg)
-                    except Exception as e:
-                        print(f"err: {e}")
-                    
-            # do wait if any,its different than cmdDelay
-            await asyncio.sleep(self.wait_ms)
-            self.wait_ms = 0
+        self.client_socket.settimeout(5.0) 
+        try:
+            self.client_socket.connect((host_ip, port))
+            self.write_message("<policy-file-request/>")
+            self.is_client_connected = True
+            print(f"{Fore.GREEN}Connected to {hostname}:{port}{Fore.RESET}")
+        except (socket.error, ConnectionRefusedError) as e:
+            self.is_client_connected = False
+            print(f"{Fore.RED}Connection failed: {e}{Fore.RESET}")
             
-            if self.player.ISDEAD:
-                self.debug(Fore.MAGENTA + "respawned" + Fore.WHITE)
-                self.write_message(f"%xt%zm%resPlayerTimed%{self.areaId}%{self.username_id}%")
-                self.jump_cell(self.player.CELL, self.player.PAD)
-                self.player.ISDEAD = False
-                self.player.MANA = 100
-                continue
-            # Execute a command
-            if self.is_char_load_complete:
-                if self.is_joining_map:
+    # Handling Sequential Commands bot mode
+    async def run_commands(self):    
+        if not self.is_client_connected:
+            print("Client not connected!")
+            return
+        
+        print("Running bot commands...")
+
+        while self.is_client_connected:
+            try:
+                messages = self.read_batch(self.client_socket)
+                
+                # Handle Server Request-Response
+                if messages:
+                    for msg in messages:
+                        try:
+                            await self.handle_server_response(msg)
+                        except Exception as e:
+                            print(f"Handle Response Error: {e}")
+                
+                # Auto Quest Task
+                if self.registered_auto_quest_ids and not self.is_register_quest_task_running:
+                    self.run_register_quest_task()
+                    self.is_register_quest_task_running = True
+
+                # Handle Death / Respawn
+                if self.player.ISDEAD:
+                    self.write_message(f"%xt%zm%resPlayerTimed%{self.areaId}%{self.username_id}%")
+                    self.jump_cell(self.player.CELL, self.player.PAD)
+                    self.player.ISDEAD = False
+                    self.player.MANA = 100
+                    await asyncio.sleep(0.5)
                     continue
-                if self.follow_player and self.followed_player_cell != self.player.CELL:
-                    await self.goto_player(self.follow_player)
-                    await asyncio.sleep(1)
-                    continue                
-                if self.index >= len(self.cmds):
-                    self.index = 0                
-                cmd = self.cmds[self.index]
-                await self.handle_command(cmd)
-                self.index += 1
+
+                # Command Execution Logic
+                if self.is_char_load_complete and not self.is_joining_map:
+                    if self.follow_player and self.followed_player_cell != self.player.CELL:
+                        await self.goto_player(self.follow_player)
+                        await asyncio.sleep(1)
+                        continue                
+                    
+                    if self.cmds:
+                        if self.index >= len(self.cmds):
+                            self.index = 0                
+                        
+                        cmd = self.cmds[self.index]
+                        await self.handle_command(cmd)
+                        self.index += 1
+
+                await asyncio.sleep(max(0.1, self.wait_ms / 1000))
+                self.wait_ms = 0
+                
+            except BlockingIOError:
+                await asyncio.sleep(0.1)
+            except (ConnectionResetError, BrokenPipeError):
+                print("Server closed the connection.")
+                self.is_client_connected = False
+                break
+            except Exception as e:
+                print(f"Loop Error: {e}")
+                
         print('BOT STOPPED\n')
         if self.auto_relogin:
-            print("relogin from run commands")
             await self.relogin_and_restart()
         
     def print_commands(self):
@@ -321,7 +346,7 @@ class Bot:
                         self.monsters.append(Monster(i_mon_branch))
                     for i_mon_def in mon_def:
                         for mon in self.monsters:
-                            if i_mon_def["MonID"] == mon.mon_id:
+                            if str(i_mon_def["MonID"]) == mon.mon_id:
                                 mon.mon_name = i_mon_def["strMonName"]
                     for i_mon_map in mon_map:
                         for mon in self.monsters:
@@ -684,7 +709,7 @@ class Bot:
                 self.player.removeAllAuras()
         elif self.is_valid_xml(msg):
             if ("<cross-domain-policy><allow-access-from domain='*'" in msg):
-                self.write_message(f"<msg t='sys'><body action='login' r='0'><login z='zone_master'><nick><![CDATA[SPIDER#0001~{self.player.USER}~3.012]]></nick><pword><![CDATA[{self.player.TOKEN}]]></pword></login></body></msg>")
+                self.write_message(f"<msg t='sys'><body action='login' r='0'><login z='zone_master'><nick><![CDATA[SPIDER#0001~{self.player.USER}~3.0141]]></nick><pword><![CDATA[{self.player.TOKEN}]]></pword></login></body></msg>")
             elif "joinOK" in msg:
                 self.extract_user_ids(msg)
             elif "userGone" in msg:

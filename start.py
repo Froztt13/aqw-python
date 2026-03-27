@@ -45,5 +45,7 @@ try:
     bot_class = importlib.import_module(bot_path)
     print(f"starting bot: {bot_path.split('.')[-1]}")
     asyncio.run(b.start_bot(bot_class.main))
+except KeyboardInterrupt:
+    print("\nBot stopped by user.")
 except ModuleNotFoundError as e:
-    print(f"Error: {e}")
+    print(f"\nError: {e}")

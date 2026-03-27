@@ -89,7 +89,7 @@ class Player:
         headers = {
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Safari/537.36',
             'Content-Type': 'application/x-www-form-urlencoded',
-            'ccid': self.CHARID,
+            'ccid': str(self.CHARID),
             'token': self.TOKEN,
             'artixmode': 'launcher',
             'X-Requested-With': 'ShockwaveFlash/32.0.0.371'
@@ -114,7 +114,7 @@ class Player:
         current_mana = self.MANA
         skillCost = skills["mp"]*self.ManaCost
         if current_mana < skillCost:
-            print(f"skill:{skillNumber} cost:{skillCost} current_mp:{current_mana}")
+            # print(f"skill:{skillNumber} cost:{skillCost} current_mp:{current_mana}")
             return False
         
         # Cooldown check 
