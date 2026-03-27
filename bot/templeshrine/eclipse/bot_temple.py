@@ -4,7 +4,7 @@ from bot.templeshrine.eclipse.core.core_eclipse import EclipseMasterBot, Eclipse
 from core.bot import Bot
 from colorama import Fore
 
-from core.commands import Command
+from core.command import Command
 
 # Requirement:
 # a lot of "Scroll of Enrage", minimal 50
@@ -16,6 +16,7 @@ from core.commands import Command
 
 server = "safiria"
 slaves = [
+    # LR, Arcana Concerto, Penitance
     SlaveConfig("username",
                 "password",
                 "Legion Revenant",
@@ -26,6 +27,7 @@ slaves = [
                 light_gather_taunter=False,
                 ),
 
+    # SC, Praxis, Absolution
     SlaveConfig("username",
                 "password",
                 "StoneCrusher",
@@ -37,6 +39,7 @@ slaves = [
                 debug_mon=True
                 ),
 
+    # AP, Valiance, Penitence
     SlaveConfig("username",
                 "password",
                 "ArchPaladin",
@@ -48,6 +51,7 @@ slaves = [
                 moon_haze_taunter=True,
                 ),
 
+    # LOO, Arcana Concerto, Absolution
     SlaveConfig("username",
                 "password",
                 "Lord of Order",
