@@ -350,7 +350,7 @@ class Bot:
                                 mon.mon_name = i_mon_def["strMonName"]
                     for i_mon_map in mon_map:
                         for mon in self.monsters:
-                            if i_mon_map["MonMapID"] == mon.mon_map_id:
+                            if str(i_mon_map["MonMapID"]) == mon.mon_map_id:
                                 mon.frame = i_mon_map["strFrame"]
             elif cmd == "initUserDatas":
                 try:
