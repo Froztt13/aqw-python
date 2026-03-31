@@ -233,7 +233,7 @@ async def get_dark_token(cmd: Command, qty: int = 100):
             break
 
         for q in [6248, 6249]:
-            if cmd.is_quest_not_in_progress(q):
+            if cmd.quest_not_in_progress(q):
                 await cmd.accept_quest(q)
             if cmd.can_turnin_quest(q):
                 await cmd.turn_in_quest(q)
@@ -262,7 +262,7 @@ async def get_leto_ssp(cmd: Command, qty: int = 4000):
         if cmd.is_in_inventory(item_name, qty, ">="):
             break
 
-        if cmd.is_quest_not_in_progress(5755):
+        if cmd.quest_not_in_progress(5755):
             await cmd.accept_quest(5755)
         if cmd.can_turnin_quest(5755):
             await cmd.turn_in_quest(5755)
