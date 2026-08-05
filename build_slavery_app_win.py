@@ -25,9 +25,10 @@ def main():
                 print(f"Warning: Could not clean {path}: {e}")
 
     # Build command for PyInstaller on Windows
-    # Windows uses ";" as path separator for --add-data instead of ":"
     cmd = [
-        "pyinstaller",
+        sys.executable,
+        "-m",
+        "PyInstaller",
         "--name=" + app_name,
         "--noconsole",
         "--noconfirm",
@@ -39,7 +40,7 @@ def main():
     ]
     
     print("Executing command: " + " ".join(cmd))
-    result = subprocess.run(cmd, shell=True)
+    result = subprocess.run(cmd)
     
     if result.returncode == 0:
         print("\n" + "="*50)

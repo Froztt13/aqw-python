@@ -309,8 +309,7 @@ def main():
 
     # Determine resources base directory
     if getattr(sys, 'frozen', False):
-        contents_dir = os.path.dirname(os.path.dirname(sys.executable))
-        web_dir = os.path.join(contents_dir, 'Resources', 'web')
+        web_dir = os.path.join(getattr(sys, '_MEIPASS', ''), 'web')
     else:
         web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web')
 

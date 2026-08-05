@@ -28,9 +28,8 @@ if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
 if getattr(sys, 'frozen', False):
-    contents_dir = os.path.dirname(os.path.dirname(sys.executable))
-    resources_dir = os.path.join(contents_dir, 'Resources')
-    if resources_dir not in sys.path:
+    resources_dir = getattr(sys, '_MEIPASS', None)
+    if resources_dir and resources_dir not in sys.path:
         sys.path.insert(0, resources_dir)
 
 from core.bot import Bot
@@ -331,8 +330,7 @@ def main():
     api = SlaveryApi()
     
     if getattr(sys, 'frozen', False):
-        contents_dir = os.path.dirname(os.path.dirname(sys.executable))
-        web_dir = os.path.join(contents_dir, 'Resources', 'web_slavery')
+        web_dir = os.path.join(getattr(sys, '_MEIPASS', ''), 'web_slavery')
     else:
         web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web_slavery')
 
