@@ -9,9 +9,17 @@ def main():
     app_name = "Slavery_Bot"
     entrypoint = "slavery_gui.py"
     
+    # Try to terminate any running instance of the app to avoid file lock issues
+    if sys.platform == "win32":
+        try:
+            subprocess.run(["taskkill", "/F", "/IM", f"{app_name}.exe"], stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except Exception:
+            pass
+
     # Clean output directories if they exist
     for path in [
         os.path.join("build", app_name),
+        os.path.join("dist", app_name),
         os.path.join("dist", f"{app_name}.exe")
     ]:
         if os.path.exists(path):
@@ -30,6 +38,7 @@ def main():
         "-m",
         "PyInstaller",
         "--name=" + app_name,
+        "--onefile",
         "--noconsole",
         "--noconfirm",
         "--clean",

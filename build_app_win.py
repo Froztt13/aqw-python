@@ -30,6 +30,7 @@ def main():
         "-m",
         "PyInstaller",
         "--name=" + app_name,
+        "--onefile",
         "--noconsole",
         "--noconfirm",
         "--clean",
