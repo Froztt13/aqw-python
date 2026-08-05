@@ -1,5 +1,29 @@
 import os
 import sys
+
+# Patch certifi path inside frozen app bundles before other imports
+if getattr(sys, 'frozen', False):
+    try:
+        import certifi
+        import certifi.core
+        def patched_where():
+            meipass_cacert = os.path.join(getattr(sys, '_MEIPASS', ''), 'certifi', 'cacert.pem')
+            if os.path.exists(meipass_cacert):
+                return meipass_cacert
+            resources_cacert = os.path.join(os.path.dirname(sys.executable), '..', 'Resources', 'certifi', 'cacert.pem')
+            if os.path.exists(resources_cacert):
+                return os.path.abspath(resources_cacert)
+            frameworks_cacert = os.path.join(os.path.dirname(sys.executable), '..', 'Frameworks', 'certifi', 'cacert.pem')
+            if os.path.exists(frameworks_cacert):
+                return os.path.abspath(frameworks_cacert)
+            return meipass_cacert
+        certifi.core.where = patched_where
+        certifi.where = patched_where
+        os.environ['SSL_CERT_FILE'] = patched_where()
+        os.environ['REQUESTS_CA_BUNDLE'] = patched_where()
+    except Exception as e:
+        print(f"Warning: certifi patch failed: {e}")
+
 import json
 import asyncio
 import threading

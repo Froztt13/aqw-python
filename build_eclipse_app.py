@@ -4,10 +4,10 @@ import os
 import shutil
 
 def main():
-    print("Building Slavery Bot macOS app bundle...")
+    print("Building Eclipse Bot macOS app bundle...")
     
-    app_name = "Slavery_Bot"
-    entrypoint = "slavery_gui.py"
+    app_name = "Eclipse_Bot"
+    entrypoint = "eclipse_gui.py"
     
     # Ensure specific build/dist outputs are clean without wiping other apps in dist/
     for path in [
@@ -31,9 +31,9 @@ def main():
         "--windowed",
         "--noconfirm",
         "--clean",
-        "--add-data=web_slavery:web_slavery",
+        "--add-data=web_eclipse:web_eclipse",
         "--add-data=bot:bot",
-        "--icon=slavery_app.icns",
+        "--icon=eclipse_app.icns",
         entrypoint
     ]
     

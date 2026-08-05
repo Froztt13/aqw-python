@@ -4,10 +4,10 @@ import os
 import shutil
 
 def main():
-    print("Building Slavery Bot Windows standalone executable...")
+    print("Building Eclipse Bot Windows standalone executable...")
     
-    app_name = "Slavery_Bot"
-    entrypoint = "slavery_gui.py"
+    app_name = "Eclipse_Bot"
+    entrypoint = "eclipse_gui.py"
     
     # Try to terminate any running instance of the app to avoid file lock issues
     if sys.platform == "win32":
@@ -42,9 +42,9 @@ def main():
         "--noconsole",
         "--noconfirm",
         "--clean",
-        "--add-data=web_slavery;web_slavery",
+        "--add-data=web_eclipse;web_eclipse",
         "--add-data=bot;bot",
-        "--icon=slavery_app.ico",
+        "--icon=eclipse_app.ico",
         entrypoint
     ]
     
