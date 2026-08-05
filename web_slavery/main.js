@@ -3,6 +3,7 @@ document.addEventListener('DOMContentLoaded', () => {
     let statusInterval = null;
     let activeConsoleTab = 'System';
     let slaveLogs = { 'System': [] };
+    let editingId = null;
 
     // Elements
     const btnStart = document.getElementById('btn-start-slaves');
@@ -133,6 +134,12 @@ document.addEventListener('DOMContentLoaded', () => {
     btnCancelAddSlave.addEventListener('click', () => {
         addSlaveForm.classList.add('hidden');
         clearAddFormInputs();
+        
+        // Reset edit states if any
+        editingId = null;
+        document.getElementById('add-slave-title').textContent = 'Add New Slave Account';
+        btnSaveNewSlave.textContent = 'Save Account';
+        slaveUsernameInput.disabled = false;
     });
 
     function clearAddFormInputs() {
@@ -228,11 +235,15 @@ document.addEventListener('DOMContentLoaded', () => {
         }
         
         if (confirm(`Are you sure you want to delete these ${chks.length} accounts?`)) {
-            const deleteUsernames = Array.from(chks).map(c => c.value);
-            globalConfig.slaves = globalConfig.slaves.filter(s => !deleteUsernames.includes(s.username));
+            const deleteIds = Array.from(chks).map(c => c.value);
+            globalConfig.slaves = globalConfig.slaves.filter(s => !deleteIds.includes(s.id));
             saveConfigurationLocal(true);
         }
     });
+
+    function generateUniqueId() {
+        return 'id_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).substring(4);
+    }
 
     btnSaveNewSlave.addEventListener('click', () => {
         const user = slaveUsernameInput.value.trim();
@@ -244,19 +255,58 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        if (globalConfig.slaves.some(s => s.username.toLowerCase() === user.toLowerCase())) {
-            alert('This slave account username already exists in registry.');
-            return;
-        }
+        if (editingId) {
+            // Edit Mode: check if username already exists in *other* accounts
+            if (globalConfig.slaves.some(s => s.id !== editingId && s.username.toLowerCase() === user.toLowerCase())) {
+                alert('This slave account username already exists in registry.');
+                return;
+            }
 
-        globalConfig.slaves.push({
-            username: user,
-            password: pass,
-            char_class: cls
-        });
+            const slaveIdx = globalConfig.slaves.findIndex(s => s.id === editingId);
+            if (slaveIdx !== -1) {
+                const oldUsername = globalConfig.slaves[slaveIdx].username;
+                
+                globalConfig.slaves[slaveIdx] = {
+                    id: editingId,
+                    username: user,
+                    password: pass,
+                    char_class: cls
+                };
+                
+                // If username changed, update keys in logs map
+                if (user !== oldUsername) {
+                    if (slaveLogs[oldUsername]) {
+                        slaveLogs[user] = slaveLogs[oldUsername];
+                        delete slaveLogs[oldUsername];
+                    }
+                    if (activeConsoleTab === oldUsername) {
+                        activeConsoleTab = user;
+                    }
+                }
+            }
+            
+            // Reset edit states
+            editingId = null;
+            document.getElementById('add-slave-title').textContent = 'Add New Slave Account';
+            btnSaveNewSlave.textContent = 'Save Account';
+        } else {
+            // Add Mode
+            if (globalConfig.slaves.some(s => s.username.toLowerCase() === user.toLowerCase())) {
+                alert('This slave account username already exists in registry.');
+                return;
+            }
 
-        if (!slaveLogs[user]) {
-            slaveLogs[user] = [];
+            const newId = generateUniqueId();
+            globalConfig.slaves.push({
+                id: newId,
+                username: user,
+                password: pass,
+                char_class: cls
+            });
+
+            if (!slaveLogs[user]) {
+                slaveLogs[user] = [];
+            }
         }
 
         saveConfigurationLocal(true);
@@ -287,9 +337,17 @@ document.addEventListener('DOMContentLoaded', () => {
             roomNumberInput.value = config.room_number || 9099;
             targetsInput.value = config.targets_priority || '';
             
+            // Backport unique IDs to existing accounts
+            const slaves = globalConfig.slaves || [];
+            slaves.forEach(s => {
+                if (!s.id) {
+                    s.id = generateUniqueId();
+                }
+            });
+
             // Pre-initialize logs objects
             if (!slaveLogs['System']) slaveLogs['System'] = [];
-            (config.slaves || []).forEach(s => {
+            slaves.forEach(s => {
                 if (!slaveLogs[s.username]) {
                     slaveLogs[s.username] = [];
                 }
@@ -313,41 +371,72 @@ document.addEventListener('DOMContentLoaded', () => {
 
         slaves.forEach(s => {
             const tr = document.createElement('tr');
-            tr.id = `slave-row-${s.username}`;
+            tr.setAttribute('data-username', s.username);
+            tr.id = `slave-row-${s.id}`;
             tr.innerHTML = `
-                <td><input type="checkbox" class="chk-slave" value="${s.username}"></td>
+                <td><input type="checkbox" class="chk-slave" value="${s.id}"></td>
                 <td><strong>${s.username}</strong></td>
                 <td><span class="text-muted">${s.char_class}</span></td>
                 <td class="col-map">-</td>
                 <td class="col-vitals">
                     <div class="vitals-progress-wrapper">
                         <div class="mini-vital-bar">
-                            <div class="mini-hp-fill" id="hp-bar-${s.username}"></div>
+                            <div class="mini-hp-fill" id="hp-bar-${s.id}"></div>
                         </div>
                         <div class="mini-vital-bar">
-                            <div class="mini-mp-fill" id="mp-bar-${s.username}"></div>
+                            <div class="mini-mp-fill" id="mp-bar-${s.id}"></div>
                         </div>
                         <div class="vital-labels-sm">
-                            <span id="hp-txt-${s.username}">0/0</span>
-                            <span id="mp-txt-${s.username}">0/0</span>
+                            <span id="hp-txt-${s.id}">0/0</span>
+                            <span id="mp-txt-${s.id}">0/0</span>
                         </div>
                     </div>
                 </td>
                 <td class="col-status"><span class="status-pill offline">Offline</span></td>
                 <td>
-                    <button class="btn btn-small btn-danger btn-delete-row" data-username="${s.username}">Delete</button>
+                    <select class="select-action" data-id="${s.id}">
+                        <option value="" disabled selected>Actions</option>
+                        <option value="edit">Edit</option>
+                        <option value="delete">Delete</option>
+                    </select>
                 </td>
             `;
             slaveTableBody.appendChild(tr);
         });
     }
 
-    slaveTableBody.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-delete-row')) {
-            const username = e.target.getAttribute('data-username');
-            if (confirm(`Delete account ${username}?`)) {
-                globalConfig.slaves = globalConfig.slaves.filter(s => s.username !== username);
-                saveConfigurationLocal(true);
+    slaveTableBody.addEventListener('change', (e) => {
+        if (e.target.classList.contains('select-action')) {
+            const action = e.target.value;
+            const id = e.target.getAttribute('data-id');
+            const slave = globalConfig.slaves.find(s => s.id === id);
+            
+            if (!slave) return;
+            
+            if (action === 'delete') {
+                if (confirm(`Delete account ${slave.username}?`)) {
+                    globalConfig.slaves = globalConfig.slaves.filter(s => s.id !== id);
+                    saveConfigurationLocal(true);
+                } else {
+                    e.target.value = "";
+                }
+            } else if (action === 'edit') {
+                // Open and set form in edit mode
+                editingId = id;
+                
+                slaveUsernameInput.value = slave.username;
+                slavePasswordInput.value = slave.password;
+                slaveClassInput.value = slave.char_class;
+                
+                document.getElementById('add-slave-title').textContent = 'Edit Slave Account';
+                btnSaveNewSlave.textContent = 'Update Account';
+                
+                slaveUsernameInput.disabled = false;
+                
+                addSlaveForm.classList.remove('hidden');
+                addSlaveForm.scrollIntoView({ behavior: 'smooth' });
+                
+                e.target.value = "";
             }
         }
     });
@@ -406,8 +495,8 @@ document.addEventListener('DOMContentLoaded', () => {
         const slaveChks = slaveTableBody.querySelectorAll('.chk-slave');
         slaveChks.forEach(c => c.disabled = isRunning);
 
-        const deleteRowBtns = slaveTableBody.querySelectorAll('.btn-delete-row');
-        deleteRowBtns.forEach(btn => btn.disabled = isRunning);
+        const actionSelects = slaveTableBody.querySelectorAll('.select-action');
+        actionSelects.forEach(sel => sel.disabled = isRunning);
         
         if (isRunning) {
             addSlaveForm.classList.add('hidden');
@@ -430,7 +519,11 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        const selectedUsernames = Array.from(checkedChks).map(c => c.value);
+        const selectedIds = Array.from(checkedChks).map(c => c.value);
+        const selectedUsernames = selectedIds.map(id => {
+            const s = globalConfig.slaves.find(s => s.id === id);
+            return s ? s.username : null;
+        }).filter(u => u !== null);
         
         btnStart.disabled = true;
         btnStart.textContent = 'Launching...';
@@ -518,16 +611,20 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     function updateRowStatus(username, status) {
-        const row = document.getElementById(`slave-row-${username}`);
+        const row = document.querySelector(`.slave-table tbody tr[data-username="${username}"]`);
         if (!row) return;
 
         const colMap = row.querySelector('.col-map');
         const colStatus = row.querySelector('.col-status');
         
-        const hpBar = document.getElementById(`hp-bar-${username}`);
-        const mpBar = document.getElementById(`mp-bar-${username}`);
-        const hpTxt = document.getElementById(`hp-txt-${username}`);
-        const mpTxt = document.getElementById(`mp-txt-${username}`);
+        const slave = globalConfig.slaves.find(s => s.username === username);
+        if (!slave) return;
+        const id = slave.id;
+
+        const hpBar = document.getElementById(`hp-bar-${id}`);
+        const mpBar = document.getElementById(`mp-bar-${id}`);
+        const hpTxt = document.getElementById(`hp-txt-${id}`);
+        const mpTxt = document.getElementById(`mp-txt-${id}`);
 
         if (!status || !status.running) {
             colMap.textContent = '-';

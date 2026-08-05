@@ -9,12 +9,15 @@ def main():
     app_name = "AQW_Bot"
     entrypoint = "gui.py"
     
-    # Ensure build and dist directories are clean
-    for path in ["build", "dist"]:
+    # Ensure specific build/dist outputs are clean without wiping other apps in dist/
+    for path in [
+        os.path.join("build", app_name),
+        os.path.join("dist", f"{app_name}.app")
+    ]:
         if os.path.exists(path):
             try:
                 shutil.rmtree(path)
-                print(f"Cleaned existing {path} directory.")
+                print(f"Cleaned existing {path}.")
             except Exception as e:
                 print(f"Warning: Could not clean {path}: {e}")
 
@@ -28,6 +31,7 @@ def main():
         "--noconfirm",
         "--clean",
         "--add-data=web:web",
+        "--icon=app.icns",
         entrypoint
     ]
     

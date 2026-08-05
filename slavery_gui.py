@@ -27,6 +27,12 @@ project_root = get_project_root()
 if project_root not in sys.path:
     sys.path.insert(0, project_root)
 
+if getattr(sys, 'frozen', False):
+    contents_dir = os.path.dirname(os.path.dirname(sys.executable))
+    resources_dir = os.path.join(contents_dir, 'Resources')
+    if resources_dir not in sys.path:
+        sys.path.insert(0, resources_dir)
+
 from core.bot import Bot
 
 # ANSI color helper
@@ -166,7 +172,12 @@ def start_local_server(web_dir):
 class SlaveryApi:
     def __init__(self):
         self.window = None
-        self.config_path = os.path.join(get_project_root(), "slavery_config.json")
+        if getattr(sys, 'frozen', False):
+            config_dir = os.path.expanduser("~/.aqw_bot")
+            os.makedirs(config_dir, exist_ok=True)
+            self.config_path = os.path.join(config_dir, "slavery_config.json")
+        else:
+            self.config_path = os.path.join(get_project_root(), "slavery_config.json")
         self.active_threads = {} # username -> SlaveBotThread
         global_redirector_out.default_callback = lambda msg: self.handle_slave_log("System", msg)
         global_redirector_err.default_callback = lambda msg: self.handle_slave_log("System", msg)
@@ -341,7 +352,7 @@ def main():
         print("[System] GUI loaded and ready")
 
     window.events.loaded += on_loaded
-    webview.start(debug=True)
+    webview.start(debug=False)
 
 if __name__ == '__main__':
     main()

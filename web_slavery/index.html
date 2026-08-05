@@ -55,7 +55,7 @@
                     
                     <!-- Add account inline form -->
                     <div class="inline-form hidden" id="add-slave-form">
-                        <h3>Add New Slave Account</h3>
+                        <h3 id="add-slave-title">Add New Slave Account</h3>
                         <div class="form-row">
                             <div class="form-group">
                                 <label for="slave-username">Username</label>
@@ -104,7 +104,10 @@
             <!-- Right Side: Global Configuration -->
             <section class="panel-column span-2">
                 <div class="card glass-card fill-height scrollable-panel">
-                    <h2>Global Slavery Settings</h2>
+                    <div class="settings-header-wrapper" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px dashed rgba(255, 255, 255, 0.08); padding-bottom: 12px;">
+                        <h2 style="margin: 0; font-size: 1.2rem;">Global Slavery Settings</h2>
+                        <button class="btn btn-small btn-success" id="btn-save-settings">Save Settings</button>
+                    </div>
                     
                     <div class="form-group">
                         <label for="input-follow-player">Master Player Name</label>
@@ -165,10 +168,6 @@
                             <input type="text" id="input-new-map" placeholder="Add custom map...">
                             <button class="btn btn-primary" id="btn-add-map">Add</button>
                         </div>
-                    </div>
-
-                    <div class="settings-actions">
-                        <button class="btn btn-primary btn-block" id="btn-save-settings">Save Global Settings</button>
                     </div>
                 </div>
             </section>

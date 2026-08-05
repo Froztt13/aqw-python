@@ -32,6 +32,8 @@ def main():
         "--noconfirm",
         "--clean",
         "--add-data=web_slavery:web_slavery",
+        "--add-data=bot:bot",
+        "--icon=app.icns",
         entrypoint
     ]
     
