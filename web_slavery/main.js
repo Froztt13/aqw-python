@@ -657,4 +657,19 @@ document.addEventListener('DOMContentLoaded', () => {
             mpTxt.textContent = `${status.mp}/${status.max_mp}`;
         }
     }
+
+    // Dynamic Versioning check
+    window.addEventListener('pywebviewready', async () => {
+        try {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.get_version) {
+                const version = await window.pywebview.api.get_version();
+                const verEl = document.getElementById('app-version');
+                if (verEl && version) {
+                    verEl.textContent = version;
+                }
+            }
+        } catch (err) {
+            console.log("Could not fetch version:", err);
+        }
+    });
 });

@@ -168,6 +168,8 @@ def start_local_server(web_dir):
     t.start()
     return f"http://127.0.0.1:{port}"
 
+APP_VERSION = "v1.0.0"
+
 class SlaveryApi:
     def __init__(self):
         self.window = None
@@ -283,6 +285,9 @@ class SlaveryApi:
         self.active_threads.clear()
         return {"success": True}
 
+    def get_version(self):
+        return APP_VERSION
+
     def get_status(self):
         statuses = {}
         for username, thread in list(self.active_threads.items()):
@@ -338,7 +343,7 @@ def main():
     url = start_local_server(web_dir)
     
     window = webview.create_window(
-        'AQW Slavery Bot Multi-Client Manager',
+        f'AQW Maid Slavery {APP_VERSION}',
         url,
         js_api=api,
         width=1200,
