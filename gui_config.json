@@ -1,0 +1,25 @@
+{
+    "username": "",
+    "password": "",
+    "server": "Alteon",
+    "room_number": 1,
+    "bot_path": "bot.nulgath.larvae",
+    "bot_display_name": "larvae.py",
+    "bot_abs_path": "/Users/d/Documents/Python/aqw-python/bot/nulgath/larvae.py",
+    "bot_external": false,
+    "bot_parent_dir": "",
+    "selected_script": {
+        "display_name": "larvae.py",
+        "path": "bot.nulgath.larvae",
+        "abs_path": "/Users/d/Documents/Python/aqw-python/bot/nulgath/larvae.py",
+        "external": false,
+        "parent_dir": ""
+    },
+    "farm_class": "",
+    "solo_class": "",
+    "whitelist": [],
+    "auto_relogin": true,
+    "anti_mod": true,
+    "mute_spam": true,
+    "show_chat": true
+}

@@ -158,10 +158,17 @@ class Bot:
     def run_aggro_hadler_task(self):
         asyncio.create_task(aggro_handler_task(self))
     
-    def stop_bot(self):
+    def stop_bot(self, user_triggered=False):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] Stopping bot...")
-        self.client_socket.close()
+        if user_triggered:
+            self.auto_relogin = False
+        if self.client_socket:
+            try:
+                self.client_socket.close()
+            except Exception as e:
+                print(f"Error closing socket: {e}")
         self.is_client_connected = False
+        print(f"[{datetime.now().strftime('%H:%M:%S')}] Bot stopped")
 
     def debug(self, *args):
         if not self.showDebug:

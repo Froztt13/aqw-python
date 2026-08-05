@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQW Slavery Bot Panel</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Header Bar -->
+        <header class="app-header">
+            <div class="brand">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="brand-logo">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"></path>
+                    <circle cx="9" cy="7" r="4"></circle>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"></path>
+                    <path d="M16 3.13a4 4 0 0 1 0 7.75"></path>
+                </svg>
+                <div class="brand-text">
+                    <h1>Slavery Multi-Client Control Panel</h1>
+                    <p>Simultaneously control and track multiple follower accounts</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <button class="btn btn-success" id="btn-start-slaves">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    Start Selected Slaves
+                </button>
+                <button class="btn btn-danger hidden" id="btn-stop-slaves">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                        <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
+                    </svg>
+                    Stop All Slaves
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Body -->
+        <main class="app-body">
+            
+            <!-- Left Side: Slaves Accounts Manager -->
+            <section class="panel-column span-3">
+                <div class="card glass-card fill-height">
+                    <div class="card-header">
+                        <h2>Slave Bots Registry</h2>
+                        <button class="btn btn-small btn-primary" id="btn-toggle-add-form">
+                            + Add Account
+                        </button>
+                    </div>
+                    
+                    <!-- Add account inline form -->
+                    <div class="inline-form hidden" id="add-slave-form">
+                        <h3>Add New Slave Account</h3>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="slave-username">Username</label>
+                                <input type="text" id="slave-username" placeholder="Username">
+                            </div>
+                            <div class="form-group">
+                                <label for="slave-password">Password</label>
+                                <input type="password" id="slave-password" placeholder="Password">
+                            </div>
+                            <div class="form-group">
+                                <label for="slave-class">Class</label>
+                                <input type="text" id="slave-class" placeholder="e.g. ArchPaladin">
+                            </div>
+                        </div>
+                        <div class="form-actions">
+                            <button class="btn btn-small btn-success" id="btn-save-new-slave">Save Account</button>
+                            <button class="btn btn-small btn-secondary" id="btn-cancel-add-slave">Cancel</button>
+                        </div>
+                    </div>
+
+                    <!-- Slave Accounts Table -->
+                    <div class="table-container">
+                        <table class="slave-table" id="slave-table">
+                            <thead>
+                                <tr>
+                                    <th width="40"><input type="checkbox" id="chk-select-all"></th>
+                                    <th>Username</th>
+                                    <th>Class</th>
+                                    <th>Map / Position</th>
+                                    <th>Vitals (HP/MP)</th>
+                                    <th>Status</th>
+                                    <th width="60">Action</th>
+                                </tr>
+                            </thead>
+                            <tbody id="slave-table-body">
+                                <!-- Populated dynamically -->
+                            </tbody>
+                        </table>
+                    </div>
+                    <div class="table-actions">
+                        <button class="btn btn-small btn-danger" id="btn-delete-selected">Delete Selected</button>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Right Side: Global Configuration -->
+            <section class="panel-column span-2">
+                <div class="card glass-card fill-height scrollable-panel">
+                    <h2>Global Slavery Settings</h2>
+                    
+                    <div class="form-group">
+                        <label for="input-follow-player">Master Player Name</label>
+                        <input type="text" id="input-follow-player" placeholder="e.g. MasterAccount">
+                        <span class="help-text">The username of the player that all slaves will follow.</span>
+                    </div>
+
+                    <div class="form-row">
+                        <div class="form-group">
+                            <label for="select-server">Server</label>
+                            <select id="select-server">
+                                <option value="Twilly">Twilly</option>
+                                <option value="Twig">Twig</option>
+                                <option value="Artix">Artix</option>
+                                <option value="Sepulchure">Sepulchure</option>
+                                <option value="Gravelyn">Gravelyn</option>
+                                <option value="Safiria">Safiria</option>
+                                <option value="Sir Ver">Sir Ver</option>
+                                <option value="Swordhaven (EU)">Swordhaven (EU)</option>
+                                <option value="Galanoth">Galanoth</option>
+                                <option value="Alteon">Alteon</option>
+                                <option value="Yorumi">Yorumi</option>
+                                <option value="Yokai (SEA)">Yokai (SEA)</option>
+                                <option value="Espada">Espada</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label for="input-room-number">Room Number</label>
+                            <input type="number" id="input-room-number" value="9099">
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="input-targets-priority">Combat Priority List</label>
+                        <input type="text" id="input-targets-priority" placeholder="Comma-separated monster names">
+                    </div>
+
+                    <!-- Whitelist Section -->
+                    <div class="form-group">
+                        <label>Item Drop Whitelist</label>
+                        <div class="tag-input-container">
+                            <input type="text" id="input-new-tag" placeholder="Add drop item...">
+                            <button class="btn btn-primary" id="btn-add-tag">Add</button>
+                        </div>
+                        <div class="tags-container" id="whitelist-tags">
+                            <!-- Populated dynamically -->
+                        </div>
+                    </div>
+
+                    <!-- Locked Zones Checklist -->
+                    <div class="form-group">
+                        <label>Locked Zones Map Patrol</label>
+                        <span class="help-text">Maps check path if master is in locked zone:</span>
+                        <div class="checklist-container" id="locked-zones-list">
+                            <!-- Populated dynamically with checklist items -->
+                        </div>
+                        <div class="tag-input-container margin-top-sm">
+                            <input type="text" id="input-new-map" placeholder="Add custom map...">
+                            <button class="btn btn-primary" id="btn-add-map">Add</button>
+                        </div>
+                    </div>
+
+                    <div class="settings-actions">
+                        <button class="btn btn-primary btn-block" id="btn-save-settings">Save Global Settings</button>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+        <!-- Bottom Console Console -->
+        <footer class="app-console">
+            <div class="console-tabs-bar">
+                <div class="tabs-list" id="console-tabs-list">
+                    <button class="console-tab active" data-source="System">System</button>
+                </div>
+                <div class="console-actions">
+                    <div class="console-checkbox-wrapper">
+                        <input type="checkbox" id="chk-auto-scroll" checked>
+                        <label for="chk-auto-scroll">Auto-Scroll</label>
+                    </div>
+                    <button class="btn btn-small btn-secondary" id="btn-clear-logs">Clear Logs</button>
+                </div>
+            </div>
+            <div class="console-viewport" id="console-viewport">
+                <!-- Log streams appear here -->
+            </div>
+        </footer>
+    </div>
+    <script src="main.js"></script>
+</body>
+</html>

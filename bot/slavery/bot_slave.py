@@ -10,7 +10,7 @@ class Slave:
         self.password = password
         self.char_class = char_class
 
-server = "Alteon"
+server = "Gravelyn"
 default_room_number = 9099  # For checking Master account is in locked zone map
 targets_priority = "Defense Drone,Staff of Inversion"
 slaves = [
@@ -29,6 +29,11 @@ async def main(cmd: Command):
     global checking_locked_zone
     skills = [0,1,2,0,3,4]
     skill_index = 0
+    
+    # Resolve dynamic properties if injected via GUI, otherwise fallback to script globals
+    f_player = getattr(cmd.bot, "follow_player", None) or (follow_player if 'follow_player' in globals() else "")
+    room_num = getattr(cmd.bot, "default_room_number", None) or default_room_number
+    targets = getattr(cmd.bot, "targets_priority", None) or targets_priority
     
     await cmd.equip_item(cmd.get_farm_class())
     await cmd.sleep(500)
@@ -61,26 +66,31 @@ async def main(cmd: Command):
     async def goto_master():
         global checking_locked_zone
         print(f"goto master...")
-        await cmd.goto_player(follow_player)
+        await cmd.goto_player(f_player)
         await cmd.sleep(200)
-        if cmd.get_player_in_map(follow_player):
+        if cmd.get_player_in_map(f_player):
             checking_locked_zone = False
     
     async def checking_map():
         global checking_locked_zone
-        map_to_check = [
-            "ultraengineer",
-            "doomvaultb",
-            "championdrakath",
-            "tercessuinotlim",
-            "icestormunder"
-        ]
+        map_to_check = getattr(cmd.bot, "locked_zones", None)
+        if not map_to_check:
+            map_to_check = [
+                "ultraezrajal",
+                "ultrawarden",
+                "ultraengineer",
+                "doomvault",
+                "doomvaultb",
+                "championdrakath",
+                "tercessuinotlim",
+                "icestormunder",
+            ]
         for map_name in map_to_check:
             print(f"checking {map_name}...")
-            await cmd.join_map(map_name, roomNumber=default_room_number)
+            await cmd.join_map(map_name, roomNumber=room_num)
             while cmd.is_not_in_map(map_name):
                 await cmd.sleep(100)
-            if cmd.get_player_in_map(follow_player):
+            if cmd.get_player_in_map(f_player):
                 print(f"stopped at {map_name}...")
                 checking_locked_zone = False
                 await cmd.sleep(1000)
@@ -97,7 +107,7 @@ async def main(cmd: Command):
             print(f"checking locked zone...")
             await checking_map()
         
-        master = cmd.get_player_in_map(follow_player)
+        master = cmd.get_player_in_map(f_player)
         check_master_in_cell = master and master.str_frame == cmd.get_player().CELL
         
         if not check_master_in_cell and not checking_locked_zone:
@@ -112,7 +122,7 @@ async def main(cmd: Command):
         
         await cmd.use_skill(
             index=skills[skill_index],
-            target_monsters=targets_priority,
+            target_monsters=targets,
             skill_mode=skill_mode
             )
         

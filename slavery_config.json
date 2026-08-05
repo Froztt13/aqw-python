@@ -1,0 +1,37 @@
+{
+    "server": "Alteon",
+    "room_number": 9099,
+    "follow_player": "Remake",
+    "targets_priority": "Defense Drone,Staff of Inversion",
+    "whitelist": [
+        "Treasure Chest",
+        "Void Aura"
+    ],
+    "locked_zones": [
+        "ultraezrajal",
+        "ultrawarden",
+        "ultraengineer",
+        "doomvault",
+        "doomvaultb",
+        "championdrakath",
+        "tercessuinotlim",
+        "icestormunder"
+    ],
+    "slaves": [
+        {
+            "username": "u",
+            "password": "pass",
+            "char_class": "Lord of Order"
+        },
+        {
+            "username": "u",
+            "password": "pass",
+            "char_class": "Legion Revenant"
+        },
+        {
+            "username": "u",
+            "password": "pass",
+            "char_class": "Legion Revenant"
+        }
+    ]
+}
