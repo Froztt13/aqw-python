@@ -8,16 +8,29 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
 <body>
+    <!-- Password Protection Overlay -->
+    <div id="password-screen" class="password-screen">
+        <div class="password-card">
+            <div class="lock-icon" id="password-lock-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+            </div>
+            <h2>Authentication Required</h2>
+            <p>Please enter the password to access Maid Eclipse.</p>
+            <form id="password-form" class="password-input-row" onsubmit="event.preventDefault();">
+                <input type="password" id="app-access-password" placeholder="Enter password..." required autofocus>
+                <button type="submit" id="btn-submit-password">Unlock</button>
+            </form>
+            <div id="password-error" class="password-error hidden">Incorrect password. Please try again.</div>
+        </div>
+    </div>
+
     <div class="app-container">
         
         <!-- Header Bar -->
         <header class="app-header">
             <div class="brand">
                 <div class="brand-logo-wrapper">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="brand-logo">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M12 2a7 7 0 1 0 10 10"></path>
-                    </svg>
+                    <img src="app_icon.png" class="brand-logo" alt="Astolfo Logo" style="width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4));">
                 </div>
                 <div class="brand-text">
                     <div class="title-row">

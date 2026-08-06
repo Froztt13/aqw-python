@@ -218,6 +218,12 @@ class EclipseApi:
     def set_window(self, window):
         self.window = window
 
+    def validate_password(self, password):
+        import hashlib
+        target_hash = "a919ac0a401b1b9863c9bcbae2becbc52c5d518c1b95c06b4e35460697f31c27"
+        input_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
+        return {"valid": input_hash == target_hash}
+
     def handle_slave_log(self, username, message):
         html_msg = ansi_to_html(message)
         if self.window:

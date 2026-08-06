@@ -635,7 +635,6 @@ function handleDisconnectMonitoring(statuses) {
             // Re-start status polling loop to update the countdown
             startTelemetryPolling();
         });
-        });
     }
 }
 
@@ -653,6 +652,65 @@ document.addEventListener("DOMContentLoaded", () => {
         });
         infoBubble.addEventListener("click", (e) => {
             e.stopPropagation();
+        });
+    }
+});
+
+// Password Validation Handler
+document.addEventListener("DOMContentLoaded", () => {
+    const passwordForm = document.getElementById("password-form");
+    const passwordInput = document.getElementById("app-access-password");
+    const passwordScreen = document.getElementById("password-screen");
+    const passwordError = document.getElementById("password-error");
+    const passwordLockIcon = document.getElementById("password-lock-icon");
+
+    const defaultIconHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
+    const errorIconHTML = `<img src="error_astolfo.jpg" alt="Wrong Password" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+
+    if (passwordForm && passwordInput && passwordScreen && passwordError) {
+        // Focus the input initially
+        setTimeout(() => passwordInput.focus(), 100);
+
+        // Revert icon and hide error when typing starts
+        passwordInput.addEventListener("input", () => {
+            passwordError.classList.add("hidden");
+            if (passwordLockIcon) {
+                passwordLockIcon.innerHTML = defaultIconHTML;
+                passwordLockIcon.style.borderColor = "rgba(147, 51, 234, 0.2)";
+                passwordLockIcon.style.background = "rgba(147, 51, 234, 0.1)";
+            }
+        });
+
+        const performCheck = (password) => {
+            if (window.pywebview && window.pywebview.api && window.pywebview.api.validate_password) {
+                window.pywebview.api.validate_password(password).then((res) => {
+                    if (res && res.valid) {
+                        passwordScreen.classList.add("hidden");
+                    } else {
+                        passwordError.classList.remove("hidden");
+                        passwordInput.value = "";
+                        passwordInput.focus();
+                        if (passwordLockIcon) {
+                            passwordLockIcon.innerHTML = errorIconHTML;
+                            passwordLockIcon.style.borderColor = "var(--danger-color)";
+                            passwordLockIcon.style.background = "rgba(239, 68, 68, 0.1)";
+                        }
+                    }
+                }).catch((err) => {
+                    console.error("Error validating password:", err);
+                    alert("An error occurred during verification.");
+                });
+            } else {
+                // If api not ready yet, wait for pywebviewready event and try again
+                window.addEventListener("pywebviewready", () => {
+                    performCheck(password);
+                }, { once: true });
+            }
+        };
+
+        passwordForm.addEventListener("submit", (e) => {
+            e.preventDefault();
+            performCheck(passwordInput.value);
         });
     }
 });

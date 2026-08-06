@@ -33,7 +33,7 @@ def main():
         "--clean",
         "--add-data=web_eclipse:web_eclipse",
         "--add-data=bot:bot",
-        "--icon=eclipse_app.icns",
+        "--icon=temple_app.icns",
         entrypoint
     ]
     

@@ -44,7 +44,7 @@ def main():
         "--clean",
         "--add-data=web_eclipse;web_eclipse",
         "--add-data=bot;bot",
-        "--icon=eclipse_app.ico",
+        "--icon=temple_app.ico",
         entrypoint
     ]
     
