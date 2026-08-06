@@ -125,6 +125,14 @@
                         <span class="help-text">The username of the player that all slaves will follow.</span>
                     </div>
 
+                    <div class="form-group" style="margin-bottom: 20px;">
+                        <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
+                            <input type="checkbox" id="input-copy-walk" style="accent-color: var(--primary-color); cursor: pointer; width: 16px; height: 16px;">
+                            <label for="input-copy-walk" style="margin: 0; cursor: pointer; user-select: none; font-weight: 500;">Enable Copy Walk</label>
+                        </div>
+                        <span class="help-text">Directly mirror the master's cell jumps and cell movements.</span>
+                    </div>
+
                     <div class="form-row">
                         <div class="form-group">
                             <label for="select-server">Server</label>
@@ -148,6 +156,19 @@
                             <label for="input-room-number">Room Number</label>
                             <input type="number" id="input-room-number" value="9099">
                         </div>
+                    </div>
+                    
+                    <div class="form-group">
+                        <label for="select-auto-zone">Auto Zone Boss Mechanic</label>
+                        <select id="select-auto-zone">
+                            <option value="none">None</option>
+                            <option value="Astral Empyrean">Astral Empyrean</option>
+                            <option value="Dark Carnax">Dark Carnax</option>
+                            <option value="Ultra Dage">Ultra Dage</option>
+                            <option value="Queen Iona">Queen Iona</option>
+                            <option value="Vordred">Vordred</option>
+                        </select>
+                        <span class="help-text">Automatically reposition the player to safe zones during the selected boss fight.</span>
                     </div>
 
                     <div class="form-group">

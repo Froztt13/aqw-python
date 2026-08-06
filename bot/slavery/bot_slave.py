@@ -1,5 +1,6 @@
 import json
 import sys
+import asyncio
 from core.bot import Bot
 from core.command import Command, SkillMode
 from core.utils import is_valid_json
@@ -35,6 +36,9 @@ async def main(cmd: Command):
     room_num = getattr(cmd.bot, "default_room_number", None) or default_room_number
     targets = getattr(cmd.bot, "targets_priority", None) or targets_priority
     
+    copy_walk = getattr(cmd.bot, "copy_walk", True)
+    auto_zone = getattr(cmd.bot, "auto_zone", "none")
+    
     await cmd.equip_item(cmd.get_farm_class())
     await cmd.sleep(500)
     
@@ -46,14 +50,102 @@ async def main(cmd: Command):
             if "locked zone" in message.lower():
                 checking_locked_zone = True
                 
+            parts = message.split("%")
+            if len(parts) > 5 and parts[2] == "uotls":
+                try:
+                    curr_username = parts[4].lower()
+                    # print(f"[{cmd.bot.username}] uotls packet from '{curr_username}'. target='{f_player.lower() if f_player else ''}', copy_walk={copy_walk}, loading={cmd.bot.is_joining_map}")
+                    if f_player and curr_username == f_player.lower() and not cmd.bot.is_joining_map and copy_walk:
+                        movement = parts[5]
+                        cell = None
+                        pad = None
+                        x = None
+                        y = None
+                        for m in movement.split(','):
+                            m_parts = m.split(':')
+                            if len(m_parts) == 2:
+                                if m_parts[0] == "strFrame":
+                                    cell = m_parts[1]
+                                elif m_parts[0] == "strPad":
+                                    pad = m_parts[1]
+                                elif m_parts[0] == "tx":
+                                    x = float(m_parts[1])
+                                elif m_parts[0] == "ty":
+                                    y = float(m_parts[1])
+                        
+                        if cell is not None and cell.lower() != cmd.bot.player.CELL.lower():
+                            target_pad = pad if pad is not None else "Left"
+                            asyncio.create_task(cmd.jump_cell(cell, target_pad))
+                        elif x is not None and y is not None and (x != 0 or y != 0):
+                            asyncio.create_task(cmd.walk_to(int(x), int(y)))
+                except Exception as e:
+                    print(f"Error handling uotls: {e}")
+                
         if is_valid_json(message):
             try:
                 data = json.loads(message)["b"]["o"]
                 cmdData = data["cmd"]
 
                 if cmdData == "pi":
-                    # handle party invitation here
-                    pass
+                    pid = data.get("pid") or data.get("owner")
+                    if pid:
+                        cmd.bot.write_message(f"%xt%zm%gp%1%pa%{pid}%")
+
+                if cmdData == "event":
+                    args = data.get("args")
+                    print(f"[{cmd.bot.username}] Event packet. auto_zone='{auto_zone}', args={args}")
+                    if args and "zoneSet" in args:
+                        zone = args["zoneSet"]
+                        if auto_zone == "Astral Empyrean":
+                            if zone == "A":
+                                asyncio.create_task(cmd.walk_to(708, 447))
+                            elif zone == "B":
+                                asyncio.create_task(cmd.walk_to(287, 191))
+                            else:
+                                asyncio.create_task(cmd.walk_to(461, 329))
+                        elif auto_zone == "Dark Carnax":
+                            if zone == "A":
+                                asyncio.create_task(cmd.walk_to(860, 400))
+                            elif zone == "B":
+                                asyncio.create_task(cmd.walk_to(49, 400))
+                            else:
+                                asyncio.create_task(cmd.walk_to(426, 372))
+                        elif auto_zone == "Ultra Dage":
+                            if zone == "A":
+                                asyncio.create_task(cmd.walk_to(107, 400))
+                            elif zone == "B":
+                                asyncio.create_task(cmd.walk_to(843, 400))
+                            else:
+                                asyncio.create_task(cmd.walk_to(503, 276))
+                        elif auto_zone == "Queen Iona":
+                            async def handle_iona(zone_val):
+                                await asyncio.sleep(0.5)
+                                player = cmd.get_player()
+                                pos_charge = player.hasAura("Positive Charge")
+                                pos_charge_rev = player.hasAura("Positive Charge?")
+                                neg_charge = player.hasAura("Negative Charge")
+                                neg_charge_rev = player.hasAura("Negative Charge?")
+                                
+                                if zone_val == "A":
+                                    if pos_charge or neg_charge_rev:
+                                        await cmd.walk_to(679, 339)
+                                    elif neg_charge or pos_charge_rev:
+                                        await cmd.walk_to(272, 379)
+                                elif zone_val == "B":
+                                    if pos_charge or neg_charge_rev:
+                                        await cmd.walk_to(272, 379)
+                                    elif neg_charge or pos_charge_rev:
+                                        await cmd.walk_to(679, 339)
+                                else:
+                                    await cmd.walk_to(490, 320)
+                            asyncio.create_task(handle_iona(zone))
+                        elif auto_zone == "Vordred":
+                            if zone == "A":
+                                asyncio.create_task(cmd.walk_to(731, 461))
+                            elif zone == "B":
+                                asyncio.create_task(cmd.walk_to(700, 321))
+                            else:
+                                asyncio.create_task(cmd.walk_to(748, 372))
 
                 if cmdData == "ct":
                     pass

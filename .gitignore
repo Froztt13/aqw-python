@@ -163,3 +163,5 @@ cython_debug/
 #.idea/
 
 .DS_Store
+bot/templeshrine/eclipse/bot_temple_me.py
+bot/templeshrine/temple/bot_temple_me.py

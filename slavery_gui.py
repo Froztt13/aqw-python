@@ -154,6 +154,8 @@ class SlaveBotThread(threading.Thread):
             self.bot_instance.default_room_number = int(self.config.get("room_number", 9099))
             self.bot_instance.targets_priority = self.config.get("targets_priority", "Defense Drone,Staff of Inversion")
             self.bot_instance.locked_zones = self.config.get("locked_zones", [])
+            self.bot_instance.copy_walk = self.config.get("copy_walk", True)
+            self.bot_instance.auto_zone = self.config.get("auto_zone", "none")
             
             bot_module = importlib.import_module("bot.slavery.bot_slave")
             
@@ -225,6 +227,8 @@ class SlaveryApi:
             "server": "Artix",
             "room_number": 9099,
             "follow_player": "",
+            "copy_walk": True,
+            "auto_zone": "none",
             "targets_priority": "Defense Drone,Staff of Inversion",
             "whitelist": [
                 "Treasure Chest",

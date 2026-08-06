@@ -11,9 +11,11 @@ document.addEventListener('DOMContentLoaded', () => {
     
     // Config Inputs
     const followPlayerInput = document.getElementById('input-follow-player');
+    const copyWalkInput = document.getElementById('input-copy-walk');
     const serverSelect = document.getElementById('select-server');
     const roomNumberInput = document.getElementById('input-room-number');
     const targetsInput = document.getElementById('input-targets-priority');
+    const autoZoneSelect = document.getElementById('select-auto-zone');
     
     // Tag Whitelist
     const newTagInput = document.getElementById('input-new-tag');
@@ -333,9 +335,11 @@ document.addEventListener('DOMContentLoaded', () => {
             globalConfig = config;
             
             followPlayerInput.value = config.follow_player || '';
+            copyWalkInput.checked = config.copy_walk !== undefined ? config.copy_walk : true;
             serverSelect.value = config.server || 'Artix';
             roomNumberInput.value = config.room_number || 9099;
             targetsInput.value = config.targets_priority || '';
+            autoZoneSelect.value = config.auto_zone || 'none';
             
             // Backport unique IDs to existing accounts
             const slaves = globalConfig.slaves || [];
@@ -445,9 +449,11 @@ document.addEventListener('DOMContentLoaded', () => {
         const checkedMaps = Array.from(lockedZonesContainer.querySelectorAll('.chk-map:checked')).map(c => c.value);
         
         globalConfig.follow_player = followPlayerInput.value.trim();
+        globalConfig.copy_walk = copyWalkInput.checked;
         globalConfig.server = serverSelect.value;
         globalConfig.room_number = parseInt(roomNumberInput.value) || 9099;
         globalConfig.targets_priority = targetsInput.value.trim();
+        globalConfig.auto_zone = autoZoneSelect.value;
         globalConfig.locked_zones = checkedMaps;
     }
 
@@ -478,9 +484,11 @@ document.addEventListener('DOMContentLoaded', () => {
         chkSelectAll.disabled = isRunning;
 
         followPlayerInput.disabled = isRunning;
+        copyWalkInput.disabled = isRunning;
         serverSelect.disabled = isRunning;
         roomNumberInput.disabled = isRunning;
         targetsInput.disabled = isRunning;
+        autoZoneSelect.disabled = isRunning;
         newTagInput.disabled = isRunning;
         btnAddTag.disabled = isRunning;
         newMapInput.disabled = isRunning;
