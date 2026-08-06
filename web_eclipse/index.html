@@ -10,17 +10,35 @@
 <body>
     <!-- Password Protection Overlay -->
     <div id="password-screen" class="password-screen">
-        <div class="password-card">
-            <div class="lock-icon" id="password-lock-icon">
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+        <div class="password-card" id="password-card-container">
+            <div id="password-normal-flow">
+                <div class="lock-icon" id="password-lock-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+                <h2>Authentication Required</h2>
+                <p>Please enter the password to access Maid Eclipse.</p>
+                <form id="password-form" class="password-input-row" onsubmit="event.preventDefault();">
+                    <input type="password" id="app-access-password" placeholder="Enter password..." required autofocus>
+                    <button type="submit" id="btn-submit-password">Unlock</button>
+                </form>
+                <div id="password-error" class="password-error hidden">Incorrect password. Please try again.</div>
             </div>
-            <h2>Authentication Required</h2>
-            <p>Please enter the password to access Maid Eclipse.</p>
-            <form id="password-form" class="password-input-row" onsubmit="event.preventDefault();">
-                <input type="password" id="app-access-password" placeholder="Enter password..." required autofocus>
-                <button type="submit" id="btn-submit-password">Unlock</button>
-            </form>
-            <div id="password-error" class="password-error hidden">Incorrect password. Please try again.</div>
+
+            <!-- Captcha Locked Out Flow -->
+            <div id="password-captcha-flow" class="hidden">
+                <div class="lock-icon danger">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+                <h2>Security Lockout</h2>
+                <p style="margin-bottom: 12px; color: var(--danger-color); font-weight: 500;">Failed attempts exceeded! Solve the game to unlock.</p>
+                
+                <div class="captcha-game-area" id="captcha-game-area">
+                    <img src="astolfo_scratch0.png" alt="Blushing Astolfo Game" class="captcha-bg" id="captcha-bg-img">
+                    <canvas id="scratch-canvas"></canvas>
+                </div>
+                
+                <div class="captcha-status" id="captcha-status">Scratch to reveal image: 0% revealed</div>
+            </div>
         </div>
     </div>
 

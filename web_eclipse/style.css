@@ -860,3 +860,55 @@ body {
     font-size: 0.8rem;
     font-weight: 500;
 }
+
+/* Captcha Game Styles */
+.captcha-game-area {
+    position: relative;
+    width: 100%;
+    height: 320px;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 1px solid var(--border-color);
+    margin-bottom: 16px;
+    background-color: #0b0818;
+    box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.8);
+    user-select: none;
+}
+
+.captcha-bg {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    opacity: 0.8;
+}
+
+#scratch-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    z-index: 10;
+    cursor: crosshair;
+    transition: opacity 0.5s ease;
+}
+
+#scratch-canvas.fade-out {
+    opacity: 0;
+    pointer-events: none;
+}
+
+.captcha-status {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+    margin-top: 8px;
+}
+
+.lock-icon.danger {
+    background: rgba(239, 68, 68, 0.1);
+    border: 1px solid rgba(239, 68, 68, 0.2);
+    color: var(--danger-color);
+    box-shadow: 0 0 20px rgba(239, 68, 68, 0.2);
+}

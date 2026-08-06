@@ -220,7 +220,7 @@ class EclipseApi:
 
     def validate_password(self, password):
         import hashlib
-        target_hash = "a919ac0a401b1b9863c9bcbae2becbc52c5d518c1b95c06b4e35460697f31c27"
+        target_hash = "080dcf0b2c402cb9ac5be3dc6907f79a3a2b113325755ecdd792bdc6b8c7399e"
         input_hash = hashlib.sha256(password.encode('utf-8')).hexdigest()
         return {"valid": input_hash == target_hash}
 

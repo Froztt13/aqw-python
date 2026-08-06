@@ -664,8 +664,16 @@ document.addEventListener("DOMContentLoaded", () => {
     const passwordError = document.getElementById("password-error");
     const passwordLockIcon = document.getElementById("password-lock-icon");
 
+    const normalFlow = document.getElementById("password-normal-flow");
+    const captchaFlow = document.getElementById("password-captcha-flow");
+    const gameArea = document.getElementById("captcha-game-area");
+    const statusText = document.getElementById("captcha-status");
+
     const defaultIconHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>`;
     const errorIconHTML = `<img src="error_astolfo.jpg" alt="Wrong Password" style="width: 100%; height: 100%; object-fit: cover; border-radius: 50%;">`;
+
+    let failedAttempts = 0;
+    let poppedHearts = 0;
 
     if (passwordForm && passwordInput && passwordScreen && passwordError) {
         // Focus the input initially
@@ -681,19 +689,169 @@ document.addEventListener("DOMContentLoaded", () => {
             }
         });
 
+        // Scratch card implementation
+        let scratchCanvas = document.getElementById("scratch-canvas");
+        let scratchCtx = null;
+        let isDrawing = false;
+        let scratchFinished = false;
+
+        const initScratchCard = () => {
+            scratchCanvas = document.getElementById("scratch-canvas");
+            if (!scratchCanvas) return;
+
+            scratchCtx = scratchCanvas.getContext("2d");
+            scratchFinished = false;
+            scratchCanvas.classList.remove("fade-out");
+
+            // Match canvas internal resolution with CSS display size
+            scratchCanvas.width = scratchCanvas.clientWidth || 280;
+            scratchCanvas.height = scratchCanvas.clientHeight || 320;
+
+            // Draw metallic/dark covering layer
+            const grad = scratchCtx.createLinearGradient(0, 0, scratchCanvas.width, scratchCanvas.height);
+            grad.addColorStop(0, "#2d2845");
+            grad.addColorStop(1, "#16122e");
+            scratchCtx.fillStyle = grad;
+            scratchCtx.fillRect(0, 0, scratchCanvas.width, scratchCanvas.height);
+
+            // Add some noise texture for a scratch-card texture feel
+            scratchCtx.fillStyle = "rgba(255, 255, 255, 0.03)";
+            for (let i = 0; i < 2000; i++) {
+                const rx = Math.random() * scratchCanvas.width;
+                const ry = Math.random() * scratchCanvas.height;
+                scratchCtx.fillRect(rx, ry, 2, 2);
+            }
+
+            // Draw instructing label text in middle
+            scratchCtx.fillStyle = "#a855f7"; // primary purple
+            scratchCtx.font = "bold 16px 'Inter', sans-serif";
+            scratchCtx.textAlign = "center";
+            scratchCtx.textBaseline = "middle";
+            scratchCtx.fillText("SCRATCH TO REVEAL ASTOLFO", scratchCanvas.width / 2, scratchCanvas.height / 2 - 10);
+
+            scratchCtx.fillStyle = "#9ca3af";
+            scratchCtx.font = "11px 'Inter', sans-serif";
+            scratchCtx.fillText("Hold & drag mouse/touch to usap", scratchCanvas.width / 2, scratchCanvas.height / 2 + 15);
+
+            // Configure canvas to erase drawings
+            scratchCtx.globalCompositeOperation = "destination-out";
+
+            // Bind scratch events (mouse & touch)
+            const scratch = (e) => {
+                if (!isDrawing || scratchFinished) return;
+                
+                // Prevent scrolling on touch devices
+                e.preventDefault();
+
+                // Get coordinates relative to canvas
+                const rect = scratchCanvas.getBoundingClientRect();
+                const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+                const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+                const x = clientX - rect.left;
+                const y = clientY - rect.top;
+
+                // Erase circle
+                scratchCtx.beginPath();
+                scratchCtx.arc(x, y, 28, 0, Math.PI * 2);
+                scratchCtx.fill();
+
+                // Check scratch percentage occasionally
+                checkProgress();
+            };
+
+            const startDrawing = (e) => {
+                isDrawing = true;
+                scratch(e);
+            };
+
+            const stopDrawing = () => {
+                isDrawing = false;
+            };
+
+            scratchCanvas.addEventListener("mousedown", startDrawing);
+            scratchCanvas.addEventListener("mousemove", scratch);
+            window.addEventListener("mouseup", stopDrawing);
+
+            scratchCanvas.addEventListener("touchstart", startDrawing, { passive: false });
+            scratchCanvas.addEventListener("touchmove", scratch, { passive: false });
+            window.addEventListener("touchend", stopDrawing);
+        };
+
+        const checkProgress = () => {
+            if (scratchFinished || !scratchCtx) return;
+
+            const imgData = scratchCtx.getImageData(0, 0, scratchCanvas.width, scratchCanvas.height);
+            const data = imgData.data;
+            let transparentCount = 0;
+            const step = 20; // check every 20th pixel to prevent lagging
+            let totalCount = 0;
+
+            for (let i = 3; i < data.length; i += 4 * step) {
+                totalCount++;
+                if (data[i] === 0) {
+                    transparentCount++;
+                }
+            }
+
+            const percent = Math.round((transparentCount / totalCount) * 100);
+            if (statusText) {
+                statusText.innerText = `Scratch to reveal image: ${percent}% revealed`;
+            }
+
+            // Exceeds 65% scratched = revealed!
+            if (percent >= 65) {
+                scratchFinished = true;
+                scratchCanvas.classList.add("fade-out");
+                
+                if (statusText) {
+                    statusText.innerHTML = `<span style="color: var(--success-color)">Verification success! Resetting attempts...</span>`;
+                }
+
+                setTimeout(() => {
+                    failedAttempts = 0;
+                    if (captchaFlow) captchaFlow.classList.add("hidden");
+                    if (normalFlow) normalFlow.classList.remove("hidden");
+                    passwordInput.value = "";
+                    passwordInput.focus();
+                }, 1500);
+            }
+        };
+
+        const startCaptchaGame = () => {
+            const bgImg = document.getElementById("captcha-bg-img");
+            if (bgImg) {
+                const randomIndex = Math.floor(Math.random() * 3);
+                bgImg.src = `astolfo_scratch${randomIndex}.png`;
+            }
+            if (statusText) {
+                statusText.innerText = `Scratch to reveal image: 0% revealed`;
+            }
+            if (normalFlow) normalFlow.classList.add("hidden");
+            if (captchaFlow) captchaFlow.classList.remove("hidden");
+            
+            // Wait brief moment for container to render so bounding rect works
+            setTimeout(initScratchCard, 50);
+        };
+
         const performCheck = (password) => {
             if (window.pywebview && window.pywebview.api && window.pywebview.api.validate_password) {
                 window.pywebview.api.validate_password(password).then((res) => {
                     if (res && res.valid) {
                         passwordScreen.classList.add("hidden");
                     } else {
-                        passwordError.classList.remove("hidden");
-                        passwordInput.value = "";
-                        passwordInput.focus();
-                        if (passwordLockIcon) {
-                            passwordLockIcon.innerHTML = errorIconHTML;
-                            passwordLockIcon.style.borderColor = "var(--danger-color)";
-                            passwordLockIcon.style.background = "rgba(239, 68, 68, 0.1)";
+                        failedAttempts++;
+                        if (failedAttempts >= 3) {
+                            startCaptchaGame();
+                        } else {
+                            passwordError.innerHTML = `Incorrect password. Attempts left: ${3 - failedAttempts}`;
+                            passwordError.classList.remove("hidden");
+                            passwordInput.value = "";
+                            passwordInput.focus();
+                            if (passwordLockIcon) {
+                                passwordLockIcon.innerHTML = errorIconHTML;
+                                passwordLockIcon.style.borderColor = "var(--danger-color)";
+                                passwordLockIcon.style.background = "rgba(239, 68, 68, 0.1)";
+                            }
                         }
                     }
                 }).catch((err) => {
