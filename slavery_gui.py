@@ -27,6 +27,7 @@ if getattr(sys, 'frozen', False):
 import json
 import asyncio
 import threading
+from datetime import datetime
 import socket
 import re
 import html
@@ -116,13 +117,20 @@ sys.stdout = global_redirector_out
 sys.stderr = global_redirector_err
 
 class SlaveBotThread(threading.Thread):
-    def __init__(self, username, password, char_class, config, callback):
+    def __init__(self, username, password, char_class, config, callback, skills="0,1,2,0,3,4", hp_operator="<", hp_threshold=0, hp_skills="", mp_operator="<", mp_threshold=0, mp_skills=""):
         super().__init__()
         self.username = username
         self.password = password
         self.char_class = char_class
         self.config = config
         self.callback = callback
+        self.skills = skills
+        self.hp_operator = hp_operator
+        self.hp_threshold = hp_threshold
+        self.hp_skills = hp_skills
+        self.mp_operator = mp_operator
+        self.mp_threshold = mp_threshold
+        self.mp_skills = mp_skills
         self.bot_instance = None
         self.loop = None
         self.daemon = True
@@ -156,6 +164,13 @@ class SlaveBotThread(threading.Thread):
             self.bot_instance.locked_zones = self.config.get("locked_zones", [])
             self.bot_instance.copy_walk = self.config.get("copy_walk", True)
             self.bot_instance.auto_zone = self.config.get("auto_zone", "none")
+            self.bot_instance.skills = self.skills
+            self.bot_instance.hp_operator = self.hp_operator
+            self.bot_instance.hp_threshold = self.hp_threshold
+            self.bot_instance.hp_skills = self.hp_skills
+            self.bot_instance.mp_operator = self.mp_operator
+            self.bot_instance.mp_threshold = self.mp_threshold
+            self.bot_instance.mp_skills = self.mp_skills
             
             bot_module = importlib.import_module("bot.slavery.bot_slave")
             
@@ -182,11 +197,19 @@ def start_local_server(web_dir):
 
     @app.route('/')
     def serve_index():
-        return static_file('index.html', root=web_dir)
+        res = static_file('index.html', root=web_dir)
+        res.set_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        res.set_header('Pragma', 'no-cache')
+        res.set_header('Expires', '0')
+        return res
 
     @app.route('/<path:path>')
     def serve_files(path):
-        return static_file(path, root=web_dir)
+        res = static_file(path, root=web_dir)
+        res.set_header('Cache-Control', 'no-cache, no-store, must-revalidate')
+        res.set_header('Pragma', 'no-cache')
+        res.set_header('Expires', '0')
+        return res
 
     port = find_free_port()
     t = threading.Thread(target=lambda: app.run(host='127.0.0.1', port=port, quiet=True))
@@ -280,12 +303,27 @@ class SlaveryApi:
                 password = slave.get("password")
                 char_class = slave.get("char_class")
                 
+                skills = slave.get("skills", "0,1,2,0,3,4")
+                hp_operator = slave.get("hp_operator", "<")
+                hp_threshold = slave.get("hp_threshold", 0)
+                hp_skills = slave.get("hp_skills", "")
+                mp_operator = slave.get("mp_operator", "<")
+                mp_threshold = slave.get("mp_threshold", 0)
+                mp_skills = slave.get("mp_skills", "")
+                
                 thread = SlaveBotThread(
                     username=username,
                     password=password,
                     char_class=char_class,
                     config=config,
-                    callback=self.handle_slave_log
+                    callback=self.handle_slave_log,
+                    skills=skills,
+                    hp_operator=hp_operator,
+                    hp_threshold=hp_threshold,
+                    hp_skills=hp_skills,
+                    mp_operator=mp_operator,
+                    mp_threshold=mp_threshold,
+                    mp_skills=mp_skills
                 )
                 self.active_threads[username] = thread
                 thread.start()
@@ -367,8 +405,8 @@ def main():
     else:
         web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web_slavery')
 
-    print(f"Loading GUI assets from: {web_dir}")
-    url = start_local_server(web_dir)
+    import time
+    url = f"{start_local_server(web_dir)}?t={int(time.time())}"
     
     window = webview.create_window(
         f'AQW Maid Slavery {APP_VERSION}',

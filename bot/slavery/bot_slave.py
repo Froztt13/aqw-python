@@ -28,7 +28,14 @@ whitelist = [
 checking_locked_zone = False
 async def main(cmd: Command):
     global checking_locked_zone
-    skills = [0,1,2,0,3,4]
+    skills_str = getattr(cmd.bot, "skills", "0,1,2,0,3,4")
+    try:
+        skills = [int(x.strip()) for x in skills_str.split(",") if x.strip().isdigit()]
+        if not skills:
+            skills = [0, 1, 2, 0, 3, 4]
+    except Exception:
+        skills = [0, 1, 2, 0, 3, 4]
+        
     skill_index = 0
     
     # Resolve dynamic properties if injected via GUI, otherwise fallback to script globals
@@ -38,6 +45,22 @@ async def main(cmd: Command):
     
     copy_walk = getattr(cmd.bot, "copy_walk", True)
     auto_zone = getattr(cmd.bot, "auto_zone", "none")
+    
+    hp_operator = getattr(cmd.bot, "hp_operator", "<")
+    hp_threshold = getattr(cmd.bot, "hp_threshold", 0)
+    hp_skills_str = getattr(cmd.bot, "hp_skills", "")
+    try:
+        hp_skills = [int(x.strip()) for x in hp_skills_str.split(",") if x.strip().isdigit()]
+    except Exception:
+        hp_skills = []
+        
+    mp_operator = getattr(cmd.bot, "mp_operator", "<")
+    mp_threshold = getattr(cmd.bot, "mp_threshold", 0)
+    mp_skills_str = getattr(cmd.bot, "mp_skills", "")
+    try:
+        mp_skills = [int(x.strip()) for x in mp_skills_str.split(",") if x.strip().isdigit()]
+    except Exception:
+        mp_skills = []
     
     await cmd.equip_item(cmd.get_farm_class())
     await cmd.sleep(500)
@@ -211,6 +234,30 @@ async def main(cmd: Command):
         if targeted_monster and targeted_monster.getAura('Counter Attack'):
             skill_mode = SkillMode.BUFF_ONLY
             print('buff only mode...')
+        
+        # Check health and MP thresholds
+        player_obj = cmd.get_player()
+        current_skill = skills[skill_index]
+        
+        # Check HP threshold
+        if hp_threshold > 0 and hp_skills:
+            if current_skill in hp_skills:
+                hp_pct = (player_obj.CURRENT_HP / player_obj.MAX_HP * 100) if player_obj.MAX_HP > 0 else 100
+                is_triggered = hp_pct < hp_threshold if hp_operator == "<" else hp_pct > hp_threshold
+                if not is_triggered:
+                    # Skip since the condition to USE this skill is NOT met!
+                    skill_index = (skill_index + 1) % len(skills)
+                    continue
+                
+        # Check MP threshold
+        if mp_threshold > 0 and mp_skills:
+            if current_skill in mp_skills:
+                mp_pct = (player_obj.MANA / player_obj.MAX_MP * 100) if player_obj.MAX_MP > 0 else 100
+                is_triggered = mp_pct < mp_threshold if mp_operator == "<" else mp_pct > mp_threshold
+                if not is_triggered:
+                    # Skip since the condition to USE this skill is NOT met!
+                    skill_index = (skill_index + 1) % len(skills)
+                    continue
         
         await cmd.use_skill(
             index=skills[skill_index],

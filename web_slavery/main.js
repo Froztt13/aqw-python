@@ -35,12 +35,18 @@ document.addEventListener('DOMContentLoaded', () => {
     const slaveUsernameInput = document.getElementById('slave-username');
     const slavePasswordInput = document.getElementById('slave-password');
     const slaveClassInput = document.getElementById('slave-class');
+    const slaveSkillsInput = document.getElementById('slave-skills');
+    const slaveHpOperatorSelect = document.getElementById('slave-hp-operator');
+    const slaveHpThresholdInput = document.getElementById('slave-hp-threshold');
+    const slaveHpSkillsInput = document.getElementById('slave-hp-skills');
+    const slaveMpOperatorSelect = document.getElementById('slave-mp-operator');
+    const slaveMpThresholdInput = document.getElementById('slave-mp-threshold');
+    const slaveMpSkillsInput = document.getElementById('slave-mp-skills');
     const btnSaveNewSlave = document.getElementById('btn-save-new-slave');
     const btnCancelAddSlave = document.getElementById('btn-cancel-add-slave');
     
     const slaveTableBody = document.getElementById('slave-table-body');
     const chkSelectAll = document.getElementById('chk-select-all');
-    const btnDeleteSelected = document.getElementById('btn-delete-selected');
 
     // Console Elements
     const consoleViewport = document.getElementById('console-viewport');
@@ -96,6 +102,18 @@ document.addEventListener('DOMContentLoaded', () => {
         consoleViewport.innerHTML = `<div class="log-line system">Logs for ${activeConsoleTab} cleared.</div>`;
     });
 
+    const btnToggleTheme = document.getElementById('btn-toggle-theme');
+    if (btnToggleTheme) {
+        const isMaidTheme = localStorage.getItem('theme-maid') === 'true';
+        if (isMaidTheme) {
+            document.body.classList.add('theme-maid');
+        }
+        btnToggleTheme.addEventListener('click', () => {
+            const active = document.body.classList.toggle('theme-maid');
+            localStorage.setItem('theme-maid', active);
+        });
+    }
+
     // Console Tab Switch handler
     tabsList.addEventListener('click', (e) => {
         const tabBtn = e.target.closest('.console-tab');
@@ -130,7 +148,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
     // 2. Toggle Forms
     btnToggleAddForm.addEventListener('click', () => {
-        addSlaveForm.classList.toggle('hidden');
+        addSlaveForm.classList.remove('hidden');
     });
 
     btnCancelAddSlave.addEventListener('click', () => {
@@ -144,10 +162,30 @@ document.addEventListener('DOMContentLoaded', () => {
         slaveUsernameInput.disabled = false;
     });
 
+    const btnCloseSlaveModal = document.getElementById('btn-close-slave-modal');
+    if (btnCloseSlaveModal) {
+        btnCloseSlaveModal.addEventListener('click', () => {
+            btnCancelAddSlave.click();
+        });
+    }
+
+    addSlaveForm.addEventListener('click', (e) => {
+        if (e.target === addSlaveForm) {
+            btnCancelAddSlave.click();
+        }
+    });
+
     function clearAddFormInputs() {
         slaveUsernameInput.value = '';
         slavePasswordInput.value = '';
         slaveClassInput.value = '';
+        slaveSkillsInput.value = '0,1,2,0,3,4';
+        slaveHpThresholdInput.value = '';
+        slaveHpSkillsInput.value = '';
+        slaveMpThresholdInput.value = '';
+        slaveMpSkillsInput.value = '';
+        slaveHpOperatorSelect.value = '<';
+        slaveMpOperatorSelect.value = '<';
     }
 
     // 3. Checklist & Whitelist Managers
@@ -229,19 +267,7 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     });
 
-    btnDeleteSelected.addEventListener('click', () => {
-        const chks = slaveTableBody.querySelectorAll('.chk-slave:checked');
-        if (chks.length === 0) {
-            alert('Please select slave accounts to delete.');
-            return;
-        }
-        
-        if (confirm(`Are you sure you want to delete these ${chks.length} accounts?`)) {
-            const deleteIds = Array.from(chks).map(c => c.value);
-            globalConfig.slaves = globalConfig.slaves.filter(s => !deleteIds.includes(s.id));
-            saveConfigurationLocal(true);
-        }
-    });
+    // Deleted btnDeleteSelected handler
 
     function generateUniqueId() {
         return 'id_' + Math.random().toString(36).substring(2, 9) + Date.now().toString(36).substring(4);
@@ -272,7 +298,14 @@ document.addEventListener('DOMContentLoaded', () => {
                     id: editingId,
                     username: user,
                     password: pass,
-                    char_class: cls
+                    char_class: cls,
+                    skills: slaveSkillsInput.value.trim() || '0,1,2,0,3,4',
+                    hp_operator: slaveHpOperatorSelect.value,
+                    hp_threshold: parseInt(slaveHpThresholdInput.value) || 0,
+                    hp_skills: slaveHpSkillsInput.value.trim() || '',
+                    mp_operator: slaveMpOperatorSelect.value,
+                    mp_threshold: parseInt(slaveMpThresholdInput.value) || 0,
+                    mp_skills: slaveMpSkillsInput.value.trim() || ''
                 };
                 
                 // If username changed, update keys in logs map
@@ -303,7 +336,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 id: newId,
                 username: user,
                 password: pass,
-                char_class: cls
+                char_class: cls,
+                skills: slaveSkillsInput.value.trim() || '0,1,2,0,3,4',
+                hp_operator: slaveHpOperatorSelect.value,
+                hp_threshold: parseInt(slaveHpThresholdInput.value) || 0,
+                hp_skills: slaveHpSkillsInput.value.trim() || '',
+                mp_operator: slaveMpOperatorSelect.value,
+                mp_threshold: parseInt(slaveMpThresholdInput.value) || 0,
+                mp_skills: slaveMpSkillsInput.value.trim() || ''
             });
 
             if (!slaveLogs[user]) {
@@ -397,32 +437,65 @@ document.addEventListener('DOMContentLoaded', () => {
                     </div>
                 </td>
                 <td class="col-status"><span class="status-pill offline">Offline</span></td>
-                <td>
-                    <select class="select-action" data-id="${s.id}">
-                        <option value="" disabled selected>Actions</option>
-                        <option value="edit">Edit</option>
-                        <option value="delete">Delete</option>
-                    </select>
+                <td style="position: relative; text-align: center;">
+                    <button class="btn-action-trigger" data-id="${s.id}" title="Actions">
+                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="pointer-events: none; display: block; margin: 0 auto;">
+                            <circle cx="12" cy="5" r="2.2"></circle>
+                            <circle cx="12" cy="12" r="2.2"></circle>
+                            <circle cx="12" cy="19" r="2.2"></circle>
+                        </svg>
+                    </button>
+                    <div class="action-dropdown hidden" id="action-dropdown-${s.id}">
+                        <button class="action-item edit" data-action="edit" data-id="${s.id}">Edit</button>
+                        <button class="action-item delete" data-action="delete" data-id="${s.id}">Delete</button>
+                    </div>
                 </td>
             `;
             slaveTableBody.appendChild(tr);
         });
     }
 
-    slaveTableBody.addEventListener('change', (e) => {
-        if (e.target.classList.contains('select-action')) {
-            const action = e.target.value;
+    // Close dropdowns when clicking outside
+    document.addEventListener('click', (e) => {
+        if (!e.target.closest('.btn-action-trigger')) {
+            document.querySelectorAll('.action-dropdown').forEach(d => d.classList.add('hidden'));
+        }
+    });
+
+    slaveTableBody.addEventListener('click', (e) => {
+        // Toggle dropdown visibility
+        if (e.target.closest('.btn-action-trigger')) {
+            const btn = e.target.closest('.btn-action-trigger');
+            const id = btn.getAttribute('data-id');
+            const dropdown = document.getElementById(`action-dropdown-${id}`);
+            
+            // Close other dropdowns
+            document.querySelectorAll('.action-dropdown').forEach(d => {
+                if (d !== dropdown) d.classList.add('hidden');
+            });
+            
+            if (dropdown) {
+                dropdown.classList.toggle('hidden');
+            }
+            return;
+        }
+
+        // Handle action item click
+        if (e.target.classList.contains('action-item')) {
+            const action = e.target.getAttribute('data-action');
             const id = e.target.getAttribute('data-id');
             const slave = globalConfig.slaves.find(s => s.id === id);
             
+            // Close dropdown
+            const dropdown = document.getElementById(`action-dropdown-${id}`);
+            if (dropdown) dropdown.classList.add('hidden');
+
             if (!slave) return;
-            
+
             if (action === 'delete') {
                 if (confirm(`Delete account ${slave.username}?`)) {
                     globalConfig.slaves = globalConfig.slaves.filter(s => s.id !== id);
                     saveConfigurationLocal(true);
-                } else {
-                    e.target.value = "";
                 }
             } else if (action === 'edit') {
                 // Open and set form in edit mode
@@ -431,6 +504,13 @@ document.addEventListener('DOMContentLoaded', () => {
                 slaveUsernameInput.value = slave.username;
                 slavePasswordInput.value = slave.password;
                 slaveClassInput.value = slave.char_class;
+                slaveSkillsInput.value = slave.skills || '0,1,2,0,3,4';
+                slaveHpOperatorSelect.value = slave.hp_operator || '<';
+                slaveHpThresholdInput.value = slave.hp_threshold !== undefined ? slave.hp_threshold : '';
+                slaveHpSkillsInput.value = slave.hp_skills || '';
+                slaveMpOperatorSelect.value = slave.mp_operator || '<';
+                slaveMpThresholdInput.value = slave.mp_threshold !== undefined ? slave.mp_threshold : '';
+                slaveMpSkillsInput.value = slave.mp_skills || '';
                 
                 document.getElementById('add-slave-title').textContent = 'Edit Slave Account';
                 btnSaveNewSlave.textContent = 'Update Account';
@@ -438,9 +518,6 @@ document.addEventListener('DOMContentLoaded', () => {
                 slaveUsernameInput.disabled = false;
                 
                 addSlaveForm.classList.remove('hidden');
-                addSlaveForm.scrollIntoView({ behavior: 'smooth' });
-                
-                e.target.value = "";
             }
         }
     });
@@ -479,7 +556,6 @@ document.addEventListener('DOMContentLoaded', () => {
     // 6. Form Locking when active
     function setUIStateRunning(isRunning) {
         btnToggleAddForm.disabled = isRunning;
-        btnDeleteSelected.disabled = isRunning;
         btnSaveSettings.disabled = isRunning;
         chkSelectAll.disabled = isRunning;
 
@@ -649,7 +725,7 @@ document.addEventListener('DOMContentLoaded', () => {
         if (status.is_dead) {
             colStatus.innerHTML = `<span class="status-pill dead">Dead</span>`;
         } else if (status.is_connected) {
-            colStatus.innerHTML = `<span class="status-pill online">Farming</span>`;
+            colStatus.innerHTML = `<span class="status-pill online">Serving</span>`;
         } else {
             colStatus.innerHTML = `<span class="status-pill connecting">Connecting</span>`;
         }
@@ -711,4 +787,5 @@ document.addEventListener("DOMContentLoaded", () => {
             e.stopPropagation();
         });
     }
+
 });

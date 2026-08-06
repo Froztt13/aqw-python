@@ -1,21 +1,26 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>AQW Maid Slavery</title>
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
     <div class="app-container">
-        
+
         <!-- Header Bar -->
         <header class="app-header">
             <div class="brand">
                 <div class="brand-logo-wrapper">
-                    <img src="app_icon.png" alt="Slavery Bot Logo" class="brand-logo-img" onerror="this.onerror=null; this.src='app.ico';">
+                    <img src="app_icon.png" alt="Slavery Bot Logo" class="brand-logo-img"
+                        onerror="this.onerror=null; this.src='app.ico';">
                 </div>
                 <div class="brand-text">
                     <div class="title-row">
@@ -25,29 +30,35 @@
                     <p>Auto battle, follow, and sucking.</p>
                     <div class="info-tooltip-bubble" id="info-bubble">
                         Based on <strong>AQW Python</strong><br>
-                        <a href="https://github.com/Froztt13/aqw-python" target="_blank" style="color: var(--primary-color); text-decoration: underline;">GitHub Repository</a>
+                        <a href="https://github.com/Froztt13/aqw-python" target="_blank"
+                            style="color: var(--primary-color); text-decoration: underline;">GitHub Repository</a>
                     </div>
                 </div>
             </div>
             <div class="header-controls">
+                <button class="btn btn-secondary btn-icon-only" id="btn-toggle-theme" title="Toggle Maid Mode" style="margin-right: 8px; width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="margin: 0; width: 20px; height: 20px;">
+                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
+                    </svg>
+                </button>
                 <button class="btn btn-success" id="btn-start-slaves">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
-                    Start Selected Slaves
+                    Start
                 </button>
                 <button class="btn btn-danger hidden" id="btn-stop-slaves">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                         <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
                     </svg>
-                    Stop All Slaves
+                    Stop
                 </button>
             </div>
         </header>
 
         <!-- Main Body -->
         <main class="app-body">
-            
+
             <!-- Left Side: Slaves Accounts Manager -->
             <section class="panel-column span-3">
                 <div class="card glass-card fill-height">
@@ -56,34 +67,6 @@
                         <button class="btn btn-small btn-primary" id="btn-toggle-add-form">
                             + Add Account
                         </button>
-                    </div>
-                    
-                    <!-- Add account inline form -->
-                    <div class="inline-form hidden" id="add-slave-form">
-                        <h3 id="add-slave-title">Add New Slave Account</h3>
-                        <div class="form-row">
-                            <div class="form-group">
-                                <label for="slave-username">Username</label>
-                                <input type="text" id="slave-username" placeholder="Username">
-                            </div>
-                            <div class="form-group">
-                                <label for="slave-password">Password</label>
-                                <div class="password-wrapper">
-                                    <input type="password" id="slave-password" placeholder="Password">
-                                    <button type="button" class="btn-toggle-password" tabindex="-1">
-                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                    </button>
-                                </div>
-                            </div>
-                            <div class="form-group">
-                                <label for="slave-class">Class</label>
-                                <input type="text" id="slave-class" placeholder="e.g. ArchPaladin">
-                            </div>
-                        </div>
-                        <div class="form-actions">
-                            <button class="btn btn-small btn-success" id="btn-save-new-slave">Save Account</button>
-                            <button class="btn btn-small btn-secondary" id="btn-cancel-add-slave">Cancel</button>
-                        </div>
                     </div>
 
                     <!-- Slave Accounts Table -->
@@ -94,7 +77,7 @@
                                     <th width="40"><input type="checkbox" id="chk-select-all"></th>
                                     <th>Username</th>
                                     <th>Class</th>
-                                    <th>Map / Position</th>
+                                    <th>Location</th>
                                     <th>Vitals (HP/MP)</th>
                                     <th>Status</th>
                                     <th width="60">Action</th>
@@ -105,20 +88,18 @@
                             </tbody>
                         </table>
                     </div>
-                    <div class="table-actions">
-                        <button class="btn btn-small btn-danger" id="btn-delete-selected">Delete Selected</button>
-                    </div>
                 </div>
             </section>
 
             <!-- Right Side: Global Configuration -->
             <section class="panel-column span-2">
                 <div class="card glass-card fill-height scrollable-panel">
-                    <div class="settings-header-wrapper" style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px dashed rgba(255, 255, 255, 0.08); padding-bottom: 12px;">
+                    <div class="settings-header-wrapper"
+                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px dashed rgba(255, 255, 255, 0.08); padding-bottom: 12px;">
                         <h2 style="margin: 0; font-size: 1.2rem;">Global Slavery Settings</h2>
                         <button class="btn btn-small btn-success" id="btn-save-settings">Save Settings</button>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="input-follow-player">Master Player Name</label>
                         <input type="text" id="input-follow-player" placeholder="e.g. MasterAccount">
@@ -127,8 +108,11 @@
 
                     <div class="form-group" style="margin-bottom: 20px;">
                         <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 4px;">
-                            <input type="checkbox" id="input-copy-walk" style="accent-color: var(--primary-color); cursor: pointer; width: 16px; height: 16px;">
-                            <label for="input-copy-walk" style="margin: 0; cursor: pointer; user-select: none; font-weight: 500;">Enable Copy Walk</label>
+                            <input type="checkbox" id="input-copy-walk"
+                                style="accent-color: var(--primary-color); cursor: pointer; width: 16px; height: 16px;">
+                            <label for="input-copy-walk"
+                                style="margin: 0; cursor: pointer; user-select: none; font-weight: 500;">Enable Copy
+                                Walk</label>
                         </div>
                         <span class="help-text">Directly mirror the master's cell jumps and cell movements.</span>
                     </div>
@@ -157,7 +141,7 @@
                             <input type="number" id="input-room-number" value="9099">
                         </div>
                     </div>
-                    
+
                     <div class="form-group">
                         <label for="select-auto-zone">Auto Zone Boss Mechanic</label>
                         <select id="select-auto-zone">
@@ -168,7 +152,8 @@
                             <option value="Queen Iona">Queen Iona</option>
                             <option value="Vordred">Vordred</option>
                         </select>
-                        <span class="help-text">Automatically reposition the player to safe zones during the selected boss fight.</span>
+                        <span class="help-text">Automatically reposition the player to safe zones during the selected
+                            boss fight.</span>
                     </div>
 
                     <div class="form-group">
@@ -223,6 +208,101 @@
             </div>
         </footer>
     </div>
+
+    <!-- Add/Edit Slave Account Modal -->
+    <div id="add-slave-form" class="modal-overlay hidden">
+        <div class="video-container" style="max-width: 600px; padding: 24px;">
+            <button class="btn-close-modal" id="btn-close-slave-modal">&times;</button>
+            <h3 id="add-slave-title"
+                style="margin-top: 0; margin-bottom: 16px; font-size: 1.1rem; font-weight: 600; color: var(--primary-color);">
+                Add New Slave Account</h3>
+
+            <div style="display: flex; flex-direction: column; gap: 14px;">
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+                    <div class="form-group">
+                        <label for="slave-username">Username</label>
+                        <input type="text" id="slave-username" placeholder="Username" style="width: 100%;">
+                    </div>
+                    <div class="form-group">
+                        <label for="slave-password">Password</label>
+                        <div class="password-wrapper" style="width: 100%;">
+                            <input type="password" id="slave-password" placeholder="Password" style="width: 100%;">
+                            <button type="button" class="btn-toggle-password" tabindex="-1">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                                    style="width: 16px; height: 16px; pointer-events: none;">
+                                    <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                    <circle cx="12" cy="12" r="3"></circle>
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
+                    <div class="form-group">
+                        <label for="slave-class">Class</label>
+                        <input type="text" id="slave-class" placeholder="e.g. ArchPaladin" style="width: 100%;">
+                    </div>
+                    <div class="form-group">
+                        <label for="slave-skills">Skills Sequence</label>
+                        <input type="text" id="slave-skills" placeholder="e.g. 0,1,2,0,3,4" value="0,1,2,0,3,4"
+                            style="width: 100%;">
+                    </div>
+                </div>
+
+                <div style="margin-top: 8px; border-top: 1px dashed rgba(255, 255, 255, 0.08); padding-top: 14px;">
+                    <h4
+                        style="margin: 0 0 12px; font-size: 0.8rem; text-transform: uppercase; letter-spacing: 0.05em; color: var(--text-secondary);">
+                        Vitals Skill Rules (Optional)</h4>
+
+                    <div style="display: flex; flex-direction: column; gap: 12px;">
+                        <!-- HP Rule Row -->
+                        <div
+                            style="display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04);">
+                            <span
+                                style="font-size: 0.85rem; font-weight: 500; min-width: 50px; color: var(--text-primary);">If
+                                HP is</span>
+                            <select id="slave-hp-operator"
+                                style="width: 55px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 8px; outline: none; cursor: pointer; text-align: center; font-weight: bold; height: 38px;">
+                                <option value="&lt;">&lt;</option>
+                                <option value="&gt;">&gt;</option>
+                            </select>
+                            <input type="number" id="slave-hp-threshold" placeholder="60" min="0" max="100"
+                                style="width: 65px; text-align: center; padding: 8px; background-color: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); outline: none; box-sizing: border-box; height: 38px;">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">%, use skills:</span>
+                            <input type="text" id="slave-hp-skills" placeholder="e.g. 2"
+                                style="flex: 1; padding: 8px 12px; background-color: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); outline: none; box-sizing: border-box; height: 38px;">
+                        </div>
+
+                        <!-- MP Rule Row -->
+                        <div
+                            style="display: flex; align-items: center; gap: 8px; background: rgba(255, 255, 255, 0.02); padding: 10px 14px; border-radius: 8px; border: 1px solid rgba(255, 255, 255, 0.04);">
+                            <span
+                                style="font-size: 0.85rem; font-weight: 500; min-width: 50px; color: var(--text-primary);">If
+                                MP is</span>
+                            <select id="slave-mp-operator"
+                                style="width: 55px; background: var(--bg-card); border: 1px solid var(--border-color); color: var(--text-primary); border-radius: 6px; padding: 8px; outline: none; cursor: pointer; text-align: center; font-weight: bold; height: 38px;">
+                                <option value="&lt;">&lt;</option>
+                                <option value="&gt;">&gt;</option>
+                            </select>
+                            <input type="number" id="slave-mp-threshold" placeholder="30" min="0" max="100"
+                                style="width: 65px; text-align: center; padding: 8px; background-color: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); outline: none; box-sizing: border-box; height: 38px;">
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">%, use skills:</span>
+                            <input type="text" id="slave-mp-skills" placeholder="e.g. 4"
+                                style="flex: 1; padding: 8px 12px; background-color: rgba(255, 255, 255, 0.03); border: 1px solid var(--border-color); border-radius: 6px; color: var(--text-primary); outline: none; box-sizing: border-box; height: 38px;">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="form-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 10px;">
+                <button class="btn btn-secondary" id="btn-cancel-add-slave" style="padding: 8px 16px;">Cancel</button>
+                <button class="btn btn-success" id="btn-save-new-slave" style="padding: 8px 20px;">Save Account</button>
+            </div>
+        </div>
+    </div>
+
     <script src="main.js"></script>
 </body>
+
 </html>
