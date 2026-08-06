@@ -686,3 +686,21 @@ document.addEventListener('DOMContentLoaded', () => {
         });
     });
 });
+
+// Info bubble click toggle handler
+document.addEventListener("DOMContentLoaded", () => {
+    const titleClick = document.getElementById("app-title-click");
+    const infoBubble = document.getElementById("info-bubble");
+    if (titleClick && infoBubble) {
+        titleClick.addEventListener("click", (e) => {
+            e.stopPropagation();
+            infoBubble.classList.toggle("show");
+        });
+        document.addEventListener("click", () => {
+            infoBubble.classList.remove("show");
+        });
+        infoBubble.addEventListener("click", (e) => {
+            e.stopPropagation();
+        });
+    }
+});

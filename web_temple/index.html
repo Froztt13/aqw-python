@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Maid Eclipse - AQW Temple Shrine Manager</title>
+    <title>Maid Temple</title>
     <link rel="stylesheet" href="style.css">
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
@@ -14,17 +14,14 @@
         <header class="app-header">
             <div class="brand">
                 <div class="brand-logo-wrapper">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="brand-logo">
-                        <circle cx="12" cy="12" r="10"></circle>
-                        <path d="M12 2a7 7 0 1 0 10 10"></path>
-                    </svg>
+                    <img src="app_icon.png" class="brand-logo" alt="Astolfo Logo" style="width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4));">
                 </div>
                 <div class="brand-text">
                     <div class="title-row">
-                        <h1 id="app-title-click">Maid Eclipse</h1>
+                        <h1 id="app-title-click">Maid Temple</h1>
                         <span class="version-badge">v1.0.0</span>
                     </div>
-                    <p>AQW - Ascension of the Eclipse Dungeon Manager</p>
+                    <p>Temple Shrine Dungeon Manager</p>
                     <div class="info-tooltip-bubble" id="info-bubble">
                         Based on <strong>AQW Python</strong><br>
                         <a href="https://github.com/Froztt13/aqw-python" target="_blank" style="color: var(--primary-color); text-decoration: underline;">GitHub Repository</a>
@@ -55,6 +52,13 @@
                         <label for="input-room-number">Room</label>
                         <input type="number" id="input-room-number" value="9099">
                     </div>
+                    <div class="input-inline">
+                        <label for="select-temple-bot">Bot</label>
+                        <select id="select-temple-bot">
+                            <option value="MidnightSunBot">Midnight Sun</option>
+                            <option value="SolsticeMoonBot">Solstice Moon</option>
+                        </select>
+                    </div>
                 </div>
                 
                 <div class="duration-counter hidden" id="duration-counter" style="color: var(--primary-color); font-family: 'Fira Code', monospace; font-size: 0.85rem; font-weight: 600; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(245, 158, 11, 0.2); background-color: rgba(245, 158, 11, 0.05); display: flex; align-items: center; gap: 6px; height: 38px;">
@@ -68,13 +72,13 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                         <polygon points="5 3 19 12 5 21 5 3"></polygon>
                     </svg>
-                    Start Party
+                    Start
                 </button>
                 <button class="btn btn-danger hidden" id="btn-stop-party">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                         <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
                     </svg>
-                    Stop Party
+                    Stop
                 </button>
             </div>
         </header>
@@ -119,54 +123,34 @@
         <main class="app-body">
             <div class="slots-grid">
                 
-                <!-- Slot 1: Master (Sun / odd) -->
+                <!-- Slot 1: Master -->
                 <div class="slot-card sun-theme" id="card-slot1">
                     <div class="slot-header">
-                        <div class="badge-role sun">Slot 1: Master (Sun / odd)</div>
-                        <div class="status-badge" id="badge-slot1">Offline</div>
+                        <h2>Master</h2>
+                        <span class="status-badge" id="badge-slot1">Offline</span>
                     </div>
                     <div class="slot-body">
-                        <!-- Inputs -->
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" class="slot-username" id="slot1-username" placeholder="Username">
+                            <input type="text" id="slot1-username" class="slot-username" placeholder="Character Username">
                         </div>
                         <div class="form-group">
                             <label>Password</label>
                             <div class="password-wrapper">
-                                <input type="password" class="slot-password" id="slot1-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password" tabindex="-1">
+                                <input type="password" id="slot1-password" class="slot-password" placeholder="Password">
+                                <button type="button" class="btn-toggle-password">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                 </button>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Class</label>
-                            <input type="text" class="slot-class" id="slot1-class" placeholder="Legion Revenant">
+                            <input type="text" id="slot1-class" class="slot-class" placeholder="ArchPaladin">
                         </div>
-                        
-                        <!-- Configuration -->
-                        <div class="options-row">
-                            <div class="form-group flex-1">
-                                <label>Converge</label>
-                                <select class="slot-converge" id="slot1-converge">
-                                    <option value="sun">Sun</option>
-                                    <option value="moon">Moon</option>
-                                </select>
-                            </div>
-                            <div class="form-group flex-1">
-                                <label>Taunt Parity</label>
-                                <select class="slot-parity" id="slot1-parity">
-                                    <option value="odd">Odd</option>
-                                    <option value="even">Even</option>
-                                </select>
-                            </div>
-                        </div>
-                        
                         <div class="checkbox-options">
                             <label class="chk-label">
-                                <input type="checkbox" class="slot-light-gather" id="slot1-light-gather">
-                                Light Gather Taunter
+                                <input type="radio" name="taunter-group" id="slot1-is-taunter">
+                                Taunter
                             </label>
                         </div>
                         
@@ -194,55 +178,38 @@
                     </div>
                 </div>
 
-                <!-- Slot 2: Slave 1 (Sun / even) -->
-                <div class="slot-card sun-theme" id="card-slot2">
+                <!-- Slot 2: Slave 1 -->
+                <div class="slot-card moon-theme" id="card-slot2">
                     <div class="slot-header">
-                        <div class="badge-role sun">Slot 2: Slave 1 (Sun / even)</div>
-                        <div class="status-badge" id="badge-slot2">Offline</div>
+                        <h2>Slave 1</h2>
+                        <span class="status-badge" id="badge-slot2">Offline</span>
                     </div>
                     <div class="slot-body">
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" class="slot-username" id="slot2-username" placeholder="Username">
+                            <input type="text" id="slot2-username" class="slot-username" placeholder="Character Username">
                         </div>
                         <div class="form-group">
                             <label>Password</label>
                             <div class="password-wrapper">
-                                <input type="password" class="slot-password" id="slot2-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password" tabindex="-1">
+                                <input type="password" id="slot2-password" class="slot-password" placeholder="Password">
+                                <button type="button" class="btn-toggle-password">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                 </button>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Class</label>
-                            <input type="text" class="slot-class" id="slot2-class" placeholder="StoneCrusher">
+                            <input type="text" id="slot2-class" class="slot-class" placeholder="StoneCrusher">
                         </div>
-                        
-                        <div class="options-row">
-                            <div class="form-group flex-1">
-                                <label>Converge</label>
-                                <select class="slot-converge" id="slot2-converge">
-                                    <option value="sun">Sun</option>
-                                    <option value="moon">Moon</option>
-                                </select>
-                            </div>
-                            <div class="form-group flex-1">
-                                <label>Taunt Parity</label>
-                                <select class="slot-parity" id="slot2-parity">
-                                    <option value="even">Even</option>
-                                    <option value="odd">Odd</option>
-                                </select>
-                            </div>
-                        </div>
-                        
                         <div class="checkbox-options">
                             <label class="chk-label">
-                                <input type="checkbox" class="slot-light-gather" id="slot2-light-gather">
-                                Light Gather Taunter
+                                <input type="radio" name="taunter-group" id="slot2-is-taunter">
+                                Taunter
                             </label>
                         </div>
                         
+                        <!-- Telemetry Display (Hidden by default) -->
                         <div class="telemetry-panel hidden" id="telemetry-slot2">
                             <div class="telemetry-row">
                                 <span class="tel-label">Map</span>
@@ -266,59 +233,38 @@
                     </div>
                 </div>
 
-                <!-- Slot 3: Slave 2 (Moon / odd) -->
+                <!-- Slot 3: Slave 2 -->
                 <div class="slot-card moon-theme" id="card-slot3">
                     <div class="slot-header">
-                        <div class="badge-role moon">Slot 3: Slave 2 (Moon / odd)</div>
-                        <div class="status-badge" id="badge-slot3">Offline</div>
+                        <h2>Slave 2</h2>
+                        <span class="status-badge" id="badge-slot3">Offline</span>
                     </div>
                     <div class="slot-body">
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" class="slot-username" id="slot3-username" placeholder="Username">
+                            <input type="text" id="slot3-username" class="slot-username" placeholder="Character Username">
                         </div>
                         <div class="form-group">
                             <label>Password</label>
                             <div class="password-wrapper">
-                                <input type="password" class="slot-password" id="slot3-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password" tabindex="-1">
+                                <input type="password" id="slot3-password" class="slot-password" placeholder="Password">
+                                <button type="button" class="btn-toggle-password">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                 </button>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Class</label>
-                            <input type="text" class="slot-class" id="slot3-class" placeholder="ArchPaladin">
+                            <input type="text" id="slot3-class" class="slot-class" placeholder="Legion Revenant">
                         </div>
-                        
-                        <div class="options-row">
-                            <div class="form-group flex-1">
-                                <label>Converge</label>
-                                <select class="slot-converge" id="slot3-converge">
-                                    <option value="moon">Moon</option>
-                                    <option value="sun">Sun</option>
-                                </select>
-                            </div>
-                            <div class="form-group flex-1">
-                                <label>Taunt Parity</label>
-                                <select class="slot-parity" id="slot3-parity">
-                                    <option value="odd">Odd</option>
-                                    <option value="even">Even</option>
-                                </select>
-                            </div>
-                        </div>
-                        
                         <div class="checkbox-options">
                             <label class="chk-label">
-                                <input type="checkbox" class="slot-light-gather" id="slot3-light-gather" checked>
-                                Light Gather Taunter
-                            </label>
-                            <label class="chk-label">
-                                <input type="checkbox" class="slot-moon-haze" id="slot3-moon-haze" checked>
-                                Moon Haze Taunter
+                                <input type="radio" name="taunter-group" id="slot3-is-taunter">
+                                Taunter
                             </label>
                         </div>
                         
+                        <!-- Telemetry Display (Hidden by default) -->
                         <div class="telemetry-panel hidden" id="telemetry-slot3">
                             <div class="telemetry-row">
                                 <span class="tel-label">Map</span>
@@ -342,59 +288,38 @@
                     </div>
                 </div>
 
-                <!-- Slot 4: Slave 3 (Moon / even) -->
+                <!-- Slot 4: Slave 3 -->
                 <div class="slot-card moon-theme" id="card-slot4">
                     <div class="slot-header">
-                        <div class="badge-role moon">Slot 4: Slave 3 (Moon / even)</div>
-                        <div class="status-badge" id="badge-slot4">Offline</div>
+                        <h2>Slave 3</h2>
+                        <span class="status-badge" id="badge-slot4">Offline</span>
                     </div>
                     <div class="slot-body">
                         <div class="form-group">
                             <label>Username</label>
-                            <input type="text" class="slot-username" id="slot4-username" placeholder="Username">
+                            <input type="text" id="slot4-username" class="slot-username" placeholder="Character Username">
                         </div>
                         <div class="form-group">
                             <label>Password</label>
                             <div class="password-wrapper">
-                                <input type="password" class="slot-password" id="slot4-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password" tabindex="-1">
+                                <input type="password" id="slot4-password" class="slot-password" placeholder="Password">
+                                <button type="button" class="btn-toggle-password">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
                                 </button>
                             </div>
                         </div>
                         <div class="form-group">
                             <label>Class</label>
-                            <input type="text" class="slot-class" id="slot4-class" placeholder="Lord of Order">
+                            <input type="text" id="slot4-class" class="slot-class" placeholder="Lord of Order">
                         </div>
-                        
-                        <div class="options-row">
-                            <div class="form-group flex-1">
-                                <label>Converge</label>
-                                <select class="slot-converge" id="slot4-converge">
-                                    <option value="moon">Moon</option>
-                                    <option value="sun">Sun</option>
-                                </select>
-                            </div>
-                            <div class="form-group flex-1">
-                                <label>Taunt Parity</label>
-                                <select class="slot-parity" id="slot4-parity">
-                                    <option value="even">Even</option>
-                                    <option value="odd">Odd</option>
-                                </select>
-                            </div>
-                        </div>
-                        
                         <div class="checkbox-options">
                             <label class="chk-label">
-                                <input type="checkbox" class="slot-light-gather" id="slot4-light-gather" checked>
-                                Light Gather Taunter
-                            </label>
-                            <label class="chk-label">
-                                <input type="checkbox" class="slot-sunset-knight" id="slot4-sunset-knight" checked>
-                                Sunset Knight Taunter
+                                <input type="radio" name="taunter-group" id="slot4-is-taunter">
+                                Taunter
                             </label>
                         </div>
                         
+                        <!-- Telemetry Display (Hidden by default) -->
                         <div class="telemetry-panel hidden" id="telemetry-slot4">
                             <div class="telemetry-row">
                                 <span class="tel-label">Map</span>
@@ -421,12 +346,11 @@
             </div>
         </main>
 
-        <!-- Bottom Console Console -->
+        <!-- Bottom Console Bar -->
         <footer class="app-console">
             <div class="console-tabs-bar">
                 <div class="tabs-list" id="console-tabs-list">
                     <button class="console-tab active" data-source="System">System</button>
-                    <!-- Tabs for accounts populated dynamically -->
                 </div>
                 <div class="console-actions">
                     <div class="console-checkbox-wrapper">
@@ -440,7 +364,9 @@
                 <!-- Log streams appear here -->
             </div>
         </footer>
+
     </div>
+    
     <script src="main.js"></script>
 </body>
 </html>

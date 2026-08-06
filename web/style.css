@@ -876,3 +876,45 @@ input:checked + .slider:before {
 .bg-yellow {
     background-color: rgba(245, 158, 11, 0.2);
 }
+
+/* Info Tooltip styles */
+.brand-name {
+    position: relative;
+}
+
+#app-title-click {
+    cursor: pointer;
+    transition: color 0.2s ease;
+}
+
+#app-title-click:hover {
+    color: var(--primary-color);
+}
+
+.info-tooltip-bubble {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    transform: scale(0.9);
+    transform-origin: top left;
+    background-color: #0f111a;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 10px 14px;
+    width: 200px;
+    color: var(--text-primary);
+    font-size: 0.72rem;
+    line-height: 1.4;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.5);
+    z-index: 1000;
+    pointer-events: none;
+    opacity: 0;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    text-align: left;
+}
+
+.info-tooltip-bubble.show {
+    opacity: 1;
+    pointer-events: auto;
+    transform: scale(1);
+}

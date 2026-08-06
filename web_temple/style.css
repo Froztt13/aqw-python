@@ -239,6 +239,7 @@ body {
     overflow: hidden;
     backdrop-filter: blur(12px);
     transition: box-shadow 0.3s, border-color 0.3s;
+    height: fit-content;
 }
 
 .slot-card:hover {
@@ -651,7 +652,7 @@ body {
 .settings-dropdown-panel {
     position: absolute;
     top: 64px;
-    right: 135px;
+    right: 155px;
     width: 240px;
     background-color: #14121f;
     border: 1px solid var(--border-color);

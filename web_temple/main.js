@@ -17,6 +17,7 @@ let activeTab = "System";
 // HTML Elements
 const serverSelect = document.getElementById("select-server");
 const roomInput = document.getElementById("input-room-number");
+const selectTempleBot = document.getElementById("select-temple-bot");
 const btnStartParty = document.getElementById("btn-start-party");
 const btnStopParty = document.getElementById("btn-stop-party");
 const consoleTabsList = document.getElementById("console-tabs-list");
@@ -97,7 +98,6 @@ window.addEventListener("pywebviewready", () => {
 
     btnStartParty.addEventListener("click", startParty);
     btnStopParty.addEventListener("click", stopParty);
-    btnClearLogs.addEventListener("click", clearLogs);
 
     const btnResetConfig = document.getElementById("btn-reset-config");
     if (btnResetConfig) {
@@ -118,20 +118,11 @@ window.addEventListener("pywebviewready", () => {
                     
                     serverSelect.value = config.server || "Alteon";
                     roomInput.value = config.room_number || 9099;
+                    selectTempleBot.value = config.temple_bot_type || "MidnightSunBot";
                     
                     slots.forEach(slot => {
                         const slotConfig = config.slots[slot] || {};
                         document.getElementById(`${slot}-class`).value = slotConfig.char_class || "";
-                        document.getElementById(`${slot}-converge`).value = slotConfig.converge_type || "";
-                        document.getElementById(`${slot}-parity`).value = slotConfig.taunt_parity || "";
-                        document.getElementById(`${slot}-light-gather`).checked = !!slotConfig.light_gather_taunter;
-                        
-                        if (slot === "slot3") {
-                            document.getElementById("slot3-moon-haze").checked = !!slotConfig.moon_haze_taunter;
-                        }
-                        if (slot === "slot4") {
-                            document.getElementById("slot4-sunset-knight").checked = !!slotConfig.sunset_knight_taunter;
-                        }
                     });
                     
                     saveConfiguration();
@@ -150,6 +141,7 @@ function loadConfiguration() {
         
         serverSelect.value = config.server || "Alteon";
         roomInput.value = config.room_number || 9099;
+        selectTempleBot.value = config.temple_bot_type || "MidnightSunBot";
         
         // Load auto-restart settings
         document.getElementById("chk-auto-restart").checked = !!config.auto_restart_enabled;
@@ -162,16 +154,7 @@ function loadConfiguration() {
             document.getElementById(`${slot}-username`).value = slotConfig.username || "";
             document.getElementById(`${slot}-password`).value = slotConfig.password || "";
             document.getElementById(`${slot}-class`).value = slotConfig.char_class || "";
-            document.getElementById(`${slot}-converge`).value = slotConfig.converge_type || "";
-            document.getElementById(`${slot}-parity`).value = slotConfig.taunt_parity || "";
-            document.getElementById(`${slot}-light-gather`).checked = !!slotConfig.light_gather_taunter;
-            
-            if (slot === "slot3") {
-                document.getElementById("slot3-moon-haze").checked = !!slotConfig.moon_haze_taunter;
-            }
-            if (slot === "slot4") {
-                document.getElementById("slot4-sunset-knight").checked = !!slotConfig.sunset_knight_taunter;
-            }
+            document.getElementById(`${slot}-is-taunter`).checked = !!slotConfig.is_taunter;
         });
         
         updateConsoleTabs();
@@ -185,6 +168,7 @@ function saveConfiguration() {
     
     config.server = serverSelect.value;
     config.room_number = parseInt(roomInput.value) || 9099;
+    config.temple_bot_type = selectTempleBot.value;
     
     config.auto_restart_enabled = document.getElementById("chk-auto-restart").checked;
     config.auto_restart_delay = parseInt(document.getElementById("input-restart-delay").value) || 30;
@@ -195,17 +179,8 @@ function saveConfiguration() {
             username: document.getElementById(`${slot}-username`).value.trim(),
             password: document.getElementById(`${slot}-password`).value.trim(),
             char_class: document.getElementById(`${slot}-class`).value.trim(),
-            converge_type: document.getElementById(`${slot}-converge`).value,
-            taunt_parity: document.getElementById(`${slot}-parity`).value,
-            light_gather_taunter: document.getElementById(`${slot}-light-gather`).checked
+            is_taunter: document.getElementById(`${slot}-is-taunter`).checked
         };
-        
-        if (slot === "slot3") {
-            config.slots.slot3.moon_haze_taunter = document.getElementById("slot3-moon-haze").checked;
-        }
-        if (slot === "slot4") {
-            config.slots.slot4.sunset_knight_taunter = document.getElementById("slot4-sunset-knight").checked;
-        }
     });
 
     window.pywebview.api.save_config(config);
@@ -214,7 +189,7 @@ function saveConfiguration() {
 // Dynamic Tab Updating
 function updateConsoleTabs() {
     // Keep reference to currently selected tab
-    const previousActive = activeTab;
+    const currentTab = activeTab;
     
     // Clear tabs list except System
     consoleTabsList.innerHTML = `<button class="console-tab ${activeTab === 'System' ? 'active' : ''}" data-source="System">System</button>`;
@@ -275,7 +250,7 @@ function startParty(isAuto = false) {
                 if (durationVal) durationVal.innerText = `${hrs}:${mins}:${secs}`;
             }, 1000);
             
-            // Hide reset button
+            // Hide reset config button inside popover
             const btnReset = document.getElementById("btn-reset-config");
             if (btnReset) btnReset.classList.add("hidden");
             
@@ -317,49 +292,39 @@ function stopParty() {
             durationInterval = null;
         }
         const durationCounter = document.getElementById("duration-counter");
-        const durationVal = document.getElementById("duration-val");
         if (durationCounter) durationCounter.classList.add("hidden");
-        if (durationVal) durationVal.innerText = "00:00:00";
         
-        // Show reset button
+        // Show reset config button inside popover
         const btnReset = document.getElementById("btn-reset-config");
         if (btnReset) btnReset.classList.remove("hidden");
         
         // Unlock fields
         toggleFormFieldsLock(false);
         
-        // Show credentials and hide summary
+        // Show credentials input again
         toggleCredentialsVisibility(false);
         
         // Stop Polling Status
         stopTelemetryPolling();
         
-        // Clean layouts
+        // Clean layouts back to offline defaults
         slots.forEach(slot => {
-            document.getElementById(`badge-${slot}`).className = "status-badge";
-            document.getElementById(`badge-${slot}`).innerText = "Offline";
-            document.getElementById(`telemetry-${slot}`).classList.add("hidden");
+            const badge = document.getElementById(`badge-${slot}`);
+            if (badge) {
+                badge.className = "status-badge";
+                badge.innerText = "Offline";
+            }
+            const tel = document.getElementById(`telemetry-${slot}`);
+            if (tel) {
+                tel.classList.add("hidden");
+            }
         });
     });
 }
 
-// Lock/Unlock input controls
-function toggleFormFieldsLock(lock) {
-    document.querySelectorAll("input, select").forEach(elem => {
-        if (elem.id !== "chk-auto-scroll") {
-            elem.disabled = lock;
-        }
-    });
-}
-
-// Status telemetry polling
 function startTelemetryPolling() {
-    if (statusInterval) clearInterval(statusInterval);
-    
-    // Initial call
+    stopTelemetryPolling();
     checkActiveBotStatuses();
-    
-    // Poll every 1 second
     statusInterval = setInterval(checkActiveBotStatuses, 1000);
 }
 
@@ -416,75 +381,83 @@ function checkActiveBotStatuses() {
     });
 }
 
-// Add logs from Python redirector stream
+// Appending Logs into console streams
 window.addSlaveLog = function(username, htmlMsg) {
-    // Determine mapping target tab
-    let targetTab = "System";
+    // If username is not System, check if it maps to any slot username
+    let targetStream = "System";
     if (username !== "System") {
-        // Resolve if we match any slot's active username input
         slots.forEach(slot => {
-            const inputVal = document.getElementById(`${slot}-username`).value.trim();
-            if (inputVal && inputVal.toLowerCase() === username.toLowerCase()) {
-                targetTab = inputVal;
+            const slotUsername = document.getElementById(`${slot}-username`).value.trim();
+            if (slotUsername && slotUsername.toLowerCase() === username.toLowerCase()) {
+                targetStream = slotUsername;
             }
         });
     }
 
-    if (!logStreams[targetTab]) {
-        logStreams[targetTab] = [];
+    if (!logStreams[targetStream]) {
+        logStreams[targetStream] = [];
     }
     
-    // Store in stream (limit log buffer size to 500 lines)
-    logStreams[targetTab].push(htmlMsg);
-    if (logStreams[targetTab].length > 500) {
-        logStreams[targetTab].shift();
+    // Append to array
+    logStreams[targetStream].push(htmlMsg);
+    
+    // Cap log lines to 200 to save memory
+    if (logStreams[targetStream].length > 200) {
+        logStreams[targetStream].shift();
     }
     
-    // If target tab is active, append to viewport in real-time
-    if (activeTab === targetTab) {
+    // Render immediately if it is active tab
+    if (activeTab === targetStream) {
         const line = document.createElement("div");
         line.className = "log-line";
         line.innerHTML = htmlMsg;
         consoleViewport.appendChild(line);
         
-        // Auto scroll
-        if (chkAutoScroll.checked) {
+        if (chkAutoScroll && chkAutoScroll.checked) {
             consoleViewport.scrollTop = consoleViewport.scrollHeight;
         }
     }
 };
 
-// Render whole log buffer on tab click
 function renderActiveLogs() {
     consoleViewport.innerHTML = "";
-    const activeStream = logStreams[activeTab] || [];
-    
-    activeStream.forEach(htmlMsg => {
+    const stream = logStreams[activeTab] || [];
+    stream.forEach(htmlMsg => {
         const line = document.createElement("div");
         line.className = "log-line";
         line.innerHTML = htmlMsg;
         consoleViewport.appendChild(line);
     });
     
-    if (chkAutoScroll.checked) {
+    if (chkAutoScroll && chkAutoScroll.checked) {
         consoleViewport.scrollTop = consoleViewport.scrollHeight;
     }
 }
 
-// Clear log buffers
 function clearLogs() {
     logStreams[activeTab] = [];
     consoleViewport.innerHTML = "";
 }
 
-// Toggle credentials fields and display active account summaries
+function toggleFormFieldsLock(isLocked) {
+    serverSelect.disabled = isLocked;
+    roomInput.disabled = isLocked;
+    selectTempleBot.disabled = isLocked;
+    
+    slots.forEach(slot => {
+        document.getElementById(`${slot}-username`).disabled = isLocked;
+        document.getElementById(`${slot}-password`).disabled = isLocked;
+        document.getElementById(`${slot}-class`).disabled = isLocked;
+        document.getElementById(`${slot}-is-taunter`).disabled = isLocked;
+    });
+}
+
+// Censor Mode Credentials toggler on party start
 function toggleCredentialsVisibility(showInfoDisplay) {
     slots.forEach((slot, index) => {
+        const usernameFg = document.getElementById(`${slot}-username`).closest('.form-group');
+        const passwordFg = document.getElementById(`${slot}-password`).closest('.form-group');
         const usernameInput = document.getElementById(`${slot}-username`);
-        const passwordInput = document.getElementById(`${slot}-password`);
-        
-        const usernameFg = usernameInput.closest('.form-group');
-        const passwordFg = passwordInput.closest('.form-group');
         
         if (showInfoDisplay) {
             usernameFg.classList.add('hidden');
@@ -538,15 +511,7 @@ function handleDisconnectMonitoring(statuses) {
         updateRestartStatusText("");
         return;
     }
-
-    // Check if we are still within the grace period (45 seconds) to allow login
-    if (lastStartTimestamp && (Date.now() - lastStartTimestamp < 45000)) {
-        updateRestartStatusText("");
-        return;
-    }
     
-    const maxAttempts = parseInt(config.auto_restart_max_attempts) || 3;
-
     // If the restart timer is active (waiting for delay to start), handle the countdown
     if (restartTimerActive) {
         const remainingMs = restartTimerTarget - Date.now();
@@ -560,6 +525,7 @@ function handleDisconnectMonitoring(statuses) {
             updateRestartStatusText("Auto-Restarting now!");
             
             restartAttempts++;
+            const maxAttempts = parseInt(config.auto_restart_max_attempts) || 3;
             addSlaveLog("System", `<span class="log-yellow log-bold">[System] Restarting party bots (Attempt ${restartAttempts}/${maxAttempts})...</span>`);
             
             setTimeout(() => {
@@ -571,6 +537,12 @@ function handleDisconnectMonitoring(statuses) {
     }
 
     if (isStoppingForRestart) return;
+    
+    // Check if we are still within the grace period (45 seconds) to allow login
+    if (lastStartTimestamp && (Date.now() - lastStartTimestamp < 45000)) {
+        updateRestartStatusText("");
+        return;
+    }
     
     // Otherwise, check if there is an active disconnect
     let hasDisconnect = false;
@@ -585,6 +557,7 @@ function handleDisconnectMonitoring(statuses) {
     });
     
     if (hasDisconnect) {
+        const maxAttempts = parseInt(config.auto_restart_max_attempts) || 3;
         if (restartAttempts >= maxAttempts) {
             updateRestartStatusText("Auto-restart limit reached!");
             addSlaveLog("System", `<span class="log-red log-bold">[System] Error: Auto-restart failed after ${maxAttempts} attempts. Stopping bots completely.</span>`);
@@ -634,7 +607,6 @@ function handleDisconnectMonitoring(statuses) {
             
             // Re-start status polling loop to update the countdown
             startTelemetryPolling();
-        });
         });
     }
 }

@@ -83,7 +83,7 @@ class CoreTempleBot:
         self.timeleapse = time.monotonic()
         await self.cmd.sleep(1000)
         await self.cmd.send_packet(f"%xt%zm%dungeonQueue%25127%{self.temple}%")
-        while self.cmd.is_not_in_map(self.temple):
+        while self.cmd.is_not_in_map(self.temple) and self.cmd.is_still_connected():
             self.print_debug("Waiting for dungeon queue...")
             await self.cmd.sleep(200)
 
@@ -102,12 +102,14 @@ class CoreTempleBot:
             minutes = int(elapsed_seconds // 60)
             seconds = int(elapsed_seconds % 60)
             self.cleared_count += 1
+            self.print_debug(f"Dungeon cleared {self.cleared_count} times.")
             await self.cmd.send_chat(f"Dungeon cleared {self.cleared_count} times.")
             await self.cmd.sleep(1000)
+            self.print_debug(f"Total time taken: {minutes} minutes and {seconds} seconds.")
             await self.cmd.send_chat(f"Total time taken: {minutes} minutes and {seconds} seconds.")
             await self.cmd.sleep(1000)
             await self.cmd.join_map("templeshrine", roomNumber=999999)
-            while self.cmd.is_not_in_map("templeshrine"):
+            while self.cmd.is_not_in_map("templeshrine") and self.cmd.is_still_connected():
                 await self.cmd.sleep(200)
             self.print_debug("Entering new queue...")
             await self.enter_dungeon()
@@ -118,7 +120,7 @@ class CoreTempleBot:
         await self.cmd.sleep(4000)
 
         self.print_debug("Waiting for all slaves to be online...")
-        while not self.cmd.wait_count_player(4):
+        while not self.cmd.wait_count_player(4) and self.cmd.is_still_connected():
             await self.cmd.sleep(100)
 
         for slave in self.cmd.bot.slaves_player:
@@ -134,7 +136,7 @@ class CoreTempleBot:
 
     async def wait_party_invite(self):
         self.print_debug("Waiting for party invitation...")
-        while self.pid is None:
+        while self.pid is None and self.cmd.is_still_connected():
             await self.go_to_master()
             await self.cmd.sleep(1000)
         self.print_debug(f"Accepting party invitation from PID: {self.pid}")
