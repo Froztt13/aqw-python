@@ -117,7 +117,7 @@ sys.stdout = global_redirector_out
 sys.stderr = global_redirector_err
 
 class SlaveBotThread(threading.Thread):
-    def __init__(self, username, password, char_class, config, callback, skills="0,1,2,0,3,4", hp_operator="<", hp_threshold=0, hp_skills="", mp_operator="<", mp_threshold=0, mp_skills=""):
+    def __init__(self, username, password, char_class, config, callback, skills="1,2,3,4", hp_operator="<", hp_threshold=0, hp_skills="", mp_operator="<", mp_threshold=0, mp_skills=""):
         super().__init__()
         self.username = username
         self.password = password
@@ -267,7 +267,9 @@ class SlaveryApi:
                 "tercessuinotlim",
                 "icestormunder"
             ],
-            "slaves": []
+            "slaves": [],
+            "theme_maid": False,
+            "settings_hidden": False
         }
         if os.path.exists(self.config_path):
             try:
@@ -303,7 +305,7 @@ class SlaveryApi:
                 password = slave.get("password")
                 char_class = slave.get("char_class")
                 
-                skills = slave.get("skills", "0,1,2,0,3,4")
+                skills = slave.get("skills", "1,2,3,4")
                 hp_operator = slave.get("hp_operator", "<")
                 hp_threshold = slave.get("hp_threshold", 0)
                 hp_skills = slave.get("hp_skills", "")
@@ -382,7 +384,8 @@ class SlaveryApi:
                         "is_connected": bot.is_client_connected,
                         "is_dead": player.ISDEAD if player else False,
                         "gold": player.GOLD if player else 0,
-                        "index": bot.index
+                        "index": bot.index,
+                        "last_skills": getattr(bot, "last_skills", [])
                     }
                 except Exception as e:
                     statuses[username] = {

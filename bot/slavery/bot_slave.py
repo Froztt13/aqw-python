@@ -28,15 +28,17 @@ whitelist = [
 checking_locked_zone = False
 async def main(cmd: Command):
     global checking_locked_zone
-    skills_str = getattr(cmd.bot, "skills", "0,1,2,0,3,4")
+    cmd.bot.last_skills = []
+    skills_str = getattr(cmd.bot, "skills", "1,2,3,4")
     try:
-        skills = [int(x.strip()) for x in skills_str.split(",") if x.strip().isdigit()]
+        skills = [int(x.strip()) for x in skills_str.split(",") if x.strip().isdigit() and int(x.strip()) != 0]
         if not skills:
-            skills = [0, 1, 2, 0, 3, 4]
+            skills = [1, 2, 3, 4]
     except Exception:
-        skills = [0, 1, 2, 0, 3, 4]
+        skills = [1, 2, 3, 4]
         
     skill_index = 0
+    other_skills_used = 0
     
     # Resolve dynamic properties if injected via GUI, otherwise fallback to script globals
     f_player = getattr(cmd.bot, "follow_player", None) or (follow_player if 'follow_player' in globals() else "")
@@ -259,11 +261,33 @@ async def main(cmd: Command):
                     skill_index = (skill_index + 1) % len(skills)
                     continue
         
-        await cmd.use_skill(
+        success = await cmd.use_skill(
             index=skills[skill_index],
             target_monsters=targets,
             skill_mode=skill_mode
             )
+        
+        if success:
+            last_skills = getattr(cmd.bot, "last_skills", [])
+            last_skills.append(skills[skill_index])
+            if len(last_skills) > 3:
+                last_skills.pop(0)
+            cmd.bot.last_skills = last_skills
+            
+            other_skills_used += 1
+            if other_skills_used >= 2:
+                success_0 = await cmd.use_skill(
+                    index=0,
+                    target_monsters=targets,
+                    skill_mode=skill_mode
+                )
+                if success_0:
+                    last_skills = getattr(cmd.bot, "last_skills", [])
+                    last_skills.append(0)
+                    if len(last_skills) > 3:
+                        last_skills.pop(0)
+                    cmd.bot.last_skills = last_skills
+                other_skills_used = 0
         
         skill_index = skill_index + 1
         if skill_index >= len(skills):

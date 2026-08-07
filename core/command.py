@@ -950,7 +950,7 @@ class Command:
                         hunt: bool = False, 
                         skill_mode: SkillMode = SkillMode.ALL,
                         reload_delay: int = 500
-        ) -> None:
+        ) -> bool:
         """Execute a skill with optional hunting, targeting, and cooldown handling.
 
         Args:
@@ -961,12 +961,12 @@ class Command:
             reload_delay (int): Cooldown buffer in milliseconds after casting.
 
         Returns:
-            None: The coroutine schedules the skill usage and exits.
+            bool: True if the skill was successfully executed, False otherwise.
         """
         if skill_mode == SkillMode.NONE:
-            return
+            return False
         if not self.bot.player.canUseSkill(int(index)) or not self.check_is_skill_safe(int(index)):
-            return
+            return False
 
         skill = self.bot.player.SKILLS[int(index)]
         self.bot.skillAnim = skill.get("anim", None)
@@ -1045,6 +1045,7 @@ class Command:
         self.bot.player.updateNextUse(index) # do this if skills is REALLY exetuced
 
         self.skill_reload_time = int(round(datetime.now().timestamp() * 1000)) + reload_delay
+        return True
 
     @check_alive
     def do_pwd(self, monster_id: str) -> None:

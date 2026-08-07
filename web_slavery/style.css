@@ -1077,3 +1077,37 @@ button:disabled, input:disabled, select:disabled {
     opacity: 1;
 }
 
+/* Global Settings Column Toggling */
+.app-body.settings-hidden #panel-global-settings {
+    display: none !important;
+}
+
+.app-body.settings-hidden #panel-slave-registry {
+    grid-column: span 5 !important;
+}
+
+#btn-toggle-settings.active {
+    background: rgba(255, 255, 255, 0.15);
+    color: var(--primary-color);
+    box-shadow: 0 0 10px rgba(99, 102, 241, 0.3);
+}
+.theme-maid #btn-toggle-settings.active {
+    box-shadow: 0 0 10px rgba(244, 143, 177, 0.3);
+}
+
+/* Recent Skills column styling */
+.recent-skills-container {
+    display: flex;
+    gap: 4px;
+    align-items: center;
+}
+.recent-skill-pill {
+    background: rgba(255, 255, 255, 0.08);
+    color: var(--primary-color);
+    font-family: monospace;
+    font-weight: bold;
+    font-size: 0.72rem;
+    padding: 2px 6px;
+    border-radius: 4px;
+    border: 1px solid rgba(255, 255, 255, 0.1);
+}

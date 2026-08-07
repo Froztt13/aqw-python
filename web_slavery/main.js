@@ -104,13 +104,25 @@ document.addEventListener('DOMContentLoaded', () => {
 
     const btnToggleTheme = document.getElementById('btn-toggle-theme');
     if (btnToggleTheme) {
-        const isMaidTheme = localStorage.getItem('theme-maid') === 'true';
-        if (isMaidTheme) {
-            document.body.classList.add('theme-maid');
-        }
         btnToggleTheme.addEventListener('click', () => {
             const active = document.body.classList.toggle('theme-maid');
-            localStorage.setItem('theme-maid', active);
+            if (globalConfig) {
+                globalConfig.theme_maid = active;
+                window.pywebview.api.save_config(globalConfig);
+            }
+        });
+    }
+
+    const btnToggleSettings = document.getElementById('btn-toggle-settings');
+    const appBody = document.getElementById('app-body');
+    if (btnToggleSettings && appBody) {
+        btnToggleSettings.addEventListener('click', () => {
+            const active = appBody.classList.toggle('settings-hidden');
+            btnToggleSettings.classList.toggle('active', active);
+            if (globalConfig) {
+                globalConfig.settings_hidden = active;
+                window.pywebview.api.save_config(globalConfig);
+            }
         });
     }
 
@@ -179,7 +191,7 @@ document.addEventListener('DOMContentLoaded', () => {
         slaveUsernameInput.value = '';
         slavePasswordInput.value = '';
         slaveClassInput.value = '';
-        slaveSkillsInput.value = '0,1,2,0,3,4';
+        slaveSkillsInput.value = '1,2,3,4';
         slaveHpThresholdInput.value = '';
         slaveHpSkillsInput.value = '';
         slaveMpThresholdInput.value = '';
@@ -299,7 +311,7 @@ document.addEventListener('DOMContentLoaded', () => {
                     username: user,
                     password: pass,
                     char_class: cls,
-                    skills: slaveSkillsInput.value.trim() || '0,1,2,0,3,4',
+                    skills: slaveSkillsInput.value.trim() || '1,2,3,4',
                     hp_operator: slaveHpOperatorSelect.value,
                     hp_threshold: parseInt(slaveHpThresholdInput.value) || 0,
                     hp_skills: slaveHpSkillsInput.value.trim() || '',
@@ -337,7 +349,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 username: user,
                 password: pass,
                 char_class: cls,
-                skills: slaveSkillsInput.value.trim() || '0,1,2,0,3,4',
+                skills: slaveSkillsInput.value.trim() || '1,2,3,4',
                 hp_operator: slaveHpOperatorSelect.value,
                 hp_threshold: parseInt(slaveHpThresholdInput.value) || 0,
                 hp_skills: slaveHpSkillsInput.value.trim() || '',
@@ -374,6 +386,24 @@ document.addEventListener('DOMContentLoaded', () => {
         window.pywebview.api.load_config().then(config => {
             globalConfig = config;
             
+            // Apply saved settings panel state
+            const isSettingsHidden = config.settings_hidden || false;
+            if (isSettingsHidden) {
+                appBody.classList.add('settings-hidden');
+                btnToggleSettings.classList.add('active');
+            } else {
+                appBody.classList.remove('settings-hidden');
+                btnToggleSettings.classList.remove('active');
+            }
+
+            // Apply saved theme state
+            const isMaidTheme = config.theme_maid || false;
+            if (isMaidTheme) {
+                document.body.classList.add('theme-maid');
+            } else {
+                document.body.classList.remove('theme-maid');
+            }
+
             followPlayerInput.value = config.follow_player || '';
             copyWalkInput.checked = config.copy_walk !== undefined ? config.copy_walk : true;
             serverSelect.value = config.server || 'Artix';
@@ -409,7 +439,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const slaves = globalConfig.slaves || [];
         
         if (slaves.length === 0) {
-            slaveTableBody.innerHTML = `<tr><td colspan="7" class="text-muted" style="text-align: center; padding: 20px;">No registered slave accounts. Click "+ Add Account" to start.</td></tr>`;
+            slaveTableBody.innerHTML = `<tr><td colspan="8" class="text-muted" style="text-align: center; padding: 20px;">No registered slave accounts. Click "+ Add Account" to start.</td></tr>`;
             return;
         }
 
@@ -434,6 +464,11 @@ document.addEventListener('DOMContentLoaded', () => {
                             <span id="hp-txt-${s.id}">0/0</span>
                             <span id="mp-txt-${s.id}">0/0</span>
                         </div>
+                    </div>
+                </td>
+                <td class="col-recent-skills">
+                    <div class="recent-skills-container" id="recent-skills-${s.id}">
+                        <span class="text-muted">-</span>
                     </div>
                 </td>
                 <td class="col-status"><span class="status-pill offline">Offline</span></td>
@@ -504,7 +539,7 @@ document.addEventListener('DOMContentLoaded', () => {
                 slaveUsernameInput.value = slave.username;
                 slavePasswordInput.value = slave.password;
                 slaveClassInput.value = slave.char_class;
-                slaveSkillsInput.value = slave.skills || '0,1,2,0,3,4';
+                slaveSkillsInput.value = slave.skills || '1,2,3,4';
                 slaveHpOperatorSelect.value = slave.hp_operator || '<';
                 slaveHpThresholdInput.value = slave.hp_threshold !== undefined ? slave.hp_threshold : '';
                 slaveHpSkillsInput.value = slave.hp_skills || '';
@@ -709,6 +744,7 @@ document.addEventListener('DOMContentLoaded', () => {
         const mpBar = document.getElementById(`mp-bar-${id}`);
         const hpTxt = document.getElementById(`hp-txt-${id}`);
         const mpTxt = document.getElementById(`mp-txt-${id}`);
+        const recentSkillsEl = document.getElementById(`recent-skills-${id}`);
 
         if (!status || !status.running) {
             colMap.textContent = '-';
@@ -717,6 +753,9 @@ document.addEventListener('DOMContentLoaded', () => {
             if (mpBar) mpBar.style.width = '0%';
             if (hpTxt) hpTxt.textContent = '0/0';
             if (mpTxt) mpTxt.textContent = '0/0';
+            if (recentSkillsEl) {
+                recentSkillsEl.innerHTML = '<span class="text-muted">-</span>';
+            }
             return;
         }
 
@@ -728,6 +767,15 @@ document.addEventListener('DOMContentLoaded', () => {
             colStatus.innerHTML = `<span class="status-pill online">Serving</span>`;
         } else {
             colStatus.innerHTML = `<span class="status-pill connecting">Connecting</span>`;
+        }
+
+        if (recentSkillsEl) {
+            const skills = status.last_skills || [];
+            if (skills.length === 0) {
+                recentSkillsEl.innerHTML = '<span class="text-muted">-</span>';
+            } else {
+                recentSkillsEl.innerHTML = skills.map(sk => `<span class="recent-skill-pill">${sk}</span>`).join('');
+            }
         }
 
         if (hpBar && status.max_hp > 0) {
