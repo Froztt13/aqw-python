@@ -1030,9 +1030,13 @@ class Command:
             else:
                 cell_monsters.sort(key=lambda m: m.current_hp)
                 final_ids = [mon.mon_map_id for mon in cell_monsters]
+            
+            if not final_ids:
+                return False
+
             if index == 5:
                 self.bot.use_scroll(final_ids, max_target)
-            if index < 5 and final_ids:
+            if index < 5:
                 self.bot.use_skill_to_monster("a" if index == 0 else index, final_ids, max_target)
         
         if skill_mode in (SkillMode.ALL, SkillMode.BUFF_ONLY):

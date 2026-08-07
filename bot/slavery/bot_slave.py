@@ -65,7 +65,9 @@ async def main(cmd: Command):
         mp_skills = []
     
     await cmd.equip_item(cmd.get_farm_class())
-    await cmd.sleep(500)
+    await cmd.sleep(1000)
+
+    cmd.bot.taunt_error = False
     
     def handle_message(message):
         # %xt%warning%-1%Cannot goto to player in a Locked zone.%
@@ -213,12 +215,73 @@ async def main(cmd: Command):
                 await cmd.sleep(1000)
                 break
         await goto_master()
-                
+    is_currently_taunter = False
     while(cmd.is_still_connected()):
         await cmd.sleep(200)
         if not cmd.is_player_alive():
             await cmd.sleep(200)
             continue
+
+        # Sync dynamic settings from GUI/Bot instance
+        f_player = getattr(cmd.bot, "follow_player", None) or ""
+        room_num = getattr(cmd.bot, "default_room_number", None) or 9099
+        targets = getattr(cmd.bot, "targets_priority", None) or ""
+        copy_walk = getattr(cmd.bot, "copy_walk", True)
+        auto_zone = getattr(cmd.bot, "auto_zone", "none")
+
+        # Bounds check skill index in case skills list is modified
+        if skill_index >= len(skills):
+            skill_index = 0
+
+        # Check dynamic changes in taunter flag or scroll availability
+        dynamic_taunter = getattr(cmd.bot, "taunter", False)
+        
+        # Verify scroll availability if taunter is enabled
+        has_scrolls = False
+        if dynamic_taunter:
+            item_enrage = cmd.get_player().get_item_inventory("Scroll of Enrage")
+            if item_enrage and item_enrage.qty > 0:
+                has_scrolls = True
+                cmd.bot.taunt_error = False
+            else:
+                cmd.bot.taunt_error = True
+        else:
+            cmd.bot.taunt_error = False
+
+        # Determine if the bot should be active in the taunt rotation
+        should_be_active_taunter = dynamic_taunter and has_scrolls
+
+        if should_be_active_taunter != is_currently_taunter:
+            is_currently_taunter = should_be_active_taunter
+            coordinator = getattr(cmd.bot, "taunt_coordinator", None)
+            if is_currently_taunter:
+                print(f"[{cmd.bot.username}] Enrolling in Taunt Rotation. Equipping Scroll of Enrage...")
+                await cmd.equip_scroll("Scroll of Enrage")
+                if coordinator:
+                    coordinator.register_taunter(cmd.bot.username)
+                if 5 not in skills:
+                    skills.append(5)
+            else:
+                print(f"[{cmd.bot.username}] Withdrawing from Taunt Rotation.")
+                if coordinator:
+                    coordinator.unregister_taunter(cmd.bot.username)
+                if 5 in skills:
+                    skills.remove(5)
+            
+        is_paused = getattr(cmd.bot, "is_paused", False)
+        if is_paused:
+            if not getattr(cmd.bot, "was_paused", False):
+                cmd.bot.was_paused = True
+                print(f"[{cmd.bot.username}] Pausing bot: leaving combat, waiting 1s, and jumping to current cell.")
+                await cmd.leave_combat(safeLeave=False)
+                await cmd.sleep(1000)
+                player = cmd.get_player()
+                if player:
+                    await cmd.jump_cell(player.CELL, player.PAD)
+            await cmd.sleep(500)
+            continue
+        else:
+            cmd.bot.was_paused = False
         
         if checking_locked_zone:
             print(f"checking locked zone...")
@@ -241,6 +304,24 @@ async def main(cmd: Command):
         player_obj = cmd.get_player()
         current_skill = skills[skill_index]
         
+        # If casting taunt (skill 5), only proceed if it's our turn in the rotation
+        if current_skill == 5:
+            coordinator = getattr(cmd.bot, "taunt_coordinator", None)
+            
+            # Skip taunt if player has forbidden boss auras (Elegy of Madness or Seed Planted)
+            if player_obj and (player_obj.hasAura("Elegy of Madness") or player_obj.hasAura("Seed Planted")):
+                if coordinator:
+                    coordinator.skip_taunt(cmd.bot.username)
+                skill_index = (skill_index + 1) % len(skills)
+                continue
+
+            if coordinator:
+                active_taunter = coordinator.get_active_taunter()
+                if active_taunter != cmd.bot.username:
+                    # Skip skill 5 this cycle
+                    skill_index = (skill_index + 1) % len(skills)
+                    continue
+        
         # Check HP threshold
         if hp_threshold > 0 and hp_skills:
             if current_skill in hp_skills:
@@ -261,11 +342,25 @@ async def main(cmd: Command):
                     skill_index = (skill_index + 1) % len(skills)
                     continue
         
+        # Check and use auto-attack (skill 0) if available
+        if cmd.bot.player.canUseSkill(0) and cmd.check_is_skill_safe(0):
+            success_0 = await cmd.use_skill(
+                index=0,
+                target_monsters=targets,
+                skill_mode=skill_mode
+            )
+            if success_0:
+                last_skills = getattr(cmd.bot, "last_skills", [])
+                last_skills.append(0)
+                if len(last_skills) > 3:
+                    last_skills.pop(0)
+                cmd.bot.last_skills = last_skills
+
         success = await cmd.use_skill(
             index=skills[skill_index],
             target_monsters=targets,
             skill_mode=skill_mode
-            )
+        )
         
         if success:
             last_skills = getattr(cmd.bot, "last_skills", [])
@@ -273,21 +368,6 @@ async def main(cmd: Command):
             if len(last_skills) > 3:
                 last_skills.pop(0)
             cmd.bot.last_skills = last_skills
-            
-            other_skills_used += 1
-            if other_skills_used >= 2:
-                success_0 = await cmd.use_skill(
-                    index=0,
-                    target_monsters=targets,
-                    skill_mode=skill_mode
-                )
-                if success_0:
-                    last_skills = getattr(cmd.bot, "last_skills", [])
-                    last_skills.append(0)
-                    if len(last_skills) > 3:
-                        last_skills.pop(0)
-                    cmd.bot.last_skills = last_skills
-                other_skills_used = 0
         
         skill_index = skill_index + 1
         if skill_index >= len(skills):

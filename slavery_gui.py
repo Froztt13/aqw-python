@@ -25,6 +25,7 @@ if getattr(sys, 'frozen', False):
         print(f"Warning: certifi patch failed: {e}")
 
 import json
+import time
 import asyncio
 import threading
 from datetime import datetime
@@ -116,8 +117,53 @@ global_redirector_err = ThreadAwareLogRedirector(sys.stderr, lambda x: None)
 sys.stdout = global_redirector_out
 sys.stderr = global_redirector_err
 
+class TauntCoordinator:
+    def __init__(self):
+        self.taunters = []
+        self.current_index = 0
+        self.last_taunt_time = 0
+        self.taunt_duration = 6.0
+        self.active_taunter = None
+
+    def register_taunter(self, username):
+        if username not in self.taunters:
+            self.taunters.append(username)
+            self.taunters.sort()
+            print(f"[TauntCoordinator] Registered {username}. Current list: {self.taunters}")
+
+    def unregister_taunter(self, username):
+        if username in self.taunters:
+            self.taunters.remove(username)
+            if self.current_index >= len(self.taunters):
+                self.current_index = 0
+            print(f"[TauntCoordinator] Unregistered {username}. Current list: {self.taunters}")
+
+    def get_active_taunter(self):
+        if not self.taunters:
+            self.active_taunter = None
+            return None
+        now = time.time()
+        if self.active_taunter is None or (now - self.last_taunt_time >= self.taunt_duration):
+            if self.active_taunter is not None:
+                self.current_index = (self.current_index + 1) % len(self.taunters)
+            self.active_taunter = self.taunters[self.current_index]
+            self.last_taunt_time = now
+            print(f"[TauntCoordinator] Rotated to {self.active_taunter}")
+        return self.active_taunter
+
+    def skip_taunt(self, username):
+        if not self.taunters:
+            self.active_taunter = None
+            return None
+        if self.active_taunter == username:
+            self.current_index = (self.current_index + 1) % len(self.taunters)
+            self.active_taunter = self.taunters[self.current_index]
+            self.last_taunt_time = time.time()
+            print(f"[TauntCoordinator] Early rotation from {username} to {self.active_taunter} due to skip request.")
+        return self.active_taunter
+
 class SlaveBotThread(threading.Thread):
-    def __init__(self, username, password, char_class, config, callback, skills="1,2,3,4", hp_operator="<", hp_threshold=0, hp_skills="", mp_operator="<", mp_threshold=0, mp_skills=""):
+    def __init__(self, username, password, char_class, config, callback, skills="1,2,3,4", hp_operator="<", hp_threshold=0, hp_skills="", mp_operator="<", mp_threshold=0, mp_skills="", taunter=False, taunt_coordinator=None):
         super().__init__()
         self.username = username
         self.password = password
@@ -131,6 +177,8 @@ class SlaveBotThread(threading.Thread):
         self.mp_operator = mp_operator
         self.mp_threshold = mp_threshold
         self.mp_skills = mp_skills
+        self.taunter = taunter
+        self.taunt_coordinator = taunt_coordinator
         self.bot_instance = None
         self.loop = None
         self.daemon = True
@@ -171,6 +219,8 @@ class SlaveBotThread(threading.Thread):
             self.bot_instance.mp_operator = self.mp_operator
             self.bot_instance.mp_threshold = self.mp_threshold
             self.bot_instance.mp_skills = self.mp_skills
+            self.bot_instance.taunter = self.taunter
+            self.bot_instance.taunt_coordinator = self.taunt_coordinator
             
             bot_module = importlib.import_module("bot.slavery.bot_slave")
             
@@ -180,6 +230,8 @@ class SlaveBotThread(threading.Thread):
             print(f"[{self.username}] Thread Exception: {e}")
         finally:
             print(f"[{self.username}] Thread terminated.")
+            if self.taunt_coordinator:
+                self.taunt_coordinator.unregister_taunter(self.username)
             global_redirector_out.unregister_thread(thread_id)
             global_redirector_err.unregister_thread(thread_id)
             self.loop.close()
@@ -229,6 +281,7 @@ class SlaveryApi:
         else:
             self.config_path = os.path.join(get_project_root(), "slavery_config.json")
         self.active_threads = {} # username -> SlaveBotThread
+        self.taunt_coordinator = TauntCoordinator()
         global_redirector_out.default_callback = lambda msg: self.handle_slave_log("System", msg)
         global_redirector_err.default_callback = lambda msg: self.handle_slave_log("System", msg)
 
@@ -284,6 +337,23 @@ class SlaveryApi:
         try:
             with open(self.config_path, "w") as f:
                 json.dump(config, f, indent=4)
+
+            # Proactively update active threads with the new configuration
+            for username, thread in self.active_threads.items():
+                if thread.bot_instance:
+                    thread.bot_instance.default_room_number = int(config.get("room_number", 9099))
+                    thread.bot_instance.follow_player = config.get("follow_player", "")
+                    thread.bot_instance.targets_priority = config.get("targets_priority", "")
+                    thread.bot_instance.copy_walk = config.get("copy_walk", True)
+                    thread.bot_instance.auto_zone = config.get("auto_zone", "none")
+                    thread.bot_instance.locked_zones = config.get("locked_zones", [])
+                    thread.bot_instance.itemsDropWhiteList = config.get("whitelist", [])
+
+                    # Propagate individual slave configurations (e.g. taunter)
+                    slave_config = next((s for s in config.get("slaves", []) if s.get("username") == username), None)
+                    if slave_config:
+                        thread.bot_instance.taunter = slave_config.get("taunter", False)
+
             return {"success": True}
         except Exception as e:
             print(f"Failed to save config: {e}")
@@ -312,6 +382,7 @@ class SlaveryApi:
                 mp_operator = slave.get("mp_operator", "<")
                 mp_threshold = slave.get("mp_threshold", 0)
                 mp_skills = slave.get("mp_skills", "")
+                taunter = slave.get("taunter", False)
                 
                 thread = SlaveBotThread(
                     username=username,
@@ -325,7 +396,9 @@ class SlaveryApi:
                     hp_skills=hp_skills,
                     mp_operator=mp_operator,
                     mp_threshold=mp_threshold,
-                    mp_skills=mp_skills
+                    mp_skills=mp_skills,
+                    taunter=taunter,
+                    taunt_coordinator=self.taunt_coordinator
                 )
                 self.active_threads[username] = thread
                 thread.start()
@@ -353,6 +426,22 @@ class SlaveryApi:
         self.active_threads.clear()
         return {"success": True}
 
+    def toggle_pause_slaves(self, pause_state):
+        print(f"Setting pause state of all active slaves to: {pause_state}")
+        for username, thread in self.active_threads.items():
+            if thread.bot_instance:
+                thread.bot_instance.is_paused = pause_state
+        return {"success": True}
+
+    def update_slave_taunter(self, username, taunter_state):
+        print(f"Setting taunter state of {username} to: {taunter_state}")
+        thread = self.active_threads.get(username)
+        if thread:
+            thread.taunter = taunter_state
+            if thread.bot_instance:
+                thread.bot_instance.taunter = taunter_state
+        return {"success": True}
+
     def get_version(self):
         return APP_VERSION
 
@@ -372,6 +461,28 @@ class SlaveryApi:
                     pad = player.PAD if player else "-"
                     map_name = getattr(bot, "strMapName", "-")
                     
+                    cooldowns = {}
+                    now = datetime.now()
+                    if player and hasattr(player, "SKILLS"):
+                        for i in range(0, 6):
+                            if i < len(player.SKILLS):
+                                skill_data = player.SKILLS[i]
+                                next_use = skill_data.get("nextUse")
+                                if next_use and next_use > now:
+                                    cooldowns[i] = round((next_use - now).total_seconds(), 1)
+                                else:
+                                    cooldowns[i] = 0.0
+                            else:
+                                cooldowns[i] = 0.0
+                    else:
+                        cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+
+                    scroll_qty = 0
+                    if player:
+                        item_enrage = player.get_item_inventory("Scroll of Enrage")
+                        if item_enrage:
+                            scroll_qty = item_enrage.qty
+
                     statuses[username] = {
                         "running": running,
                         "hp": hp,
@@ -385,7 +496,12 @@ class SlaveryApi:
                         "is_dead": player.ISDEAD if player else False,
                         "gold": player.GOLD if player else 0,
                         "index": bot.index,
-                        "last_skills": getattr(bot, "last_skills", [])
+                        "last_skills": getattr(bot, "last_skills", []),
+                        "taunt_error": getattr(bot, "taunt_error", False),
+                        "is_paused": getattr(bot, "is_paused", False),
+                        "is_active_taunter": (self.taunt_coordinator.active_taunter == username) if self.taunt_coordinator else False,
+                        "cooldowns": cooldowns,
+                        "scroll_enrage_qty": scroll_qty
                     }
                 except Exception as e:
                     statuses[username] = {
