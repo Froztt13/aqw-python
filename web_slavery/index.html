@@ -25,7 +25,7 @@
                 <div class="brand-text">
                     <div class="title-row">
                         <h1 id="app-title-click">Maid Slavery</h1>
-                        <span class="version-badge" id="app-version">v1.0.0</span>
+                        <span class="version-badge" id="app-version">v1.1.0</span>
                     </div>
                     <p>Auto battle, follow, and sucking.</p>
                     <div class="info-tooltip-bubble" id="info-bubble">
@@ -35,16 +35,18 @@
                     </div>
                 </div>
             </div>
-            <div class="header-controls">
+            <div class="header-controls" style="display: flex; align-items: center;">
+                <div class="theme-selector-group" id="theme-selector-group" style="padding: 4px 10px; height: 42px; border-radius: 10px; margin-right: 8px; display: inline-flex; align-items: center; gap: 8px;">
+                    <button type="button" class="theme-dot default" data-theme="default" title="Default Theme"></button>
+                    <button type="button" class="theme-dot red" data-theme="red" title="Red Theme"></button>
+                    <button type="button" class="theme-dot pink" data-theme="pink" title="Pink Theme"></button>
+                    <button type="button" class="theme-dot blue" data-theme="blue" title="Blue Theme"></button>
+                    <button type="button" class="theme-dot green" data-theme="green" title="Green Theme"></button>
+                </div>
                 <button class="btn btn-secondary btn-icon-only" id="btn-toggle-settings" title="Toggle Global Settings" style="margin-right: 8px; width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="margin: 0; width: 20px; height: 20px;">
                         <circle cx="12" cy="12" r="3"></circle>
                         <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
-                    </svg>
-                </button>
-                <button class="btn btn-secondary btn-icon-only" id="btn-toggle-theme" title="Toggle Maid Mode" style="margin-right: 8px; width: 42px; height: 42px; padding: 0; display: inline-flex; align-items: center; justify-content: center; border-radius: 10px; cursor: pointer; transition: all 0.3s ease;">
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" style="margin: 0; width: 20px; height: 20px;">
-                        <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"></path>
                     </svg>
                 </button>
                 <button class="btn btn-success" id="btn-start-slaves">
@@ -180,7 +182,6 @@
                                 <input type="text" id="input-new-map" placeholder="Add custom map...">
                                 <button class="btn btn-primary" id="btn-add-map">Add</button>
                             </div>
-                        </div>
 
                         <!-- Room Number under Locked Zones -->
                         <div class="form-group margin-top-md" style="margin-bottom: 0;">

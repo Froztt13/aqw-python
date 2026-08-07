@@ -269,7 +269,7 @@ def start_local_server(web_dir):
     t.start()
     return f"http://127.0.0.1:{port}"
 
-APP_VERSION = "v1.0.0"
+APP_VERSION = "v1.1.0"
 
 class SlaveryApi:
     def __init__(self):
@@ -321,7 +321,7 @@ class SlaveryApi:
                 "icestormunder"
             ],
             "slaves": [],
-            "theme_maid": False,
+            "theme": "default",
             "settings_hidden": False
         }
         if os.path.exists(self.config_path):
@@ -335,8 +335,10 @@ class SlaveryApi:
 
     def save_config(self, config):
         try:
-            with open(self.config_path, "w") as f:
+            temp_path = self.config_path + ".tmp"
+            with open(temp_path, "w") as f:
                 json.dump(config, f, indent=4)
+            os.replace(temp_path, self.config_path)
 
             # Proactively update active threads with the new configuration
             for username, thread in self.active_threads.items():

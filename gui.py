@@ -190,8 +190,10 @@ class Api:
 
     def save_config(self, config):
         try:
-            with open(self.config_path, "w") as f:
+            temp_path = self.config_path + ".tmp"
+            with open(temp_path, "w") as f:
                 json.dump(config, f, indent=4)
+            os.replace(temp_path, self.config_path)
             return {"success": True}
         except Exception as e:
             print(f"Failed to save config: {e}")

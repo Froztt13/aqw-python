@@ -228,12 +228,17 @@ class AscendEclipseBot:
 
                 if self.do_taunt:
                     target = self.taunt_target or self.target_monsters
-                    self.print_debug(f"{Fore.BLUE}Taunting {target}...{Fore.RESET}")
-                    await self.cmd.sleep(500)
-                    await self.cmd.wait_use_skill(5, target_monsters=target)
-                    self.taunt_target = None
-                    self.do_taunt = False
-                    continue
+                    if self.cmd.get_player().canUseSkill(5):
+                        self.print_debug(f"{Fore.BLUE}Taunting {target}...{Fore.RESET}")
+                        success = await self.cmd.use_skill(5, target_monsters=target)
+                        if success:
+                            if target == "Suffocated Light" and self.cmd.is_monster_alive("Suffocated Light"):
+                                # Loop taunt: keep do_taunt = True and self.taunt_target as is
+                                continue
+                            else:
+                                self.taunt_target = None
+                                self.do_taunt = False
+                                continue
 
                 if self.cmd.get_player().hasAura("Sun's Heat"):
                     skill_mode = SkillMode.ATTACK_ONLY # dont use heal when having inverted dmg debuff

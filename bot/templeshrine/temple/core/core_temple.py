@@ -28,6 +28,7 @@ class CoreTempleBot:
 
         # subscribe ke event
         self.cmd.bot.subscribe(self.msg_handler)
+        self.cmd.bot.taunt_error = False
 
     def print_debug(self, message):
         print(f"[{datetime.now().strftime('%H:%M:%S')}] "
@@ -156,18 +157,46 @@ class CoreTempleBot:
                 master and master.str_frame == self.cmd.get_player().CELL
             )
             while self.cmd.is_monster_alive() and check_master_in_cell and self.cmd.is_still_connected():
+                # Check scroll availability dynamically if taunter
+                is_currently_taunter = self.is_taunter
+                if is_currently_taunter:
+                    item_enrage = self.cmd.get_player().get_item_inventory("Scroll of Enrage")
+                    if not item_enrage or item_enrage.qty <= 0:
+                        is_currently_taunter = False
+                        self.cmd.bot.taunt_error = True
+                    else:
+                        self.cmd.bot.taunt_error = False
+                else:
+                    self.cmd.bot.taunt_error = False
+
+                coordinator = getattr(self.cmd.bot, "taunt_coordinator", None)
+                if coordinator:
+                    if is_currently_taunter:
+                        coordinator.register_taunter(self.cmd.bot.username)
+                    else:
+                        coordinator.unregister_taunter(self.cmd.bot.username)
+
                 if not self.is_attacking:
                     self.print_debug("Attacking monsters...")
                     self.is_attacking = True
 
-                if self.do_taunt and self.is_taunter:
-                    self.print_debug("Doing taunt...")
-                    await self.cmd.sleep(500)
-                    await self.cmd.wait_use_skill(5, target_monsters=self.target_monsters)
-                    self.do_taunt = False
-                    self.target_monsters = self._target_monsters
-                    await self.cmd.sleep(200)
-                    continue
+                if self.do_taunt and is_currently_taunter:
+                    should_taunt = True
+                    if coordinator:
+                        should_taunt = coordinator.request_taunt(self.cmd.bot.username)
+                    
+                    if should_taunt:
+                        self.print_debug("Doing taunt...")
+                        await self.cmd.sleep(500)
+                        await self.cmd.wait_use_skill(5, target_monsters=self.target_monsters)
+                        self.do_taunt = False
+                        self.target_monsters = self._target_monsters
+                        await self.cmd.sleep(200)
+                        continue
+                    else:
+                        self.do_taunt = False
+                        self.target_monsters = self._target_monsters
+                        continue
 
                 if self.cmd.get_player().hasAura("Sun's Heat"):
                     skill_mode = SkillMode.ATTACK_ONLY # dont use heal when having inverted dmg debuff

@@ -7,6 +7,26 @@ document.addEventListener('DOMContentLoaded', () => {
     let slaveLogs = { 'System': [] };
     let editingId = null;
 
+    function applyTheme(themeName) {
+        document.body.classList.remove("theme-red", "theme-pink", "theme-blue", "theme-green");
+        if (themeName !== "default") {
+            document.body.classList.add(`theme-${themeName}`);
+        }
+        if (globalConfig) {
+            globalConfig.theme = themeName;
+        }
+    }
+
+    function updateActiveThemeDot(theme) {
+        document.querySelectorAll(".theme-dot").forEach(dot => {
+            if (dot.getAttribute("data-theme") === theme) {
+                dot.classList.add("active");
+            } else {
+                dot.classList.remove("active");
+            }
+        });
+    }
+
     // Elements
     const btnStart = document.getElementById('btn-start-slaves');
     const btnStop = document.getElementById('btn-stop-slaves');
@@ -107,16 +127,7 @@ document.addEventListener('DOMContentLoaded', () => {
         consoleViewport.innerHTML = `<div class="log-line system">Logs for ${activeConsoleTab} cleared.</div>`;
     });
 
-    const btnToggleTheme = document.getElementById('btn-toggle-theme');
-    if (btnToggleTheme) {
-        btnToggleTheme.addEventListener('click', () => {
-            const active = document.body.classList.toggle('theme-maid');
-            if (globalConfig) {
-                globalConfig.theme_maid = active;
-                window.pywebview.api.save_config(globalConfig);
-            }
-        });
-    }
+
 
     const btnToggleSettings = document.getElementById('btn-toggle-settings');
     const appBody = document.getElementById('app-body');
@@ -413,13 +424,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 btnToggleSettings.classList.remove('active');
             }
 
-            // Apply saved theme state
-            const isMaidTheme = config.theme_maid || false;
-            if (isMaidTheme) {
-                document.body.classList.add('theme-maid');
-            } else {
-                document.body.classList.remove('theme-maid');
-            }
+
+
+            const savedTheme = config.theme || "default";
+            updateActiveThemeDot(savedTheme);
+            applyTheme(savedTheme);
 
             followPlayerInput.value = config.follow_player || '';
             copyWalkInput.checked = config.copy_walk !== undefined ? config.copy_walk : true;
@@ -882,7 +891,9 @@ document.addEventListener('DOMContentLoaded', () => {
                     htmlStr += `
                         <span class="skill-cd-badge ready${extraClass}" title="Skill ${label} ready">
                             <span class="skill-idx">${label}</span>
-                            <span class="skill-cd-val">-</span>
+                            <span class="skill-cd-val">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                            </span>
                         </span>
                     `;
                 }
@@ -963,6 +974,18 @@ document.addEventListener('DOMContentLoaded', () => {
             } else {
                 input.type = "password";
                 btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
+            }
+        });
+    });
+
+    document.querySelectorAll(".theme-dot").forEach(dot => {
+        dot.addEventListener("click", () => {
+            const selectedTheme = dot.getAttribute("data-theme");
+            applyTheme(selectedTheme);
+            if (globalConfig) {
+                globalConfig.theme = selectedTheme;
+                updateActiveThemeDot(selectedTheme);
+                window.pywebview.api.save_config(globalConfig);
             }
         });
     });

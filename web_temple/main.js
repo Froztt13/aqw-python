@@ -8,6 +8,29 @@ let partyStartTime = null;
 let restartAttempts = 0;
 let lastStartTimestamp = null;
 
+// Global Theme Manager
+function applyTheme(themeName) {
+    document.body.classList.remove("theme-red", "theme-pink", "theme-blue", "theme-green");
+    if (themeName !== "default") {
+        document.body.classList.add(`theme-${themeName}`);
+    }
+    if (config) {
+        config.theme = themeName;
+    }
+}
+
+function updateActiveThemeDot(theme) {
+    document.querySelectorAll(".theme-dot").forEach(dot => {
+        if (dot.getAttribute("data-theme") === theme) {
+            dot.classList.add("active");
+        } else {
+            dot.classList.remove("active");
+        }
+    });
+}
+
+
+
 // Console log storage per tab
 const logStreams = {
     "System": []
@@ -157,6 +180,10 @@ function loadConfiguration() {
             document.getElementById(`${slot}-is-taunter`).checked = !!slotConfig.is_taunter;
         });
         
+        const savedTheme = config.theme || "default";
+        updateActiveThemeDot(savedTheme);
+        applyTheme(savedTheme);
+        
         updateConsoleTabs();
         checkActiveBotStatuses();
     });
@@ -173,6 +200,8 @@ function saveConfiguration() {
     config.auto_restart_enabled = document.getElementById("chk-auto-restart").checked;
     config.auto_restart_delay = parseInt(document.getElementById("input-restart-delay").value) || 30;
     config.auto_restart_max_attempts = parseInt(document.getElementById("input-restart-max-attempts").value) || 3;
+    const activeThemeDot = document.querySelector(".theme-dot.active");
+    config.theme = activeThemeDot ? activeThemeDot.getAttribute("data-theme") : "default";
     
     slots.forEach(slot => {
         config.slots[slot] = {
@@ -237,7 +266,8 @@ function startParty(isAuto = false) {
             btnStopParty.classList.remove("hidden");
             btnStartParty.disabled = false;
             
-            // Start duration counter
+
+            
             const durationCounter = document.getElementById("duration-counter");
             const durationVal = document.getElementById("duration-val");
             if (durationCounter) durationCounter.classList.remove("hidden");
@@ -281,6 +311,8 @@ function stopParty() {
     
     window.pywebview.api.stop_party().then(() => {
         isPartyRunning = false;
+        
+
         btnStopParty.classList.add("hidden");
         btnStartParty.removeAttribute("disabled");
         btnStartParty.classList.remove("hidden");
@@ -337,10 +369,20 @@ function stopTelemetryPolling() {
 
 function checkActiveBotStatuses() {
     window.pywebview.api.get_status().then(statuses => {
+        const activeTaunter = statuses["_active_taunter"];
         slots.forEach(slot => {
             const status = statuses[slot];
             const badge = document.getElementById(`badge-${slot}`);
             const telemetryPanel = document.getElementById(`telemetry-${slot}`);
+            const card = document.getElementById(`card-${slot}`);
+            const soeQtyEl = document.getElementById(`${slot}-soe-qty`);
+            const cooldownsEl = document.getElementById(`cooldowns-${slot}`);
+            
+            // Clean active taunt outlines/highlights
+            if (card) {
+                card.classList.remove("taunt-active-highlight");
+                card.classList.remove("taunt-error-highlight");
+            }
             
             if (status && status.running) {
                 // Online
@@ -368,11 +410,68 @@ function checkActiveBotStatuses() {
                     badge.innerText = "DEAD";
                     badge.className = "status-badge dead";
                 }
+
+                // Scroll of Enrage count display
+                const infoSoe = document.getElementById(`${slot}-info-soe`);
+                if (infoSoe) {
+                    const qty = status.scroll_enrage_qty || 0;
+                    infoSoe.innerText = `${qty} SoE`;
+                    if (qty >= 10) {
+                        infoSoe.style.color = "#22c55e";
+                    } else if (qty > 0) {
+                        infoSoe.style.color = "#f59e0b";
+                    } else {
+                        infoSoe.style.color = "#ef4444";
+                    }
+                }
+
+                // Card Highlights for active rotation and error status
+                const currentUsername = document.getElementById(`${slot}-username`).value || "";
+                if (isTaunter && card) {
+                    if (status.taunt_error) {
+                        card.classList.add("taunt-error-highlight");
+                    } else if (activeTaunter && currentUsername.toLowerCase() === activeTaunter.toLowerCase()) {
+                        card.classList.add("taunt-active-highlight");
+                    }
+                }
+
+                // Skill Cooldowns Grid rendering
+                if (cooldownsEl) {
+                    const cooldowns = status.cooldowns || { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+                    let htmlStr = '<div class="cooldowns-grid">';
+                    for (let i = 0; i <= 5; i++) {
+                        const cd = cooldowns[i] || 0;
+                        const isSkill5 = i === 5;
+                        const isSkill0 = i === 0;
+                        const extraClass = isSkill5 ? ' skill-5-badge' : (isSkill0 ? ' skill-0-badge' : '');
+                        const label = isSkill0 ? 'AA' : i;
+                        if (cd > 0) {
+                            htmlStr += `
+                                <span class="skill-cd-badge on-cooldown${extraClass}" title="Skill ${label} on cooldown">
+                                    <span class="skill-idx">${label}</span>
+                                    <span class="skill-cd-val">${cd.toFixed(1)}s</span>
+                                </span>
+                            `;
+                        } else {
+                            htmlStr += `
+                                <span class="skill-cd-badge ready${extraClass}" title="Skill ${label} ready">
+                                    <span class="skill-idx">${label}</span>
+                                    <span class="skill-cd-val">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    </span>
+                                </span>
+                            `;
+                        }
+                    }
+                    htmlStr += '</div>';
+                    cooldownsEl.innerHTML = htmlStr;
+                }
             } else {
                 // Offline
                 badge.className = "status-badge";
                 badge.innerText = "Offline";
                 telemetryPanel.classList.add("hidden");
+                if (soeQtyEl) soeQtyEl.classList.add("hidden");
             }
         });
 
@@ -455,41 +554,41 @@ function toggleFormFieldsLock(isLocked) {
 // Censor Mode Credentials toggler on party start
 function toggleCredentialsVisibility(showInfoDisplay) {
     slots.forEach((slot, index) => {
-        const usernameFg = document.getElementById(`${slot}-username`).closest('.form-group');
-        const passwordFg = document.getElementById(`${slot}-password`).closest('.form-group');
-        const usernameInput = document.getElementById(`${slot}-username`);
+        const inputsContainer = document.getElementById(`${slot}-inputs-container`);
+        const runningDisplay = document.getElementById(`${slot}-running-display`);
+        
+        if (!inputsContainer || !runningDisplay) return;
         
         if (showInfoDisplay) {
-            usernameFg.classList.add('hidden');
-            passwordFg.classList.add('hidden');
+            // Hide editable inputs container
+            inputsContainer.classList.add("hidden");
             
-            const displayVal = isCensorActive ? `Player ${index + 1}` : (usernameInput.value || '-');
+            // Populate running display info
+            const usernameInput = document.getElementById(`${slot}-username`);
+            const classInput = document.getElementById(`${slot}-class`);
+            const taunterInput = document.getElementById(`${slot}-is-taunter`);
             
-            let summaryEl = document.getElementById(`${slot}-summary-display`);
-            if (!summaryEl) {
-                summaryEl = document.createElement('div');
-                summaryEl.id = `${slot}-summary-display`;
-                summaryEl.className = 'form-group account-summary-display';
-                summaryEl.innerHTML = `
-                    <label>Active Account</label>
-                    <div style="font-weight: 600; color: #fff; background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); height: 38px; display: flex; align-items: center; font-size: 0.85rem;">
-                        ${displayVal}
-                    </div>
-                `;
-                const classFg = document.getElementById(`${slot}-class`).closest('.form-group');
-                classFg.parentNode.insertBefore(summaryEl, classFg);
-            } else {
-                summaryEl.querySelector('div').innerText = displayVal;
-                summaryEl.classList.remove('hidden');
+            const infoUsername = document.getElementById(`${slot}-info-username`);
+            const infoClass = document.getElementById(`${slot}-info-class`);
+            const infoTaunter = document.getElementById(`${slot}-info-taunter`);
+            
+            if (infoUsername) {
+                const userVal = usernameInput.value.trim() || "-";
+                infoUsername.innerText = isCensorActive ? `Player ${index + 1}` : userVal;
             }
+            if (infoClass) {
+                infoClass.innerText = classInput.value.trim() || "Standard class";
+            }
+            if (infoTaunter) {
+                infoTaunter.innerText = taunterInput && taunterInput.checked ? "YES" : "NO";
+            }
+            
+            runningDisplay.classList.remove("hidden");
         } else {
-            usernameFg.classList.remove('hidden');
-            passwordFg.classList.remove('hidden');
-            
-            const summaryEl = document.getElementById(`${slot}-summary-display`);
-            if (summaryEl) {
-                summaryEl.classList.add('hidden');
-            }
+            // Show editable inputs container
+            inputsContainer.classList.remove("hidden");
+            // Hide running display
+            runningDisplay.classList.add("hidden");
         }
     });
 }
@@ -620,11 +719,22 @@ document.addEventListener("DOMContentLoaded", () => {
             e.stopPropagation();
             infoBubble.classList.toggle("show");
         });
-        document.addEventListener("click", () => {
-            infoBubble.classList.remove("show");
-        });
         infoBubble.addEventListener("click", (e) => {
             e.stopPropagation();
         });
     }
+
+    document.addEventListener("click", () => {
+        if (infoBubble) infoBubble.classList.remove("show");
+    });
+
+    document.querySelectorAll(".theme-dot").forEach(dot => {
+        dot.addEventListener("click", () => {
+            const selectedTheme = dot.getAttribute("data-theme");
+            applyTheme(selectedTheme);
+            config.theme = selectedTheme;
+            updateActiveThemeDot(selectedTheme);
+            window.pywebview.api.save_config(config);
+        });
+    });
 });

@@ -114,8 +114,67 @@ global_redirector_err = ThreadAwareLogRedirector(sys.stderr, lambda x: None)
 sys.stdout = global_redirector_out
 sys.stderr = global_redirector_err
 
+import time
+
+class TauntCoordinator:
+    def __init__(self):
+        self.taunters = []
+        self.current_index = 0
+        self.last_taunt_time = 0
+        self.taunt_duration = 6.0
+        self.active_taunter = None
+        self.last_event_time = 0
+
+    def register_taunter(self, username):
+        if username not in self.taunters:
+            self.taunters.append(username)
+            self.taunters.sort()
+            print(f"[TauntCoordinator] Registered {username}. Current list: {self.taunters}")
+
+    def unregister_taunter(self, username):
+        if username in self.taunters:
+            self.taunters.remove(username)
+            if self.current_index >= len(self.taunters):
+                self.current_index = 0
+            print(f"[TauntCoordinator] Unregistered {username}. Current list: {self.taunters}")
+
+    def get_active_taunter(self):
+        if not self.taunters:
+            self.active_taunter = None
+            return None
+        now = time.time()
+        # Fallback rotation after 15 seconds if the active taunter failed to cast
+        if self.active_taunter is None or (now - self.last_taunt_time >= 15.0):
+            if self.active_taunter is not None:
+                self.current_index = (self.current_index + 1) % len(self.taunters)
+            self.active_taunter = self.taunters[self.current_index]
+            self.last_taunt_time = now
+            print(f"[TauntCoordinator] Fallback rotated to {self.active_taunter}")
+        return self.active_taunter
+
+    def rotate_taunt(self):
+        if self.taunters:
+            self.current_index = (self.current_index + 1) % len(self.taunters)
+            self.active_taunter = self.taunters[self.current_index]
+            self.last_taunt_time = time.time()
+            print(f"[TauntCoordinator] Rotated to {self.active_taunter} after successful cast.")
+
+    def request_taunt(self, username):
+        # Only allow one taunt every 5 seconds
+        now = time.time()
+        if now - self.last_event_time < 5.0:
+            # Already handled by someone else
+            return False
+            
+        active = self.get_active_taunter()
+        if active == username:
+            self.last_event_time = now
+            self.rotate_taunt()
+            return True
+        return False
+
 class TempleBotThread(threading.Thread):
-    def __init__(self, slot_id, username, password, char_class, bot_class, role, is_taunter, config, callback):
+    def __init__(self, slot_id, username, password, char_class, bot_class, role, is_taunter, config, callback, taunt_coordinator=None):
         super().__init__()
         self.slot_id = slot_id
         self.username = username
@@ -126,6 +185,7 @@ class TempleBotThread(threading.Thread):
         self.is_taunter = is_taunter
         self.config = config
         self.callback = callback
+        self.taunt_coordinator = taunt_coordinator
         self.bot_instance = None
         self.daemon = True
 
@@ -155,6 +215,7 @@ class TempleBotThread(threading.Thread):
             muteSpamWarning=True
         )
         b.set_login_info(self.username, self.password, self.config.get("server", "Alteon"))
+        b.taunt_coordinator = self.taunt_coordinator
         self.bot_instance = b
 
         async def run_bot(cmd):
@@ -210,6 +271,7 @@ class TempleApi:
             self.config_path = os.path.join(get_project_root(), "temple_config.json")
             
         self.active_threads = {}
+        self.taunt_coordinator = TauntCoordinator()
         global_redirector_out.default_callback = lambda msg: self.handle_slave_log("System", msg)
         global_redirector_err.default_callback = lambda msg: self.handle_slave_log("System", msg)
 
@@ -239,6 +301,7 @@ class TempleApi:
             "server": "Alteon",
             "room_number": 9099,
             "temple_bot_type": "MidnightSunBot",
+            "theme": "default",
             "slots": {
                 "slot1": {
                     "username": "",
@@ -290,8 +353,10 @@ class TempleApi:
 
     def save_config(self, config):
         try:
-            with open(self.config_path, "w") as f:
+            temp_path = self.config_path + ".tmp"
+            with open(temp_path, "w") as f:
                 json.dump(config, f, indent=4)
+            os.replace(temp_path, self.config_path)
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -308,6 +373,7 @@ class TempleApi:
         if self.active_threads:
             return {"success": False, "error": "Party is already running!"}
             
+        self.taunt_coordinator = TauntCoordinator() # Reset coordinator for new run
         server = config.get("server", "Alteon")
         room_number = int(config.get("room_number", 9099))
         temple_bot_type = config.get("temple_bot_type", "MidnightSunBot")
@@ -347,7 +413,8 @@ class TempleApi:
                 role, 
                 is_taunter, 
                 execution_config, 
-                self.handle_slave_log
+                self.handle_slave_log,
+                taunt_coordinator=self.taunt_coordinator
             )
             self.active_threads[s_id] = t
             t.start()
@@ -369,11 +436,35 @@ class TempleApi:
         return {"success": True}
 
     def get_status(self):
+        from datetime import datetime
         status_data = {}
         for s_id, thread in self.active_threads.items():
             if thread.bot_instance:
                 b = thread.bot_instance
                 p = b.player
+                
+                cooldowns = {}
+                now = datetime.now()
+                if p and hasattr(p, "SKILLS"):
+                    for i in range(0, 6):
+                        if i < len(p.SKILLS):
+                            skill_data = p.SKILLS[i]
+                            next_use = skill_data.get("nextUse")
+                            if next_use and next_use > now:
+                                cooldowns[i] = round((next_use - now).total_seconds(), 1)
+                            else:
+                                cooldowns[i] = 0.0
+                        else:
+                            cooldowns[i] = 0.0
+                else:
+                    cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+
+                scroll_qty = 0
+                if p:
+                    item_enrage = p.get_item_inventory("Scroll of Enrage")
+                    if item_enrage:
+                        scroll_qty = item_enrage.qty
+
                 status_data[s_id] = {
                     "running": True,
                     "is_connected": b.is_client_connected,
@@ -384,7 +475,10 @@ class TempleApi:
                     "max_hp": p.MAX_HP if p else 0,
                     "mp": p.MANA if p else 0,
                     "max_mp": p.MAX_MP if p else 0,
-                    "is_dead": p.ISDEAD if p else False
+                    "is_dead": p.ISDEAD if p else False,
+                    "cooldowns": cooldowns,
+                    "scroll_enrage_qty": scroll_qty,
+                    "taunt_error": getattr(b, "taunt_error", False)
                 }
             else:
                 status_data[s_id] = {"running": False}
@@ -393,6 +487,8 @@ class TempleApi:
         for s_id in ["slot1", "slot2", "slot3", "slot4"]:
             if s_id not in status_data:
                 status_data[s_id] = {"running": False}
+        
+        status_data["_active_taunter"] = self.taunt_coordinator.active_taunter if hasattr(self, "taunt_coordinator") else None
         return status_data
 
 def main():

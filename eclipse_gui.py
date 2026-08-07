@@ -139,7 +139,7 @@ class EclipseBotThread(threading.Thread):
         global_redirector_err.register_thread(thread_id, self.username, self.callback)
 
         b = Bot(
-            roomNumber=int(self.config.get("room_number", 9099)),
+            roomNumber=99999,
             itemsDropWhiteList=[
                 "Sliver of Sunlight",
                 "Sliver of Moonlight",
@@ -214,6 +214,13 @@ class EclipseApi:
         self.active_threads = {}
         global_redirector_out.default_callback = lambda msg: self.handle_slave_log("System", msg)
         global_redirector_err.default_callback = lambda msg: self.handle_slave_log("System", msg)
+        
+        import psutil
+        try:
+            self.process = psutil.Process(os.getpid())
+            self.process.cpu_percent(interval=None)
+        except Exception:
+            self.process = None
 
     def set_window(self, window):
         self.window = window
@@ -246,6 +253,7 @@ class EclipseApi:
         default_config = {
             "server": "Alteon",
             "room_number": 9099,
+            "theme": "default",
             "slots": {
                 "slot1": {
                     "username": "",
@@ -303,8 +311,10 @@ class EclipseApi:
 
     def save_config(self, config):
         try:
-            with open(self.config_path, "w") as f:
+            temp_path = self.config_path + ".tmp"
+            with open(temp_path, "w") as f:
                 json.dump(config, f, indent=4)
+            os.replace(temp_path, self.config_path)
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
@@ -322,7 +332,7 @@ class EclipseApi:
             return {"success": False, "error": "Party is already running!"}
             
         server = config.get("server", "Alteon")
-        room_number = int(config.get("room_number", 9099))
+        room_number = 99999
         slots = config.get("slots", {})
         
         # Verify credentials
@@ -345,8 +355,8 @@ class EclipseApi:
         s1 = slots["slot1"]
         s1_kwargs = {
             "default_target": "Ascended Solstice,Blessless Deer",
-            "taunt_parity": s1.get("taunt_parity", "odd"),
-            "converge_type": s1.get("converge_type", "sun"),
+            "taunt_parity": "odd",
+            "converge_type": "sun",
             "light_gather_taunter": bool(s1.get("light_gather_taunter", False))
         }
         t1 = EclipseBotThread("slot1", s1["username"], s1["password"], s1["char_class"], EclipseMasterBot, s1_kwargs, execution_config, self.handle_slave_log)
@@ -357,8 +367,8 @@ class EclipseApi:
         s2 = slots["slot2"]
         s2_kwargs = {
             "default_target": "Ascended Solstice",
-            "taunt_parity": s2.get("taunt_parity", "even"),
-            "converge_type": s2.get("converge_type", "sun"),
+            "taunt_parity": "even",
+            "converge_type": "sun",
             "light_gather_taunter": bool(s2.get("light_gather_taunter", False)),
             "debug_mon": True
         }
@@ -370,8 +380,8 @@ class EclipseApi:
         s3 = slots["slot3"]
         s3_kwargs = {
             "default_target": "Ascended Midnight",
-            "taunt_parity": s3.get("taunt_parity", "odd"),
-            "converge_type": s3.get("converge_type", "moon"),
+            "taunt_parity": "odd",
+            "converge_type": "moon",
             "light_gather_taunter": bool(s3.get("light_gather_taunter", True)),
             "moon_haze_taunter": bool(s3.get("moon_haze_taunter", True))
         }
@@ -383,8 +393,8 @@ class EclipseApi:
         s4 = slots["slot4"]
         s4_kwargs = {
             "default_target": "Ascended Midnight",
-            "taunt_parity": s4.get("taunt_parity", "even"),
-            "converge_type": s4.get("converge_type", "moon"),
+            "taunt_parity": "even",
+            "converge_type": "moon",
             "light_gather_taunter": bool(s4.get("light_gather_taunter", True)),
             "sunset_knight_taunter": bool(s4.get("sunset_knight_taunter", True))
         }
@@ -414,12 +424,36 @@ class EclipseApi:
         return {"success": True}
 
     def get_status(self):
+        from datetime import datetime
         statuses = {}
         for slot_id, thread in list(self.active_threads.items()):
             running = thread.is_alive()
             if running and thread.bot_instance:
                 bot = thread.bot_instance
                 player = bot.player
+                
+                cooldowns = {}
+                now = datetime.now()
+                if player and hasattr(player, "SKILLS"):
+                    for i in range(0, 6):
+                        if i < len(player.SKILLS):
+                            skill_data = player.SKILLS[i]
+                            next_use = skill_data.get("nextUse")
+                            if next_use and next_use > now:
+                                cooldowns[i] = round((next_use - now).total_seconds(), 1)
+                            else:
+                                cooldowns[i] = 0.0
+                        else:
+                            cooldowns[i] = 0.0
+                else:
+                    cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+
+                scroll_qty = 0
+                if player:
+                    item_enrage = player.get_item_inventory("Scroll of Enrage")
+                    if item_enrage:
+                        scroll_qty = item_enrage.qty
+
                 try:
                     hp = player.CURRENT_HP if player else 0
                     max_hp = player.MAX_HP if player else 0
@@ -440,7 +474,10 @@ class EclipseApi:
                         "map": map_name,
                         "is_connected": bot.is_client_connected,
                         "is_dead": player.ISDEAD if player else False,
-                        "username": thread.username
+                        "username": thread.username,
+                        "cooldowns": cooldowns,
+                        "scroll_enrage_qty": scroll_qty,
+                        "taunt_error": getattr(bot, "taunt_error", False)
                     }
                 except Exception as e:
                     statuses[slot_id] = {
@@ -453,7 +490,50 @@ class EclipseApi:
                     "running": running,
                     "is_connected": False
                 }
-        return statuses
+        
+        # Fill in inactive slots
+        for s_id in ["slot1", "slot2", "slot3", "slot4"]:
+            if s_id not in statuses:
+                statuses[s_id] = {"running": False}
+
+        # Collect monsters HP info from the first active bot that has monsters in the current cell
+        monsters_info = []
+        for slot_id, thread in list(self.active_threads.items()):
+            if thread.is_alive() and thread.bot_instance:
+                bot = thread.bot_instance
+                player = bot.player
+                current_cell = player.CELL if player else None
+                if current_cell and hasattr(bot, "monsters") and bot.monsters:
+                    for mon in bot.monsters:
+                        # Only show monsters in the current cell frame and that are alive
+                        if mon.frame == current_cell and mon.current_hp > 0:
+                            monsters_info.append({
+                                "name": mon.mon_name,
+                                "id": mon.mon_map_id,
+                                "hp": mon.current_hp,
+                                "max_hp": mon.max_hp
+                            })
+                    if monsters_info:
+                        break
+
+        # Fetch CPU & memory stats for this app process using self.process
+        mem_mb = 0.0
+        cpu_pct = 0.0
+        if hasattr(self, "process") and self.process:
+            try:
+                mem_mb = round(self.process.memory_info().rss / (1024 * 1024), 1)
+                cpu_pct = round(self.process.cpu_percent(interval=None), 1)
+            except Exception:
+                pass
+
+        return {
+            "statuses": statuses,
+            "monsters": monsters_info,
+            "system_stats": {
+                "cpu": cpu_pct,
+                "memory": mem_mb
+            }
+        }
 
 def main():
     api = EclipseApi()

@@ -19,7 +19,7 @@
                 <div class="brand-text">
                     <div class="title-row">
                         <h1 id="app-title-click">Maid Temple</h1>
-                        <span class="version-badge">v1.0.0</span>
+                        <span class="version-badge">v1.1.0</span>
                     </div>
                     <p>Temple Shrine Dungeon Manager</p>
                     <div class="info-tooltip-bubble" id="info-bubble">
@@ -65,7 +65,7 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     <span id="duration-val">00:00:00</span>
                 </div>
-                <button class="btn btn-secondary btn-icon-only" id="btn-toggle-settings" title="Auto-Restart Settings">
+                <button class="btn btn-secondary btn-icon-only" id="btn-toggle-settings" title="General Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 </button>
                 <button class="btn btn-success" id="btn-start-party">
@@ -85,7 +85,7 @@
 
         <!-- Settings Dropdown Panel -->
         <div class="settings-dropdown-panel hidden" id="settings-dropdown-panel">
-            <div class="settings-panel-header">Auto-Restart Settings</div>
+            <div class="settings-panel-header">General Settings</div>
             <div class="settings-panel-body">
                 <div class="form-group-checkbox">
                     <label class="chk-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.75rem; color: #e5e7eb;">
@@ -100,6 +100,16 @@
                 <div class="form-group-inline">
                     <span>Max Attempts</span>
                     <input type="number" id="input-restart-max-attempts" min="1" max="10" value="3" style="width: 70px;">
+                </div>
+                <div class="form-group-inline" style="margin-top: 10px; margin-bottom: 5px;">
+                    <span>Theme</span>
+                    <div class="theme-selector-group" id="theme-selector-group" style="padding: 4px 8px; height: 32px;">
+                        <button type="button" class="theme-dot default" data-theme="default" title="Default Theme"></button>
+                        <button type="button" class="theme-dot red" data-theme="red" title="Red Theme"></button>
+                        <button type="button" class="theme-dot pink" data-theme="pink" title="Pink Theme"></button>
+                        <button type="button" class="theme-dot blue" data-theme="blue" title="Blue Theme"></button>
+                        <button type="button" class="theme-dot green" data-theme="green" title="Green Theme"></button>
+                    </div>
                 </div>
                 <div class="restart-status-indicator" id="restart-status-indicator" style="font-size: 0.7rem; color: var(--primary-color); font-weight: bold; text-align: center; margin-top: 4px;"></div>
                 
@@ -130,28 +140,51 @@
                         <span class="status-badge" id="badge-slot1">Offline</span>
                     </div>
                     <div class="slot-body">
-                        <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" id="slot1-username" class="slot-username" placeholder="Character Username">
-                        </div>
-                        <div class="form-group">
-                            <label>Password</label>
-                            <div class="password-wrapper">
-                                <input type="password" id="slot1-password" class="slot-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                </button>
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot1-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot1-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot1-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot1-class" class="slot-class" placeholder="ArchPaladin">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot1-is-taunter">
+                                    Taunter
+                                </label>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Class</label>
-                            <input type="text" id="slot1-class" class="slot-class" placeholder="ArchPaladin">
-                        </div>
-                        <div class="checkbox-options">
-                            <label class="chk-label">
-                                <input type="radio" name="taunter-group" id="slot1-is-taunter">
-                                Taunter
-                            </label>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot1-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot1-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot1-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot1-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot1-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
                         </div>
                         
                         <!-- Telemetry Display (Hidden by default) -->
@@ -174,6 +207,10 @@
                                     <div class="vital-bar mp"><div class="fill" id="bar-slot1-mp" style="width: 0%"></div></div>
                                 </div>
                             </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot1" class="cooldowns-container"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -185,28 +222,51 @@
                         <span class="status-badge" id="badge-slot2">Offline</span>
                     </div>
                     <div class="slot-body">
-                        <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" id="slot2-username" class="slot-username" placeholder="Character Username">
-                        </div>
-                        <div class="form-group">
-                            <label>Password</label>
-                            <div class="password-wrapper">
-                                <input type="password" id="slot2-password" class="slot-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                </button>
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot2-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot2-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot2-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot2-class" class="slot-class" placeholder="StoneCrusher">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot2-is-taunter">
+                                    Taunter
+                                </label>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Class</label>
-                            <input type="text" id="slot2-class" class="slot-class" placeholder="StoneCrusher">
-                        </div>
-                        <div class="checkbox-options">
-                            <label class="chk-label">
-                                <input type="radio" name="taunter-group" id="slot2-is-taunter">
-                                Taunter
-                            </label>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot2-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot2-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot2-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot2-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot2-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
                         </div>
                         
                         <!-- Telemetry Display (Hidden by default) -->
@@ -229,6 +289,10 @@
                                     <div class="vital-bar mp"><div class="fill" id="bar-slot2-mp" style="width: 0%"></div></div>
                                 </div>
                             </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot2" class="cooldowns-container"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -240,28 +304,51 @@
                         <span class="status-badge" id="badge-slot3">Offline</span>
                     </div>
                     <div class="slot-body">
-                        <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" id="slot3-username" class="slot-username" placeholder="Character Username">
-                        </div>
-                        <div class="form-group">
-                            <label>Password</label>
-                            <div class="password-wrapper">
-                                <input type="password" id="slot3-password" class="slot-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                </button>
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot3-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot3-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot3-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot3-class" class="slot-class" placeholder="Legion Revenant">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot3-is-taunter">
+                                    Taunter
+                                </label>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Class</label>
-                            <input type="text" id="slot3-class" class="slot-class" placeholder="Legion Revenant">
-                        </div>
-                        <div class="checkbox-options">
-                            <label class="chk-label">
-                                <input type="radio" name="taunter-group" id="slot3-is-taunter">
-                                Taunter
-                            </label>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot3-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot3-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot3-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot3-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot3-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
                         </div>
                         
                         <!-- Telemetry Display (Hidden by default) -->
@@ -284,6 +371,10 @@
                                     <div class="vital-bar mp"><div class="fill" id="bar-slot3-mp" style="width: 0%"></div></div>
                                 </div>
                             </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot3" class="cooldowns-container"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -295,28 +386,51 @@
                         <span class="status-badge" id="badge-slot4">Offline</span>
                     </div>
                     <div class="slot-body">
-                        <div class="form-group">
-                            <label>Username</label>
-                            <input type="text" id="slot4-username" class="slot-username" placeholder="Character Username">
-                        </div>
-                        <div class="form-group">
-                            <label>Password</label>
-                            <div class="password-wrapper">
-                                <input type="password" id="slot4-password" class="slot-password" placeholder="Password">
-                                <button type="button" class="btn-toggle-password">
-                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
-                                </button>
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot4-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot4-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot4-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot4-class" class="slot-class" placeholder="Lord of Order">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot4-is-taunter">
+                                    Taunter
+                                </label>
                             </div>
                         </div>
-                        <div class="form-group">
-                            <label>Class</label>
-                            <input type="text" id="slot4-class" class="slot-class" placeholder="Lord of Order">
-                        </div>
-                        <div class="checkbox-options">
-                            <label class="chk-label">
-                                <input type="radio" name="taunter-group" id="slot4-is-taunter">
-                                Taunter
-                            </label>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot4-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot4-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot4-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot4-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot4-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
                         </div>
                         
                         <!-- Telemetry Display (Hidden by default) -->
@@ -339,6 +453,10 @@
                                     <div class="vital-bar mp"><div class="fill" id="bar-slot4-mp" style="width: 0%"></div></div>
                                 </div>
                             </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot4" class="cooldowns-container"></div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -360,8 +478,10 @@
                     <button class="btn btn-small btn-secondary" id="btn-clear-logs">Clear Logs</button>
                 </div>
             </div>
-            <div class="console-viewport" id="console-viewport">
-                <!-- Log streams appear here -->
+            <div style="display: flex; flex: 1; min-height: 0;">
+                <div class="console-viewport" id="console-viewport">
+                    <!-- Log streams appear here -->
+                </div>
             </div>
         </footer>
 

@@ -8,6 +8,36 @@ let partyStartTime = null;
 let restartAttempts = 0;
 let lastStartTimestamp = null;
 
+const SLOT_HARDCODED_SETTINGS = {
+    slot1: { converge_type: "sun", taunt_parity: "odd" },
+    slot2: { converge_type: "sun", taunt_parity: "even" },
+    slot3: { converge_type: "moon", taunt_parity: "odd" },
+    slot4: { converge_type: "moon", taunt_parity: "even" }
+};
+
+// Global Theme Manager
+function applyTheme(themeName) {
+    document.body.classList.remove("theme-red", "theme-pink", "theme-blue", "theme-green");
+    if (themeName !== "default") {
+        document.body.classList.add(`theme-${themeName}`);
+    }
+    if (config) {
+        config.theme = themeName;
+    }
+}
+
+function updateActiveThemeDot(theme) {
+    document.querySelectorAll(".theme-dot").forEach(dot => {
+        if (dot.getAttribute("data-theme") === theme) {
+            dot.classList.add("active");
+        } else {
+            dot.classList.remove("active");
+        }
+    });
+}
+
+
+
 // Console log storage per tab
 const logStreams = {
     "System": []
@@ -16,7 +46,11 @@ let activeTab = "System";
 
 // HTML Elements
 const serverSelect = document.getElementById("select-server");
-const roomInput = document.getElementById("input-room-number");
+const roomInput = {
+    get value() { return "99999"; },
+    set value(val) {},
+    disabled: false
+};
 const btnStartParty = document.getElementById("btn-start-party");
 const btnStopParty = document.getElementById("btn-stop-party");
 const consoleTabsList = document.getElementById("console-tabs-list");
@@ -122,8 +156,6 @@ window.addEventListener("pywebviewready", () => {
                     slots.forEach(slot => {
                         const slotConfig = config.slots[slot] || {};
                         document.getElementById(`${slot}-class`).value = slotConfig.char_class || "";
-                        document.getElementById(`${slot}-converge`).value = slotConfig.converge_type || "";
-                        document.getElementById(`${slot}-parity`).value = slotConfig.taunt_parity || "";
                         document.getElementById(`${slot}-light-gather`).checked = !!slotConfig.light_gather_taunter;
                         
                         if (slot === "slot3") {
@@ -162,8 +194,6 @@ function loadConfiguration() {
             document.getElementById(`${slot}-username`).value = slotConfig.username || "";
             document.getElementById(`${slot}-password`).value = slotConfig.password || "";
             document.getElementById(`${slot}-class`).value = slotConfig.char_class || "";
-            document.getElementById(`${slot}-converge`).value = slotConfig.converge_type || "";
-            document.getElementById(`${slot}-parity`).value = slotConfig.taunt_parity || "";
             document.getElementById(`${slot}-light-gather`).checked = !!slotConfig.light_gather_taunter;
             
             if (slot === "slot3") {
@@ -173,6 +203,10 @@ function loadConfiguration() {
                 document.getElementById("slot4-sunset-knight").checked = !!slotConfig.sunset_knight_taunter;
             }
         });
+        
+        const savedTheme = config.theme || "default";
+        updateActiveThemeDot(savedTheme);
+        applyTheme(savedTheme);
         
         updateConsoleTabs();
         checkActiveBotStatuses();
@@ -189,14 +223,16 @@ function saveConfiguration() {
     config.auto_restart_enabled = document.getElementById("chk-auto-restart").checked;
     config.auto_restart_delay = parseInt(document.getElementById("input-restart-delay").value) || 30;
     config.auto_restart_max_attempts = parseInt(document.getElementById("input-restart-max-attempts").value) || 3;
+    const activeThemeDot = document.querySelector(".theme-dot.active");
+    config.theme = activeThemeDot ? activeThemeDot.getAttribute("data-theme") : "default";
     
     slots.forEach(slot => {
         config.slots[slot] = {
             username: document.getElementById(`${slot}-username`).value.trim(),
             password: document.getElementById(`${slot}-password`).value.trim(),
             char_class: document.getElementById(`${slot}-class`).value.trim(),
-            converge_type: document.getElementById(`${slot}-converge`).value,
-            taunt_parity: document.getElementById(`${slot}-parity`).value,
+            converge_type: SLOT_HARDCODED_SETTINGS[slot].converge_type,
+            taunt_parity: SLOT_HARDCODED_SETTINGS[slot].taunt_parity,
             light_gather_taunter: document.getElementById(`${slot}-light-gather`).checked
         };
         
@@ -262,6 +298,8 @@ function startParty(isAuto = false) {
             btnStopParty.classList.remove("hidden");
             btnStartParty.disabled = false;
             
+
+            
             // Start duration counter
             const durationCounter = document.getElementById("duration-counter");
             const durationVal = document.getElementById("duration-val");
@@ -306,6 +344,8 @@ function stopParty() {
     
     window.pywebview.api.stop_party().then(() => {
         isPartyRunning = false;
+        
+
         btnStopParty.classList.add("hidden");
         btnStartParty.removeAttribute("disabled");
         btnStartParty.classList.remove("hidden");
@@ -370,12 +410,70 @@ function stopTelemetryPolling() {
     }
 }
 
+function formatHP(value) {
+    if (value >= 1000000) {
+        return (value / 1000000).toFixed(2) + "M";
+    } else if (value >= 1000) {
+        return (value / 1000).toFixed(1) + "K";
+    }
+    return value;
+}
+
 function checkActiveBotStatuses() {
-    window.pywebview.api.get_status().then(statuses => {
+    window.pywebview.api.get_status().then(data => {
+        const statuses = data.statuses || data;
+        const monsters = data.monsters || [];
+        const systemStats = data.system_stats || null;
+
+        // Process CPU/Mem telemetry in header
+        if (systemStats) {
+            const cpuEl = document.getElementById("sys-cpu");
+            const memEl = document.getElementById("sys-mem");
+            if (cpuEl) cpuEl.innerText = `${systemStats.cpu}%`;
+            if (memEl) memEl.innerText = `${systemStats.memory} MB`;
+        }
+
+        // Process Monsters HP Panel
+        const monstersPanel = document.getElementById("monsters-panel");
+        const monstersList = document.getElementById("monsters-list");
+        if (monstersPanel && monstersList) {
+            if (monsters.length > 0) {
+                monstersPanel.classList.remove("hidden");
+                monstersList.innerHTML = monsters.map(mon => {
+                    const hpPercent = mon.max_hp > 0 ? ((mon.hp / mon.max_hp) * 100).toFixed(1) : 0;
+                    const formattedHp = mon.hp.toLocaleString();
+                    const formattedMaxHp = mon.max_hp.toLocaleString();
+                    return `
+                        <div class="monster-hp-card">
+                            <div class="monster-info-row">
+                                <span class="monster-name">${mon.name}</span>
+                                <span class="monster-hp-text">${formattedHp} / ${formattedMaxHp} (${hpPercent}%)</span>
+                            </div>
+                            <div class="monster-hp-bar-bg">
+                                <div class="monster-hp-bar-fill" style="width: ${hpPercent}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } else {
+                monstersPanel.classList.add("hidden");
+                monstersList.innerHTML = "";
+            }
+        }
+
         slots.forEach(slot => {
             const status = statuses[slot];
             const badge = document.getElementById(`badge-${slot}`);
             const telemetryPanel = document.getElementById(`telemetry-${slot}`);
+            const card = document.getElementById(`card-${slot}`);
+            const soeInfoEl = document.getElementById(`${slot}-info-soe`);
+            const cooldownsEl = document.getElementById(`cooldowns-${slot}`);
+            
+            // Clean active outlines
+            if (card) {
+                card.classList.remove("taunt-active-highlight");
+                card.classList.remove("taunt-error-highlight");
+            }
             
             if (status && status.running) {
                 // Online
@@ -403,11 +501,63 @@ function checkActiveBotStatuses() {
                     badge.innerText = "DEAD";
                     badge.className = "status-badge dead";
                 }
+                
+                // SoE indicator in running info display
+                if (soeInfoEl) {
+                    const qty = status.scroll_enrage_qty !== undefined ? status.scroll_enrage_qty : 0;
+                    soeInfoEl.innerText = qty;
+                    
+                    // Style by quantity
+                    if (qty >= 10) {
+                        soeInfoEl.style.color = "#10b981"; // Green
+                    } else if (qty > 0) {
+                        soeInfoEl.style.color = "#f59e0b"; // Orange
+                    } else {
+                        soeInfoEl.style.color = "#ef4444"; // Red
+                    }
+                }
+                
+                // Error outlines
+                if (card && status.taunt_error) {
+                    card.classList.add("taunt-error-highlight");
+                }
+                
+                // Cooldowns
+                if (cooldownsEl && status.cooldowns) {
+                    cooldownsEl.innerHTML = "";
+                    for (let i = 0; i <= 5; i++) {
+                        const cd = status.cooldowns[i] || 0.0;
+                        const label = i === 0 ? "AA" : i;
+                        const badgeClass = i === 5 ? "skill-cd-badge skill-5-badge" : "skill-cd-badge";
+                        
+                        if (cd > 0) {
+                            cooldownsEl.innerHTML += `
+                                <div class="${badgeClass} on-cooldown">
+                                    <span class="skill-idx">${label}</span>
+                                    <span class="skill-cd-val">${cd}s</span>
+                                </div>
+                            `;
+                        } else {
+                            cooldownsEl.innerHTML += `
+                                <div class="${badgeClass} ready">
+                                    <span class="skill-idx">${label}</span>
+                                    <span class="skill-cd-val">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                    </span>
+                                </div>
+                            `;
+                        }
+                    }
+                }
             } else {
                 // Offline
                 badge.className = "status-badge";
                 badge.innerText = "Offline";
                 telemetryPanel.classList.add("hidden");
+                if (soeInfoEl) {
+                    soeInfoEl.innerText = "0";
+                    soeInfoEl.style.color = "#ef4444";
+                }
             }
         });
 
@@ -477,46 +627,47 @@ function clearLogs() {
     consoleViewport.innerHTML = "";
 }
 
-// Toggle credentials fields and display active account summaries
+// Toggle inputs fields and show running display
 function toggleCredentialsVisibility(showInfoDisplay) {
     slots.forEach((slot, index) => {
-        const usernameInput = document.getElementById(`${slot}-username`);
-        const passwordInput = document.getElementById(`${slot}-password`);
+        const inputsContainer = document.getElementById(`${slot}-inputs-container`);
+        const runningDisplay = document.getElementById(`${slot}-running-display`);
         
-        const usernameFg = usernameInput.closest('.form-group');
-        const passwordFg = passwordInput.closest('.form-group');
+        if (!inputsContainer || !runningDisplay) return;
         
         if (showInfoDisplay) {
-            usernameFg.classList.add('hidden');
-            passwordFg.classList.add('hidden');
+            // Hide editable inputs container
+            inputsContainer.classList.add("hidden");
             
-            const displayVal = isCensorActive ? `Player ${index + 1}` : (usernameInput.value || '-');
+            // Populate running display info
+            const usernameInput = document.getElementById(`${slot}-username`);
+            const classInput = document.getElementById(`${slot}-class`);
             
-            let summaryEl = document.getElementById(`${slot}-summary-display`);
-            if (!summaryEl) {
-                summaryEl = document.createElement('div');
-                summaryEl.id = `${slot}-summary-display`;
-                summaryEl.className = 'form-group account-summary-display';
-                summaryEl.innerHTML = `
-                    <label>Active Account</label>
-                    <div style="font-weight: 600; color: #fff; background-color: rgba(255,255,255,0.05); padding: 8px 12px; border-radius: 6px; border: 1px solid var(--border-color); height: 38px; display: flex; align-items: center; font-size: 0.85rem;">
-                        ${displayVal}
-                    </div>
-                `;
-                const classFg = document.getElementById(`${slot}-class`).closest('.form-group');
-                classFg.parentNode.insertBefore(summaryEl, classFg);
-            } else {
-                summaryEl.querySelector('div').innerText = displayVal;
-                summaryEl.classList.remove('hidden');
+            const infoUsername = document.getElementById(`${slot}-info-username`);
+            const infoClass = document.getElementById(`${slot}-info-class`);
+            const infoConverge = document.getElementById(`${slot}-info-converge`);
+            const infoParity = document.getElementById(`${slot}-info-parity`);
+            
+            if (infoUsername) {
+                const userVal = usernameInput.value.trim() || "-";
+                infoUsername.innerText = isCensorActive ? `Player ${index + 1}` : userVal;
             }
+            if (infoClass) {
+                infoClass.innerText = classInput.value.trim() || "Standard class";
+            }
+            if (infoConverge) {
+                infoConverge.innerText = SLOT_HARDCODED_SETTINGS[slot].converge_type.toUpperCase();
+            }
+            if (infoParity) {
+                infoParity.innerText = SLOT_HARDCODED_SETTINGS[slot].taunt_parity.toUpperCase();
+            }
+            
+            runningDisplay.classList.remove("hidden");
         } else {
-            usernameFg.classList.remove('hidden');
-            passwordFg.classList.remove('hidden');
-            
-            const summaryEl = document.getElementById(`${slot}-summary-display`);
-            if (summaryEl) {
-                summaryEl.classList.add('hidden');
-            }
+            // Show editable inputs container
+            inputsContainer.classList.remove("hidden");
+            // Hide running display
+            runningDisplay.classList.add("hidden");
         }
     });
 }
@@ -638,22 +789,17 @@ function handleDisconnectMonitoring(statuses) {
     }
 }
 
-// Info bubble click toggle handler
+// Theme selection event listener
 document.addEventListener("DOMContentLoaded", () => {
-    const titleClick = document.getElementById("app-title-click");
-    const infoBubble = document.getElementById("info-bubble");
-    if (titleClick && infoBubble) {
-        titleClick.addEventListener("click", (e) => {
-            e.stopPropagation();
-            infoBubble.classList.toggle("show");
+    document.querySelectorAll(".theme-dot").forEach(dot => {
+        dot.addEventListener("click", () => {
+            const selectedTheme = dot.getAttribute("data-theme");
+            applyTheme(selectedTheme);
+            config.theme = selectedTheme;
+            updateActiveThemeDot(selectedTheme);
+            window.pywebview.api.save_config(config);
         });
-        document.addEventListener("click", () => {
-            infoBubble.classList.remove("show");
-        });
-        infoBubble.addEventListener("click", (e) => {
-            e.stopPropagation();
-        });
-    }
+    });
 });
 
 // Password Validation Handler
