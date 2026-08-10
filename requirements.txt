@@ -9,4 +9,4 @@ pyobjc-core>=10.0
 pyobjc-framework-Cocoa>=10.0
 pyobjc-framework-WebKit>=10.0
 pyinstaller>=6.0
-
+psutil>=5.9.0

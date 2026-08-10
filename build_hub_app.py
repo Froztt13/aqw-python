@@ -1035,8 +1035,8 @@ class EclipseApi:
             
         self.active_threads = {}
         
-        import psutil
         try:
+            import psutil
             self.process = psutil.Process(os.getpid())
             self.process.cpu_percent(interval=None)
         except Exception:
@@ -1345,8 +1345,8 @@ class CombinedApi:
         self.eclipse_api = eclipse_api
         self.window = None
         
-        import psutil
         try:
+            import psutil
             self.process = psutil.Process(os.getpid())
             self.process.cpu_percent(interval=None)
         except Exception:
@@ -1871,7 +1871,8 @@ def build_app():
         f"--name={app_name}",
         "--noconfirm",
         "--clean",
-        "--windowed"
+        "--windowed",
+        "--hidden-import=psutil"
     ]
     
     for folder in data_folders:
