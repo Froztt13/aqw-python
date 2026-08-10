@@ -1,0 +1,506 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maid Eclipse - AQW Temple Shrine Manager</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- Password Protection Overlay -->
+    <div id="password-screen" class="password-screen">
+        <div class="password-card" id="password-card-container">
+            <div id="password-normal-flow">
+                <div class="lock-icon" id="password-lock-icon">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"></rect><path d="M7 11V7a5 5 0 0 1 10 0v4"></path></svg>
+                </div>
+                <h2>Authentication Required</h2>
+                <p>Please enter the password to access Maid Eclipse.</p>
+                <form id="password-form" class="password-input-row" onsubmit="event.preventDefault();">
+                    <input type="password" id="app-access-password" placeholder="Enter password..." required autofocus>
+                    <button type="submit" id="btn-submit-password">Unlock</button>
+                </form>
+                <div id="password-error" class="password-error hidden">Incorrect password. Please try again.</div>
+            </div>
+
+            <!-- Captcha Locked Out Flow -->
+            <div id="password-captcha-flow" class="hidden">
+                <div class="lock-icon danger">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="18" y1="6" x2="6" y2="18"></line><line x1="6" y1="6" x2="18" y2="18"></line></svg>
+                </div>
+                <h2>Security Lockout</h2>
+                <p style="margin-bottom: 12px; color: var(--danger-color); font-weight: 500;">Failed attempts exceeded! Solve the game to unlock.</p>
+                
+                <div class="captcha-game-area" id="captcha-game-area">
+                    <img src="astolfo_scratch0.png" alt="Blushing Astolfo Game" class="captcha-bg" id="captcha-bg-img">
+                    <canvas id="scratch-canvas"></canvas>
+                </div>
+                
+                <div class="captcha-status" id="captcha-status">Scratch to reveal image: 0% revealed</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="app-container">
+        
+        <!-- Header Bar -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-logo-wrapper">
+                    <img src="app_icon.png" class="brand-logo" alt="Astolfo Logo" style="width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4));">
+                </div>
+                <div class="brand-text">
+                    <div class="title-row">
+                        <h1 id="app-title-click">Maid Eclipse</h1>
+                        <span class="version-badge">v1.1.0</span>
+                        <div class="app-sys-stats" id="app-sys-stats" style="display: flex; gap: 8px; font-size: 0.7rem; font-family: 'Fira Code', monospace; color: var(--text-secondary); align-items: center; margin-left: 8px;">
+                            <span class="stat-item"><span style="color: var(--primary-color); font-weight: bold;">CPU:</span> <span id="sys-cpu">0.0%</span></span>
+                            <span class="stat-item"><span style="color: var(--primary-color); font-weight: bold;">MEM:</span> <span id="sys-mem">0.0 MB</span></span>
+                        </div>
+                    </div>
+                    <p>AQW - Ascension of the Eclipse Dungeon Manager</p>
+                    <div class="info-tooltip-bubble" id="info-bubble">
+                        Based on <strong>AQW Python</strong><br>
+                        <a href="https://github.com/Froztt13/aqw-python" target="_blank" style="color: var(--primary-color); text-decoration: underline;">GitHub Repository</a>
+                    </div>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="global-config-group">
+                    <div class="input-inline">
+                        <label for="select-server">Server</label>
+                        <server-select id="select-server" value="Alteon"></server-select>
+                    </div>
+                </div>
+                
+                <duration-counter id="duration-counter" val-id="duration-val"></duration-counter>
+                <settings-button id="btn-toggle-settings" title="General Settings"></settings-button>
+                <bot-control-buttons start-id="btn-start-party" stop-id="btn-stop-party" start-label="Start Party" stop-label="Stop Party"></bot-control-buttons>
+            </div>
+        </header>
+
+        <!-- Settings Dropdown Panel -->
+        <div class="settings-dropdown-panel hidden" id="settings-dropdown-panel">
+            <div class="settings-panel-header">General Settings</div>
+            <div class="settings-panel-body">
+                <div class="form-group-checkbox">
+                    <label class="chk-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.75rem; color: #e5e7eb;">
+                        <input type="checkbox" id="chk-auto-restart" style="cursor: pointer;">
+                        Enable Auto-Restart on DC
+                    </label>
+                </div>
+                <div class="form-group-inline">
+                    <span>Delay (seconds)</span>
+                    <input type="number" id="input-restart-delay" min="5" value="30" style="width: 70px;">
+                </div>
+                <div class="form-group-inline">
+                    <span>Max Attempts</span>
+                    <input type="number" id="input-restart-max-attempts" min="1" max="10" value="3" style="width: 70px;">
+                </div>
+                <div class="restart-status-indicator" id="restart-status-indicator" style="font-size: 0.7rem; color: var(--primary-color); font-weight: bold; text-align: center; margin-top: 4px;"></div>
+                
+                <div class="settings-actions-row" style="display: flex; gap: 8px; margin-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
+                    <button class="btn btn-secondary flex-1" id="btn-toggle-censor" title="Toggle Censor Mode" style="font-size: 0.72rem; padding: 6px 4px; display: flex; align-items: center; justify-content: center; gap: 4px; height: 32px;">
+                        <svg id="censor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        Censor Mode
+                    </button>
+                    <button class="btn btn-secondary flex-1" id="btn-reset-config" title="Reset Configuration" style="font-size: 0.72rem; padding: 6px 4px; display: flex; align-items: center; justify-content: center; gap: 4px; height: 32px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; pointer-events: none;">
+                            <path d="M23 4v6h-6"></path>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        Reset Config
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <main class="app-body">
+            <!-- Monsters HP Panel -->
+            <div class="monsters-panel hidden" id="monsters-panel">
+                <div class="monsters-panel-title">Monsters HP</div>
+                <div class="monsters-list" id="monsters-list"></div>
+            </div>
+            <div class="slots-grid">
+                
+                <!-- Slot 1: Master (Sun / odd) -->
+                <div class="slot-card sun-theme" id="card-slot1">
+                    <div class="slot-header">
+                        <div class="badge-role sun">Slot 1: Master (Sun / odd)</div>
+                        <div class="status-badge" id="badge-slot1">Offline</div>
+                    </div>
+                    <div class="slot-body">
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot1-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" class="slot-username" id="slot1-username" placeholder="Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" class="slot-password" id="slot1-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password" tabindex="-1">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" class="slot-class" id="slot1-class" placeholder="Legion Revenant">
+                            </div>
+
+                            
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" class="slot-light-gather" id="slot1-light-gather">
+                                    Light Gather Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot1-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot1-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot1-info-class">-</span>
+                            </div>
+
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot1-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Telemetry Display (Hidden by default) -->
+                        <div class="telemetry-panel hidden" id="telemetry-slot1">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot1-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot1-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot1-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot1-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot1-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot1-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row flex-col" style="margin-top: 8px;">
+                                <div class="cooldowns-grid" id="cooldowns-slot1">
+                                    <div class="skill-cd-badge ready" id="cd-slot1-0"><span class="skill-idx">AA</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot1-1"><span class="skill-idx">1</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot1-2"><span class="skill-idx">2</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot1-3"><span class="skill-idx">3</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot1-4"><span class="skill-idx">4</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge skill-5-badge ready" id="cd-slot1-5"><span class="skill-idx">5</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 2: Slave 1 (Sun / even) -->
+                <div class="slot-card sun-theme" id="card-slot2">
+                    <div class="slot-header">
+                        <div class="badge-role sun">Slot 2: Slave 1 (Sun / even)</div>
+                        <div class="status-badge" id="badge-slot2">Offline</div>
+                    </div>
+                    <div class="slot-body">
+                        <div class="slot-inputs-container" id="slot2-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" class="slot-username" id="slot2-username" placeholder="Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" class="slot-password" id="slot2-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password" tabindex="-1">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" class="slot-class" id="slot2-class" placeholder="StoneCrusher">
+                            </div>
+
+                            
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" class="slot-light-gather" id="slot2-light-gather">
+                                    Light Gather Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot2-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot2-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot2-info-class">-</span>
+                            </div>
+
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot2-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <div class="telemetry-panel hidden" id="telemetry-slot2">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot2-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot2-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot2-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot2-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot2-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot2-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row flex-col" style="margin-top: 8px;">
+                                <div class="cooldowns-grid" id="cooldowns-slot2">
+                                    <div class="skill-cd-badge ready" id="cd-slot2-0"><span class="skill-idx">AA</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot2-1"><span class="skill-idx">1</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot2-2"><span class="skill-idx">2</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot2-3"><span class="skill-idx">3</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot2-4"><span class="skill-idx">4</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge skill-5-badge ready" id="cd-slot2-5"><span class="skill-idx">5</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 3: Slave 2 (Moon / odd) -->
+                <div class="slot-card moon-theme" id="card-slot3">
+                    <div class="slot-header">
+                        <div class="badge-role moon">Slot 3: Slave 2 (Moon / odd)</div>
+                        <div class="status-badge" id="badge-slot3">Offline</div>
+                    </div>
+                    <div class="slot-body">
+                        <div class="slot-inputs-container" id="slot3-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" class="slot-username" id="slot3-username" placeholder="Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" class="slot-password" id="slot3-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password" tabindex="-1">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" class="slot-class" id="slot3-class" placeholder="ArchPaladin">
+                            </div>
+
+                            
+                            <div class="checkbox-options" style="display: flex; flex-direction: column; gap: 8px; position: relative;">
+                                <label class="chk-label">
+                                    <input type="checkbox" class="slot-light-gather" id="slot3-light-gather" checked>
+                                    Light Gather Taunter
+                                </label>
+                                <label class="chk-label">
+                                    <input type="checkbox" class="slot-moon-haze" id="slot3-moon-haze" checked>
+                                    Moon Haze Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot3-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot3-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot3-info-class">-</span>
+                            </div>
+
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot3-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <div class="telemetry-panel hidden" id="telemetry-slot3">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot3-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot3-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot3-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot3-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot3-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot3-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row flex-col" style="margin-top: 8px;">
+                                <div class="cooldowns-grid" id="cooldowns-slot3">
+                                    <div class="skill-cd-badge ready" id="cd-slot3-0"><span class="skill-idx">AA</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot3-1"><span class="skill-idx">1</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot3-2"><span class="skill-idx">2</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot3-3"><span class="skill-idx">3</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot3-4"><span class="skill-idx">4</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge skill-5-badge ready" id="cd-slot3-5"><span class="skill-idx">5</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 4: Slave 3 (Moon / even) -->
+                <div class="slot-card moon-theme" id="card-slot4">
+                    <div class="slot-header">
+                        <div class="badge-role moon">Slot 4: Slave 3 (Moon / even)</div>
+                        <div class="status-badge" id="badge-slot4">Offline</div>
+                    </div>
+                    <div class="slot-body">
+                        <div class="slot-inputs-container" id="slot4-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" class="slot-username" id="slot4-username" placeholder="Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" class="slot-password" id="slot4-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password" tabindex="-1">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" class="slot-class" id="slot4-class" placeholder="Lord of Order">
+                            </div>
+
+                            
+                            <div class="checkbox-options" style="display: flex; flex-direction: column; gap: 8px; position: relative;">
+                                <label class="chk-label">
+                                    <input type="checkbox" class="slot-light-gather" id="slot4-light-gather" checked>
+                                    Light Gather Taunter
+                                </label>
+                                <label class="chk-label">
+                                    <input type="checkbox" class="slot-sunset-knight" id="slot4-sunset-knight" checked>
+                                    Sunset Knight Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot4-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot4-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot4-info-class">-</span>
+                            </div>
+
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot4-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <div class="telemetry-panel hidden" id="telemetry-slot4">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot4-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot4-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot4-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot4-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot4-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot4-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row flex-col" style="margin-top: 8px;">
+                                <div class="cooldowns-grid" id="cooldowns-slot4">
+                                    <div class="skill-cd-badge ready" id="cd-slot4-0"><span class="skill-idx">AA</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot4-1"><span class="skill-idx">1</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot4-2"><span class="skill-idx">2</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot4-3"><span class="skill-idx">3</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge ready" id="cd-slot4-4"><span class="skill-idx">4</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                    <div class="skill-cd-badge skill-5-badge ready" id="cd-slot4-5"><span class="skill-idx">5</span><span class="skill-cd-val"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg></span></div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Bottom Console Console -->
+        <footer class="app-console">
+            <div class="console-tabs-bar">
+                <div class="tabs-list" id="console-tabs-list">
+                    <button class="console-tab active" data-source="System">System</button>
+                    <!-- Tabs for accounts populated dynamically -->
+                </div>
+                <div class="console-actions">
+                    <div class="console-checkbox-wrapper">
+                        <input type="checkbox" id="chk-auto-scroll" checked>
+                        <label for="chk-auto-scroll">Auto-Scroll</label>
+                    </div>
+                    <button class="btn btn-small btn-secondary" id="btn-clear-logs">Clear Logs</button>
+                </div>
+            </div>
+            <div style="display: flex; flex: 1; min-height: 0;">
+                <div class="console-viewport" id="console-viewport">
+                    <!-- Log streams appear here -->
+                </div>
+            </div>
+        </footer>
+    </div>
+    <script src="../components.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

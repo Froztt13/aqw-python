@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Maid Temple</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        
+        <!-- Header Bar -->
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-logo-wrapper">
+                    <img src="app_icon.png" class="brand-logo" alt="Astolfo Logo" style="width: 36px; height: 36px; object-fit: contain; filter: drop-shadow(0 0 6px rgba(168, 85, 247, 0.4));">
+                </div>
+                <div class="brand-text">
+                    <div class="title-row">
+                        <h1 id="app-title-click">Maid Temple</h1>
+                        <span class="version-badge">v1.1.0</span>
+                    </div>
+                    <p>Temple Shrine Dungeon Manager</p>
+                    <div class="info-tooltip-bubble" id="info-bubble">
+                        Based on <strong>AQW Python</strong><br>
+                        <a href="https://github.com/Froztt13/aqw-python" target="_blank" style="color: var(--primary-color); text-decoration: underline;">GitHub Repository</a>
+                    </div>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="global-config-group">
+                    <div class="input-inline">
+                        <label for="select-server">Server</label>
+                        <server-select id="select-server" value="Alteon"></server-select>
+                    </div>
+                    <div class="input-inline">
+                        <label for="input-room-number">Room</label>
+                        <input type="number" id="input-room-number" value="9099">
+                    </div>
+                    <div class="input-inline">
+                        <label for="select-temple-bot">Bot</label>
+                        <select id="select-temple-bot">
+                            <option value="MidnightSunBot">Midnight Sun</option>
+                            <option value="SolsticeMoonBot">Solstice Moon</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <duration-counter id="duration-counter" val-id="duration-val"></duration-counter>
+                <settings-button id="btn-toggle-settings" title="General Settings"></settings-button>
+                <bot-control-buttons start-id="btn-start-party" stop-id="btn-stop-party" start-label="Start" stop-label="Stop"></bot-control-buttons>
+            </div>
+        </header>
+
+        <!-- Settings Dropdown Panel -->
+        <div class="settings-dropdown-panel hidden" id="settings-dropdown-panel">
+            <div class="settings-panel-header">General Settings</div>
+            <div class="settings-panel-body">
+                <div class="form-group-checkbox">
+                    <label class="chk-label" style="display: flex; align-items: center; gap: 8px; cursor: pointer; font-size: 0.75rem; color: #e5e7eb;">
+                        <input type="checkbox" id="chk-auto-restart" style="cursor: pointer;">
+                        Enable Auto-Restart on DC
+                    </label>
+                </div>
+                <div class="form-group-inline">
+                    <span>Delay (seconds)</span>
+                    <input type="number" id="input-restart-delay" min="5" value="30" style="width: 70px;">
+                </div>
+                <div class="form-group-inline">
+                    <span>Max Attempts</span>
+                    <input type="number" id="input-restart-max-attempts" min="1" max="10" value="3" style="width: 70px;">
+                </div>
+                <div class="restart-status-indicator" id="restart-status-indicator" style="font-size: 0.7rem; color: var(--primary-color); font-weight: bold; text-align: center; margin-top: 4px;"></div>
+                
+                <div class="settings-actions-row" style="display: flex; gap: 8px; margin-top: 8px; border-top: 1px solid rgba(255, 255, 255, 0.05); padding-top: 8px;">
+                    <button class="btn btn-secondary flex-1" id="btn-toggle-censor" title="Toggle Censor Mode" style="font-size: 0.72rem; padding: 6px 4px; display: flex; align-items: center; justify-content: center; gap: 4px; height: 32px;">
+                        <svg id="censor-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                        Censor Mode
+                    </button>
+                    <button class="btn btn-secondary flex-1" id="btn-reset-config" title="Reset Configuration" style="font-size: 0.72rem; padding: 6px 4px; display: flex; align-items: center; justify-content: center; gap: 4px; height: 32px;">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; pointer-events: none;">
+                            <path d="M23 4v6h-6"></path>
+                            <path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"></path>
+                        </svg>
+                        Reset Config
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Main Workspace -->
+        <main class="app-body">
+            <div class="slots-grid">
+                
+                <!-- Slot 1: Master -->
+                <div class="slot-card sun-theme" id="card-slot1">
+                    <div class="slot-header">
+                        <h2>Master</h2>
+                        <span class="status-badge" id="badge-slot1">Offline</span>
+                    </div>
+                    <div class="slot-body">
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot1-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot1-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot1-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot1-class" class="slot-class" placeholder="ArchPaladin">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot1-is-taunter">
+                                    Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot1-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot1-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot1-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot1-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot1-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Telemetry Display (Hidden by default) -->
+                        <div class="telemetry-panel hidden" id="telemetry-slot1">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot1-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot1-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot1-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot1-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot1-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot1-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot1" class="cooldowns-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 2: Slave 1 -->
+                <div class="slot-card moon-theme" id="card-slot2">
+                    <div class="slot-header">
+                        <h2>Slave 1</h2>
+                        <span class="status-badge" id="badge-slot2">Offline</span>
+                    </div>
+                    <div class="slot-body">
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot2-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot2-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot2-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot2-class" class="slot-class" placeholder="StoneCrusher">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot2-is-taunter">
+                                    Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot2-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot2-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot2-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot2-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot2-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Telemetry Display (Hidden by default) -->
+                        <div class="telemetry-panel hidden" id="telemetry-slot2">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot2-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot2-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot2-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot2-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot2-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot2-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot2" class="cooldowns-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 3: Slave 2 -->
+                <div class="slot-card moon-theme" id="card-slot3">
+                    <div class="slot-header">
+                        <h2>Slave 2</h2>
+                        <span class="status-badge" id="badge-slot3">Offline</span>
+                    </div>
+                    <div class="slot-body">
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot3-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot3-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot3-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot3-class" class="slot-class" placeholder="Legion Revenant">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot3-is-taunter">
+                                    Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot3-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot3-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot3-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot3-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot3-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Telemetry Display (Hidden by default) -->
+                        <div class="telemetry-panel hidden" id="telemetry-slot3">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot3-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot3-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot3-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot3-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot3-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot3-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot3" class="cooldowns-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Slot 4: Slave 3 -->
+                <div class="slot-card moon-theme" id="card-slot4">
+                    <div class="slot-header">
+                        <h2>Slave 3</h2>
+                        <span class="status-badge" id="badge-slot4">Offline</span>
+                    </div>
+                    <div class="slot-body">
+                        <!-- Inputs -->
+                        <div class="slot-inputs-container" id="slot4-inputs-container">
+                            <div class="form-group">
+                                <label>Username</label>
+                                <input type="text" id="slot4-username" class="slot-username" placeholder="Character Username">
+                            </div>
+                            <div class="form-group">
+                                <label>Password</label>
+                                <div class="password-wrapper">
+                                    <input type="password" id="slot4-password" class="slot-password" placeholder="Password">
+                                    <button type="button" class="btn-toggle-password">
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                                    </button>
+                                </div>
+                            </div>
+                            <div class="form-group">
+                                <label>Class</label>
+                                <input type="text" id="slot4-class" class="slot-class" placeholder="Lord of Order">
+                            </div>
+                            <div class="checkbox-options" style="display: flex; align-items: center; justify-content: space-between;">
+                                <label class="chk-label">
+                                    <input type="checkbox" id="slot4-is-taunter">
+                                    Taunter
+                                </label>
+                            </div>
+                        </div>
+
+                        <!-- Running Info Display -->
+                        <div class="slot-running-display hidden" id="slot4-running-display">
+                            <div class="info-row">
+                                <span class="info-label">Active Account</span>
+                                <span class="info-value" id="slot4-info-username">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Class</span>
+                                <span class="info-value" id="slot4-info-class">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Taunter</span>
+                                <span class="info-value" id="slot4-info-taunter">-</span>
+                            </div>
+                            <div class="info-row">
+                                <span class="info-label">Scroll of Enrage</span>
+                                <span class="info-value" id="slot4-info-soe" style="font-weight: bold;">0 SoE</span>
+                            </div>
+                        </div>
+                        
+                        <!-- Telemetry Display (Hidden by default) -->
+                        <div class="telemetry-panel hidden" id="telemetry-slot4">
+                            <div class="telemetry-row">
+                                <span class="tel-label">Map</span>
+                                <span class="tel-val" id="tel-slot4-map">-</span>
+                            </div>
+                            <div class="telemetry-row">
+                                <span class="tel-label">Cell</span>
+                                <span class="tel-val" id="tel-slot4-cell">-</span>
+                            </div>
+                            <div class="vitals-group">
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">HP: <span id="val-slot4-hp">0/0</span></div>
+                                    <div class="vital-bar hp"><div class="fill" id="bar-slot4-hp" style="width: 0%"></div></div>
+                                </div>
+                                <div class="vital-bar-container">
+                                    <div class="vital-label">MP: <span id="val-slot4-mp">0/0</span></div>
+                                    <div class="vital-bar mp"><div class="fill" id="bar-slot4-mp" style="width: 0%"></div></div>
+                                </div>
+                            </div>
+                            <div class="telemetry-row" style="margin-top: 10px; border-top: 1px solid rgba(255,255,255,0.05); padding-top: 8px; flex-direction: column; align-items: stretch; gap: 4px;">
+                                <span class="tel-label" style="margin-bottom: 2px;">Skill Cooldowns</span>
+                                <div id="cooldowns-slot4" class="cooldowns-container"></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+            </div>
+        </main>
+
+        <!-- Bottom Console Bar -->
+        <footer class="app-console">
+            <div class="console-tabs-bar">
+                <div class="tabs-list" id="console-tabs-list">
+                    <button class="console-tab active" data-source="System">System</button>
+                </div>
+                <div class="console-actions">
+                    <div class="console-checkbox-wrapper">
+                        <input type="checkbox" id="chk-auto-scroll" checked>
+                        <label for="chk-auto-scroll">Auto-Scroll</label>
+                    </div>
+                    <button class="btn btn-small btn-secondary" id="btn-clear-logs">Clear Logs</button>
+                </div>
+            </div>
+            <div style="display: flex; flex: 1; min-height: 0;">
+                <div class="console-viewport" id="console-viewport">
+                    <!-- Log streams appear here -->
+                </div>
+            </div>
+        </footer>
+
+    </div>
+    
+    <script src="../components.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

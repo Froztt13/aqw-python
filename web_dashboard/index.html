@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQW Bot Hub - Admin Panel</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="stars-bg"></div>
+    <div class="glow-bg"></div>
+    
+    <div class="admin-layout">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <img src="aqw_icon.png" alt="Astolfo Logo" class="brand-logo">
+                <div class="brand-text">
+                    <h2>AQW HUB</h2>
+                    <span>ADMIN CONTROL PANEL</span>
+                </div>
+                <button class="sidebar-toggle" id="btn-sidebar-toggle" title="Collapse Sidebar">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="15 18 9 12 15 6"></polyline>
+                    </svg>
+                </button>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-item active" data-tab="dashboard">
+                    <svg class="nav-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <rect x="3" y="3" width="7" height="9"></rect>
+                        <rect x="14" y="3" width="7" height="5"></rect>
+                        <rect x="14" y="12" width="7" height="9"></rect>
+                        <rect x="3" y="16" width="7" height="5"></rect>
+                    </svg>
+                    <span class="nav-text">Dashboard</span>
+                </button>
+                <button class="nav-item" data-tab="aqw">
+                    <img src="aqw_icon.png" alt="AQW Icon" class="nav-btn-img">
+                    <span class="nav-text">AQW Solo Bot</span>
+                </button>
+                <button class="nav-item" data-tab="slavery">
+                    <img src="slavery_icon.png" alt="Slavery Icon" class="nav-btn-img">
+                    <span class="nav-text">Slavery Bot</span>
+                </button>
+                <button class="nav-item" data-tab="temple">
+                    <img src="temple_icon.png" alt="Temple Icon" class="nav-btn-img">
+                    <span class="nav-text">Temple Bot</span>
+                </button>
+                <button class="nav-item" data-tab="eclipse">
+                    <img src="temple_icon.png" alt="Eclipse Icon" class="nav-btn-img">
+                    <span class="nav-text">Maid Eclipse</span>
+                </button>
+            </nav>
+            <div class="sidebar-theme-selector">
+                <span class="theme-label">Theme</span>
+                <div class="theme-dots">
+                    <button class="theme-dot default active" data-theme="default" title="Default Theme"></button>
+                    <button class="theme-dot red" data-theme="red" title="Red Theme"></button>
+                    <button class="theme-dot pink" data-theme="pink" title="Pink Theme"></button>
+                    <button class="theme-dot blue" data-theme="blue" title="Blue Theme"></button>
+                    <button class="theme-dot green" data-theme="green" title="Green Theme"></button>
+                </div>
+            </div>
+
+            <div class="sidebar-footer">
+                <span>Hub Version 1.0.0</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="main-content">
+            <!-- Topbar Header -->
+            <header class="topbar">
+                <div class="page-info">
+                    <h1 id="page-title">Dashboard Overview</h1>
+                    <p id="page-subtitle">Overview and statistics of all active bots</p>
+                </div>
+                <div class="system-stats">
+                    <div class="stat-pill">
+                        <span class="stat-label">CPU Usage</span>
+                        <span class="stat-value" id="sys-cpu">--%</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="stat-label">Memory</span>
+                        <span class="stat-value" id="sys-mem">-- MB</span>
+                    </div>
+                    <div class="stat-pill">
+                        <span class="stat-label">Network</span>
+                        <span class="stat-value" id="ping-indicator">-- ms</span>
+                    </div>
+                </div>
+            </header>
+
+            <!-- Content Panes -->
+            <div class="panes-container">
+                <!-- 1. Dashboard Pane -->
+                <div class="tab-pane active" id="pane-dashboard">
+                    <!-- Status Summary Banner -->
+                    <div class="summary-banner">
+                        <div class="banner-info">
+                            <span class="banner-title">Hub Control Status</span>
+                            <span class="banner-desc" id="banner-description">All bots are currently inactive.</span>
+                            <span style="font-size: 0.72rem; opacity: 0.75; margin-top: 4px; display: block;">This app is based on <a href="https://github.com/Froztt13/aqw-python" target="_blank" style="color: var(--primary); text-decoration: underline;">https://github.com/Froztt13/aqw-python</a></span>
+                        </div>
+                        <div class="banner-glow-dot"></div>
+                    </div>
+
+                    <!-- Cards Grid -->
+                    <div class="bots-grid">
+                        <!-- AQW Card -->
+                        <div class="bot-card" id="card-aqw">
+                            <div class="card-glow"></div>
+                            <div class="card-content">
+                                <div class="card-header">
+                                    <img src="aqw_icon.png" alt="AQW Icon" class="card-img-logo">
+                                    <span class="status-badge" id="status-aqw">Offline</span>
+                                </div>
+                                <div class="card-body">
+                                    <h2>AQW Solo Bot</h2>
+                                    <p class="description">Standard solo bot client. Supports custom script loading, item whitelisting, and single player grinding.</p>
+                                    
+                                    <div class="active-details hidden" id="details-aqw">
+                                        <div class="detail-row">
+                                            <span>Player:</span>
+                                            <strong id="aqw-user">-</strong>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span>Map:</span>
+                                            <strong id="aqw-map">-</strong>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span>HP / MP:</span>
+                                            <strong id="aqw-stats">- / -</strong>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span>Gold Farmed:</span>
+                                            <strong id="aqw-gold" class="text-gold">0</strong>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn-navigate" data-target="aqw">
+                                        Configure Bot
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Slavery Card -->
+                        <div class="bot-card" id="card-slavery">
+                            <div class="card-glow"></div>
+                            <div class="card-content">
+                                <div class="card-header">
+                                    <img src="slavery_icon.png" alt="Slavery Icon" class="card-img-logo">
+                                    <span class="status-badge" id="status-slavery">Offline</span>
+                                </div>
+                                <div class="card-body">
+                                    <h2>Slavery Bot Army</h2>
+                                    <p class="description">Multi-account coordination client. Command a team of slave bots to follow your moves, heal, and taunt bosses.</p>
+                                    
+                                    <div class="active-details hidden" id="details-slavery">
+                                        <div class="detail-row">
+                                            <span>Active Slaves:</span>
+                                            <strong id="slavery-count">0</strong>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span>Accounts:</span>
+                                            <span class="list-chips" id="slavery-accounts"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn-navigate" data-target="slavery">
+                                        Configure Bot
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Temple Card -->
+                        <div class="bot-card" id="card-temple">
+                            <div class="card-glow"></div>
+                            <div class="card-content">
+                                <div class="card-header">
+                                    <img src="temple_icon.png" alt="Temple Icon" class="card-img-logo">
+                                    <span class="status-badge" id="status-temple">Offline</span>
+                                </div>
+                                <div class="card-body">
+                                    <h2>Temple Shrine Bot</h2>
+                                    <p class="description">Dedicated party automator for Midnight Sun and Solstice Moon boss rooms. Configures 4 accounts with distinct battle roles.</p>
+                                    
+                                    <div class="active-details hidden" id="details-temple">
+                                        <div class="detail-row">
+                                            <span>Active Party:</span>
+                                            <strong id="temple-count">0 / 4</strong>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span>Members:</span>
+                                            <span class="list-chips" id="temple-members"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn-navigate" data-target="temple">
+                                        Configure Bot
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+
+                        <!-- Eclipse Card -->
+                        <div class="bot-card" id="card-eclipse">
+                            <div class="card-glow"></div>
+                            <div class="card-content">
+                                <div class="card-header">
+                                    <img src="temple_icon.png" alt="Eclipse Icon" class="card-img-logo">
+                                    <span class="status-badge" id="status-eclipse">Offline</span>
+                                </div>
+                                <div class="card-body">
+                                    <h2>Maid Eclipse</h2>
+                                    <p class="description">Highest efficiency team automation for the Eclipse boss. Coordinates light-gather, moon-haze, and enrage timings.</p>
+                                    
+                                    <div class="active-details hidden" id="details-eclipse">
+                                        <div class="detail-row">
+                                            <span>Active Party:</span>
+                                            <strong id="eclipse-count">0 / 4</strong>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span>Members:</span>
+                                            <span class="list-chips" id="eclipse-members"></span>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="card-footer">
+                                    <button class="btn-navigate" data-target="eclipse">
+                                        Configure Bot
+                                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 18 15 12 9 6"></polyline></svg>
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 2. AQW Iframe Pane -->
+                <div class="tab-pane" id="pane-aqw">
+                    <iframe src="about:blank" id="iframe-aqw" class="bot-iframe"></iframe>
+                </div>
+
+                <!-- 3. Slavery Iframe Pane -->
+                <div class="tab-pane" id="pane-slavery">
+                    <iframe src="about:blank" id="iframe-slavery" class="bot-iframe"></iframe>
+                </div>
+
+                <!-- 4. Temple Iframe Pane -->
+                <div class="tab-pane" id="pane-temple">
+                    <iframe src="about:blank" id="iframe-temple" class="bot-iframe"></iframe>
+                </div>
+
+                <!-- 5. Eclipse Iframe Pane -->
+                <div class="tab-pane" id="pane-eclipse">
+                    <iframe src="about:blank" id="iframe-eclipse" class="bot-iframe"></iframe>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <script src="main.js"></script>
+</body>
+</html>

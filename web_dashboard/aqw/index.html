@@ -1,0 +1,376 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AQW Python Bot Client</title>
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Sidebar Navigation -->
+        <aside class="sidebar">
+            <div class="brand">
+                <svg class="brand-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                </svg>
+                <div class="brand-name">
+                    <h2 id="app-title-click">AQW BOT</h2>
+                    <span>PYTHON CLIENT</span>
+                    <div class="info-tooltip-bubble" id="info-bubble">
+                        Based on <strong>AQW Python</strong><br>
+                        <a href="https://github.com/Froztt13/aqw-python" target="_blank" style="color: var(--primary-color); text-decoration: underline;">GitHub Repository</a>
+                    </div>
+                </div>
+            </div>
+            
+            <nav class="nav-menu">
+                <button class="nav-btn active" data-tab="script">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                        <polyline points="16 18 22 12 16 6"></polyline>
+                        <polyline points="8 6 2 12 8 18"></polyline>
+                    </svg>
+                    Script & Account
+                </button>
+                <button class="nav-btn hidden" data-tab="dashboard" id="nav-dashboard">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                        <rect x="3" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="3" width="7" height="7"></rect>
+                        <rect x="14" y="14" width="7" height="7"></rect>
+                        <rect x="3" y="14" width="7" height="7"></rect>
+                    </svg>
+                    Player Stats
+                </button>
+                <button class="nav-btn" data-tab="logs">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                        <line x1="4" y1="9" x2="20" y2="9"></line>
+                        <line x1="4" y1="15" x2="20" y2="15"></line>
+                        <line x1="10" y1="3" x2="8" y2="21"></line>
+                        <line x1="16" y1="3" x2="14" y2="21"></line>
+                    </svg>
+                    Live Logs
+                </button>
+                <button class="nav-btn" data-tab="settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    Settings
+                </button>
+            </nav>
+            
+            <div class="sidebar-status">
+                <div class="status-indicator disconnected" id="connection-indicator"></div>
+                <span id="connection-text">Disconnected</span>
+            </div>
+        </aside>
+
+        <!-- Main Content Area -->
+        <main class="content-area">
+            
+            <!-- Header bar -->
+            <header class="content-header">
+                <div class="header-title">
+                    <h1 id="tab-title">Script & Account</h1>
+                    <p id="tab-subtitle">Set up credentials, target map scripts, and class setups</p>
+                </div>
+                <div class="header-controls">
+                    <bot-control-buttons start-id="btn-start" stop-id="btn-stop" start-label="Start Bot" stop-label="Stop Bot"></bot-control-buttons>
+                </div>
+            </header>
+
+            <!-- Dashboard Tab Content -->
+            <section class="tab-content" id="tab-dashboard">
+                <!-- Health / Mana & Main stats -->
+                <div class="dashboard-grid">
+                    <!-- Status Card -->
+                    <div class="card glass-card span-2">
+                        <h3>Player Vitals</h3>
+                        <div class="vitals">
+                            <div class="vital-row">
+                                <div class="vital-label">
+                                    <span>HP</span>
+                                    <span id="hp-values">0 / 0</span>
+                                </div>
+                                <div class="progress-bar-container hp-bar">
+                                    <div class="progress-bar" id="hp-progress" style="width: 0%"></div>
+                                </div>
+                            </div>
+                            <div class="vital-row">
+                                <div class="vital-label">
+                                    <span>Mana</span>
+                                    <span id="mp-values">0 / 0</span>
+                                </div>
+                                <div class="progress-bar-container mp-bar">
+                                    <div class="progress-bar" id="mp-progress" style="width: 0%"></div>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="cell-status">
+                            <div class="cell-item">
+                                <span class="label">Location</span>
+                                <span class="value" id="val-map">-</span>
+                            </div>
+                            <div class="cell-item">
+                                <span class="label">Cell / Pad</span>
+                                <span class="value" id="val-cell-pad">-</span>
+                            </div>
+                            <div class="cell-item">
+                                <span class="label">State</span>
+                                <span class="value" id="val-state">-</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bot Progress Card -->
+                    <div class="card glass-card">
+                        <h3>Session Activity</h3>
+                        <div class="stats-list">
+                            <div class="stat-item">
+                                <div class="stat-info">
+                                    <span class="label">Gold Farmed</span>
+                                    <span class="value" id="val-gold-farmed">0</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-info">
+                                    <span class="label">Exp Farmed</span>
+                                    <span class="value" id="val-exp-farmed">0</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-info">
+                                    <span class="label">Current Command Index</span>
+                                    <span class="value" id="val-cmd-index">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Inventory and Items Card -->
+                    <div class="card glass-card">
+                        <h3>Inventory & Bank</h3>
+                        <div class="stats-list">
+                            <div class="stat-item">
+                                <div class="stat-info">
+                                    <span class="label">Inventory Items</span>
+                                    <span class="value" id="val-inventory-count">0</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-info">
+                                    <span class="label">Bank Items</span>
+                                    <span class="value" id="val-bank-count">0</span>
+                                </div>
+                            </div>
+                            <div class="stat-item">
+                                <div class="stat-info">
+                                    <span class="label">Character Gold</span>
+                                    <span class="value" id="val-gold">0</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Quick Logs Box -->
+                    <div class="card glass-card span-3 logs-preview-card">
+                        <div class="card-header-actions">
+                            <h3>Logs Summary</h3>
+                            <button class="btn-text" id="btn-goto-logs">View full terminal</button>
+                        </div>
+                        <div class="mini-console" id="mini-console">
+                            <div class="log-line text-muted">System initialized. Click 'Start Bot' to connect.</div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Script & Account Tab Content -->
+            <section class="tab-content active" id="tab-script">
+                <div class="form-grid">
+                    <!-- Login Info -->
+                    <div class="card glass-card">
+                        <h3>Account Credentials</h3>
+                        <div class="form-group">
+                            <label for="input-username">Username</label>
+                            <input type="text" id="input-username" placeholder="AQW Username">
+                        </div>
+                        <div class="form-group">
+                            <label for="input-password">Password</label>
+                            <div class="password-wrapper">
+                                <input type="password" id="input-password" placeholder="AQW Password">
+                                <button type="button" class="btn-icon-only" id="btn-toggle-password">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="svg-eye">
+                                        <path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path>
+                                        <circle cx="12" cy="12" r="3"></circle>
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group-row">
+                            <div class="form-group">
+                                <label for="select-server">Server</label>
+                                <server-select id="select-server" value="Artix"></server-select>
+                            </div>
+                            <div class="form-group">
+                                <label for="input-room">Room Number</label>
+                                <input type="number" id="input-room" value="1" min="1">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Bot Script Settings -->
+                    <div class="card glass-card">
+                        <h3>Automation Target</h3>
+                        <div class="form-group">
+                            <label>Bot Script File</label>
+                            <div class="script-selector-row">
+                                <input type="text" id="input-script-path" readonly placeholder="Click Browse to select bot .py file...">
+                                <button class="btn btn-secondary btn-small" id="btn-select-script" type="button" style="width: auto; padding: 10px 15px;">
+                                    Browse...
+                                </button>
+                            </div>
+                        </div>
+                        <div class="form-group-row">
+                            <div class="form-group">
+                                <label for="input-farm-class">Farm Class Name</label>
+                                <input type="text" id="input-farm-class" placeholder="e.g. Legion Revenant">
+                            </div>
+                            <div class="form-group">
+                                <label for="input-solo-class">Solo Class Name</label>
+                                <input type="text" id="input-solo-class" placeholder="e.g. Void Highlord">
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Whitelist Tags Manager -->
+                    <div class="card glass-card span-2">
+                        <h3>Item Drop Whitelist</h3>
+                        <p class="description">Only items in this list will be auto-accepted when dropped by monsters.</p>
+                        
+                        <div class="tags-input-wrapper">
+                            <div class="tags-container" id="whitelist-tags">
+                                <!-- Tags will be injected here -->
+                            </div>
+                            <div class="input-tag-row">
+                                <input type="text" id="input-new-tag" placeholder="Add custom item name...">
+                                <button class="btn btn-secondary" id="btn-add-tag">Add</button>
+                            </div>
+                        </div>
+
+                        <div class="preset-items">
+                            <span class="preset-label">Popular Presets:</span>
+                            <div class="preset-tags">
+                                <button class="btn-preset" data-item="Void Aura">Void Aura</button>
+                                <button class="btn-preset" data-item="Gem of Nulgath">Gem of Nulgath</button>
+                                <button class="btn-preset" data-item="Diamond of Nulgath">Diamond of Nulgath</button>
+                                <button class="btn-preset" data-item="Tainted Gem">Tainted Gem</button>
+                                <button class="btn-preset" data-item="Dark Crystal Shard">Dark Crystal Shard</button>
+                                <button class="btn-preset" data-item="Voucher of Nulgath (non-mem)">Voucher of Nulgath (non-mem)</button>
+                                <button class="btn-preset" data-item="Unidentified 13">Unidentified 13</button>
+                                <button class="btn-preset" data-item="Relic of Chaos">Relic of Chaos</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Settings Tab Content -->
+            <section class="tab-content" id="tab-settings">
+                <div class="settings-grid">
+                    <div class="card glass-card">
+                        <h3>Client Protections & Toggles</h3>
+                        <div class="settings-list">
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-title">Auto Relogin</span>
+                                    <span class="settings-desc">Automatically reconnects and resumes the bot if disconnected.</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="chk-auto-relogin" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                            
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-title">Anti Moderator</span>
+                                    <span class="settings-desc">Monitors current cell for game moderators and safety kicks.</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="chk-anti-mod" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-title">Mute Spam Warnings</span>
+                                    <span class="settings-desc">Suppresses repeating warning messages from the game server.</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="chk-mute-spam" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+
+                            <div class="settings-item">
+                                <div class="settings-info">
+                                    <span class="settings-title">Show Chat Messages</span>
+                                    <span class="settings-desc">Print general/whisper chat logs into the terminal console.</span>
+                                </div>
+                                <label class="switch">
+                                    <input type="checkbox" id="chk-show-chat" checked>
+                                    <span class="slider round"></span>
+                                </label>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="card glass-card">
+                        <h3>Local Session Configuration</h3>
+                        <p class="description">GUI app configurations are stored locally on your device in <code>gui_config.json</code>.</p>
+                        <div class="actions-group">
+                            <button class="btn btn-secondary" id="btn-save-settings">
+                                Save Settings Now
+                            </button>
+                            <button class="btn btn-outline" id="btn-reset-settings">
+                                Reset Defaults
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
+            <!-- Logs Tab Content -->
+            <section class="tab-content" id="tab-logs">
+                <div class="logs-container">
+                    <div class="logs-header">
+                        <div class="logs-filter">
+                            <input type="text" id="input-log-filter" placeholder="Filter console logs...">
+                        </div>
+                        <div class="logs-actions">
+                            <label class="checkbox-inline">
+                                <input type="checkbox" id="chk-auto-scroll" checked> Auto-Scroll
+                            </label>
+                            <button class="btn btn-outline btn-small" id="btn-clear-logs">Clear Logs</button>
+                        </div>
+                    </div>
+                    <div class="console-viewport" id="console-viewport">
+                        <div class="log-line text-muted">Webview GUI Client active. Output logging channel initialized...</div>
+                    </div>
+                </div>
+            </section>
+
+        </main>
+    </div>
+
+    <!-- Scripts -->
+    <script src="../components.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
