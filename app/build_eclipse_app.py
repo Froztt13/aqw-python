@@ -4,10 +4,10 @@ import os
 import shutil
 
 def main():
-    print("Building AQW Bot macOS app bundle...")
+    print("Building Eclipse Bot macOS app bundle...")
     
-    app_name = "AQW_Bot"
-    entrypoint = "gui.py"
+    app_name = "Eclipse_Bot"
+    entrypoint = "eclipse_gui.py"
     
     # Ensure specific build/dist outputs are clean without wiping other apps in dist/
     for path in [
@@ -16,22 +16,24 @@ def main():
     ]:
         if os.path.exists(path):
             try:
-                shutil.rmtree(path)
+                if os.path.isdir(path):
+                    shutil.rmtree(path)
+                else:
+                    os.remove(path)
                 print(f"Cleaned existing {path}.")
             except Exception as e:
                 print(f"Warning: Could not clean {path}: {e}")
 
     # Build command for PyInstaller
-    # --add-data "web:web" copies the frontend web assets into the bundle
-    # --windowed creates a macOS .app bundle instead of a command-line binary
     cmd = [
         "venv/bin/pyinstaller",
         "--name=" + app_name,
         "--windowed",
         "--noconfirm",
         "--clean",
-        "--add-data=web:web",
-        "--icon=app.icns",
+        "--add-data=app/web_eclipse:web_eclipse",
+        "--add-data=bot:bot",
+        "--icon=temple_app.icns",
         entrypoint
     ]
     

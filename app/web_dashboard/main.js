@@ -2,6 +2,14 @@ document.addEventListener('DOMContentLoaded', () => {
     let statusInterval = null;
     let currentTheme = localStorage.getItem("global-theme") || "default";
 
+    function formatTimeRunning(seconds) {
+        if (!seconds) return "00:00:00";
+        const hrs = String(Math.floor(seconds / 3600)).padStart(2, '0');
+        const mins = String(Math.floor((seconds % 3600) / 60)).padStart(2, '0');
+        const secs = String(seconds % 60).padStart(2, '0');
+        return `${hrs}:${mins}:${secs}`;
+    }
+
     // DOM Elements
     const sysCpu = document.getElementById('sys-cpu');
     const sysMem = document.getElementById('sys-mem');
@@ -216,6 +224,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 document.getElementById('temple-count').textContent = `${data.temple.count} / 4 active`;
                 renderChips('temple-members', data.temple.members);
+                
+                const templeTimeEl = document.getElementById('temple-time-running');
+                if (templeTimeEl) {
+                    templeTimeEl.textContent = formatTimeRunning(data.temple.time_running);
+                }
             } else {
                 setBotActiveState('temple', false);
             }
@@ -227,6 +240,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 
                 document.getElementById('eclipse-count').textContent = `${data.eclipse.count} / 4 active`;
                 renderChips('eclipse-members', data.eclipse.members);
+                
+                const eclipseTimeEl = document.getElementById('eclipse-time-running');
+                if (eclipseTimeEl) {
+                    eclipseTimeEl.textContent = formatTimeRunning(data.eclipse.time_running);
+                }
             } else {
                 setBotActiveState('eclipse', false);
             }

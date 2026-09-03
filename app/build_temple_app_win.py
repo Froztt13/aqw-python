@@ -4,10 +4,10 @@ import os
 import shutil
 
 def main():
-    print("Building Slavery Bot Windows standalone executable...")
+    print("Building Temple Bot Windows standalone executable...")
     
-    app_name = "Slavery_Bot"
-    entrypoint = "slavery_gui.py"
+    app_name = "Temple_Bot"
+    entrypoint = "temple_gui.py"
     
     # Try to terminate any running instance of the app to avoid file lock issues
     if sys.platform == "win32":
@@ -42,9 +42,9 @@ def main():
         "--noconsole",
         "--noconfirm",
         "--clean",
-        "--add-data=web_slavery;web_slavery",
+        "--add-data=app/web_temple;web_temple",
         "--add-data=bot;bot",
-        "--icon=slavery_app.ico",
+        "--icon=temple_app.ico",
         entrypoint
     ]
     

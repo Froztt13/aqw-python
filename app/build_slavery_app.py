@@ -31,7 +31,7 @@ def main():
         "--windowed",
         "--noconfirm",
         "--clean",
-        "--add-data=web_slavery:web_slavery",
+        "--add-data=app/web_slavery:web_slavery",
         "--add-data=bot:bot",
         "--icon=slavery_app.icns",
         entrypoint

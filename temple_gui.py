@@ -498,7 +498,7 @@ def main():
     if getattr(sys, 'frozen', False):
         web_dir = os.path.join(getattr(sys, '_MEIPASS', ''), 'web_temple')
     else:
-        web_dir = os.path.join(get_project_root(), "web_temple")
+        web_dir = os.path.join(get_project_root(), "app", "web_temple")
         
     url = start_local_server(web_dir)
     

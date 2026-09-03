@@ -524,7 +524,7 @@ def main():
     if getattr(sys, 'frozen', False):
         web_dir = os.path.join(getattr(sys, '_MEIPASS', ''), 'web_slavery')
     else:
-        web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web_slavery')
+        web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app', 'web_slavery')
 
     import time
     url = f"{start_local_server(web_dir)}?t={int(time.time())}"

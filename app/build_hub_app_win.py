@@ -4,10 +4,10 @@ import os
 import shutil
 
 def main():
-    print("Building Eclipse Bot Windows standalone executable...")
+    print("Building AQW Bot Hub Windows standalone executable...")
     
-    app_name = "Eclipse_Bot"
-    entrypoint = "eclipse_gui.py"
+    app_name = "AQW_Bot_Hub"
+    entrypoint = os.path.join("app", "build_hub_app.py")
     
     # Try to terminate any running instance of the app to avoid file lock issues
     if sys.platform == "win32":
@@ -42,9 +42,11 @@ def main():
         "--noconsole",
         "--noconfirm",
         "--clean",
-        "--add-data=web_eclipse;web_eclipse",
+        "--paths=.",
+        "--add-data=app/web_dashboard;web_dashboard",
         "--add-data=bot;bot",
-        "--icon=temple_app.ico",
+        "--hidden-import=psutil",
+        "--icon=app.ico",
         entrypoint
     ]
     

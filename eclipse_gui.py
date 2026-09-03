@@ -541,7 +541,7 @@ def main():
     if getattr(sys, 'frozen', False):
         web_dir = os.path.join(getattr(sys, '_MEIPASS', ''), 'web_eclipse')
     else:
-        web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'web_eclipse')
+        web_dir = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'app', 'web_eclipse')
 
     print(f"Loading GUI assets from: {web_dir}")
     url = start_local_server(web_dir)

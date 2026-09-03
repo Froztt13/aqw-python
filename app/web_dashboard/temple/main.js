@@ -388,6 +388,53 @@ function stopTelemetryPolling() {
 function checkActiveBotStatuses() {
     window.pywebview.api.get_status().then(statuses => {
         const activeTaunter = statuses["_active_taunter"];
+        const systemStats = statuses.system_stats || null;
+
+        // Process CPU/Mem telemetry in header
+        if (systemStats) {
+            const cpuEl = document.getElementById("sys-cpu");
+            const memEl = document.getElementById("sys-mem");
+            if (cpuEl) cpuEl.innerText = `${systemStats.cpu}%`;
+            if (memEl) memEl.innerText = `${systemStats.memory} MB`;
+        }
+        
+        // Sync running state from Python backend
+        let anySlotRunning = false;
+        slots.forEach(slot => {
+            const status = statuses[slot];
+            if (status && status.running) {
+                anySlotRunning = true;
+            }
+        });
+        
+        if (anySlotRunning && !isPartyRunning) {
+            isPartyRunning = true;
+            btnStartParty.classList.add("hidden");
+            btnStopParty.classList.remove("hidden");
+            toggleFormFieldsLock(true);
+            toggleCredentialsVisibility(true);
+            
+            const btnReset = document.getElementById("btn-reset-config");
+            if (btnReset) btnReset.classList.add("hidden");
+            
+            const durationCounter = document.getElementById("duration-counter");
+            if (durationCounter) durationCounter.classList.remove("hidden");
+        }
+        
+        if (isPartyRunning && statuses["_time_running"] !== undefined) {
+            partyStartTime = Date.now() - (statuses["_time_running"] * 1000);
+            if (!durationInterval) {
+                const durationVal = document.getElementById("duration-val");
+                durationInterval = setInterval(() => {
+                    const diff = Date.now() - partyStartTime;
+                    const hrs = String(Math.floor(diff / 3600000)).padStart(2, '0');
+                    const mins = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+                    const secs = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+                    if (durationVal) durationVal.innerText = `${hrs}:${mins}:${secs}`;
+                }, 1000);
+            }
+        }
+
         slots.forEach(slot => {
             const status = statuses[slot];
             const badge = document.getElementById(`badge-${slot}`);

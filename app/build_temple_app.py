@@ -4,15 +4,15 @@ import os
 import shutil
 
 def main():
-    print("Building AQW Bot Windows standalone executable...")
+    print("Building Temple Bot macOS app bundle...")
     
-    app_name = "AQW_Bot"
-    entrypoint = "gui.py"
+    app_name = "Temple_Bot"
+    entrypoint = "temple_gui.py"
     
-    # Clean output directories if they exist
+    # Ensure specific build/dist outputs are clean without wiping other apps in dist/
     for path in [
         os.path.join("build", app_name),
-        os.path.join("dist", f"{app_name}.exe")
+        os.path.join("dist", f"{app_name}.app")
     ]:
         if os.path.exists(path):
             try:
@@ -24,18 +24,16 @@ def main():
             except Exception as e:
                 print(f"Warning: Could not clean {path}: {e}")
 
-    # Build command for PyInstaller on Windows
+    # Build command for PyInstaller
     cmd = [
-        sys.executable,
-        "-m",
-        "PyInstaller",
+        "venv/bin/pyinstaller",
         "--name=" + app_name,
-        "--onefile",
-        "--noconsole",
+        "--windowed",
         "--noconfirm",
         "--clean",
-        "--add-data=web;web",
-        "--icon=app.ico",
+        "--add-data=app/web_temple:web_temple",
+        "--add-data=bot:bot",
+        "--icon=temple_app.icns",
         entrypoint
     ]
     
@@ -44,8 +42,8 @@ def main():
     
     if result.returncode == 0:
         print("\n" + "="*50)
-        print("SUCCESS! Windows standalone executable built successfully.")
-        print(f"You can find the standalone exe at: {os.path.abspath(f'dist/{app_name}.exe')}")
+        print("SUCCESS! macOS App Bundle built successfully.")
+        print(f"You can find the double-clickable app at: {os.path.abspath(f'dist/{app_name}.app')}")
         print("="*50 + "\n")
     else:
         print("\nERROR! PyInstaller build failed.")

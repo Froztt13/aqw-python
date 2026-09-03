@@ -27,7 +27,7 @@ def get_project_root():
                 return os.path.abspath(path)
         return os.path.abspath(grandparent_dir)
     else:
-        return os.path.dirname(os.path.abspath(__file__))
+        return os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 
 project_root = get_project_root()
 if project_root not in sys.path:
@@ -818,7 +818,15 @@ class TempleApi:
         else:
             self.config_path = os.path.join(get_project_root(), "temple_config.json")
         self.active_threads = {}
+        self.start_time = None
         self.taunt_coordinator = TauntCoordinator()
+        
+        try:
+            import psutil
+            self.process = psutil.Process(os.getpid())
+            self.process.cpu_percent(interval=None)
+        except Exception:
+            self.process = None
 
     def set_window(self, window):
         self.window = window
@@ -911,6 +919,7 @@ class TempleApi:
             return {"success": False, "error": "Party is already running!"}
             
         self.taunt_coordinator = TauntCoordinator()
+        self.start_time = time.time()
         server = config.get("server", "Alteon")
         room_number = int(config.get("room_number", 9099))
         temple_bot_type = config.get("temple_bot_type", "MidnightSunBot")
@@ -959,6 +968,7 @@ class TempleApi:
         if not self.active_threads:
             return {"success": True}
             
+        self.start_time = None
         for s_id, thread in self.active_threads.items():
             if thread.bot_instance:
                 try:
@@ -1020,7 +1030,21 @@ class TempleApi:
             if s_id not in status_data:
                 status_data[s_id] = {"running": False}
         
+        mem_mb = 0.0
+        cpu_pct = 0.0
+        if hasattr(self, "process") and self.process:
+            try:
+                mem_mb = round(self.process.memory_info().rss / (1024 * 1024), 1)
+                cpu_pct = round(self.process.cpu_percent(interval=None), 1)
+            except Exception:
+                pass
+
         status_data["_active_taunter"] = self.taunt_coordinator.active_taunter if hasattr(self, "taunt_coordinator") else None
+        status_data["_time_running"] = int(time.time() - self.start_time) if getattr(self, "start_time", None) else 0
+        status_data["system_stats"] = {
+            "cpu": cpu_pct,
+            "memory": mem_mb
+        }
         return status_data
 
 class EclipseApi:
@@ -1034,6 +1058,7 @@ class EclipseApi:
             self.config_path = os.path.join(get_project_root(), "eclipse_config.json")
             
         self.active_threads = {}
+        self.start_time = None
         
         try:
             import psutil
@@ -1147,6 +1172,7 @@ class EclipseApi:
         if self.active_threads:
             return {"success": False, "error": "Party is already running!"}
             
+        self.start_time = time.time()
         server = config.get("server", "Alteon")
         room_number = 99999
         slots = config.get("slots", {})
@@ -1223,6 +1249,7 @@ class EclipseApi:
         if not self.active_threads:
             return {"success": True}
         
+        self.start_time = None
         for slot_id, thread in self.active_threads.items():
             if thread.bot_instance:
                 try:
@@ -1327,13 +1354,16 @@ class EclipseApi:
             except Exception:
                 pass
 
+        time_running = int(time.time() - self.start_time) if getattr(self, "start_time", None) else 0
+
         return {
             "statuses": statuses,
             "monsters": monsters_info,
             "system_stats": {
                 "cpu": cpu_pct,
                 "memory": mem_mb
-            }
+            },
+            "_time_running": time_running
         }
 
 # --- Combined API class ---
@@ -1518,21 +1548,37 @@ class CombinedApi:
         temple_status = {"running": False}
         active_temple = [s_id for s_id, thread in self.temple_api.active_threads.items() if thread.is_alive()]
         if active_temple:
+            members = [thread.username for thread in self.temple_api.active_threads.values() if thread.is_alive()]
+            elapsed = 0
+            if getattr(self.temple_api, "start_time", None):
+                elapsed = int(time.time() - self.temple_api.start_time)
             temple_status = {
                 "running": True,
                 "count": len(active_temple),
-                "slots": active_temple
+                "slots": active_temple,
+                "members": members,
+                "time_running": elapsed
             }
+        else:
+            self.temple_api.start_time = None
 
         # 4. Eclipse Bot
         eclipse_status = {"running": False}
         active_eclipse = [s_id for s_id, thread in self.eclipse_api.active_threads.items() if thread.is_alive()]
         if active_eclipse:
+            members = [thread.username for thread in self.eclipse_api.active_threads.values() if thread.is_alive()]
+            elapsed = 0
+            if getattr(self.eclipse_api, "start_time", None):
+                elapsed = int(time.time() - self.eclipse_api.start_time)
             eclipse_status = {
                 "running": True,
                 "count": len(active_eclipse),
-                "slots": active_eclipse
+                "slots": active_eclipse,
+                "members": members,
+                "time_running": elapsed
             }
+        else:
+            self.eclipse_api.start_time = None
 
         mem_mb = 0.0
         cpu_pct = 0.0
@@ -1749,7 +1795,7 @@ def run_gui():
         base_path = getattr(sys, '_MEIPASS', '')
         web_dashboard_dir = os.path.join(base_path, 'web_dashboard')
     else:
-        web_dashboard_dir = os.path.join(project_root, 'web_dashboard')
+        web_dashboard_dir = os.path.join(project_root, 'app', 'web_dashboard')
 
     web_dir = os.path.join(web_dashboard_dir, 'aqw')
     web_slavery_dir = os.path.join(web_dashboard_dir, 'slavery')
@@ -1784,7 +1830,7 @@ def run_gui():
 # --- Icon Generator ---
 def generate_icons():
     system = platform.system()
-    png_path = os.path.join("web_dashboard", "aqw_icon.png")
+    png_path = os.path.join(project_root, "app", "web_dashboard", "aqw_icon.png")
     if not os.path.exists(png_path):
         return
         
@@ -1822,15 +1868,16 @@ def generate_icons():
 def build_app():
     system = platform.system()
     app_name = "AQW_Bot_Hub"
-    entrypoint = "build_hub_app.py"
+    entrypoint = os.path.join("app", "build_hub_app.py")
     
     generate_icons()
     print(f"Building AQW Bot Hub for {system}...")
     
-    outputs_to_clean = []
+    # Define outputs to clean depending on the OS
     if system == "Windows":
         outputs_to_clean = [
             os.path.join("build", app_name),
+            os.path.join("dist", app_name),
             os.path.join("dist", f"{app_name}.exe")
         ]
     else:  # macOS / Linux
@@ -1852,8 +1899,8 @@ def build_app():
                 print(f"Failed to clean {path}: {e}")
                 
     data_folders = [
-        "web_dashboard",
-        "bot"
+        ("app/web_dashboard", "web_dashboard"),
+        ("bot", "bot")
     ]
     
     icon_file = "app.icns" if system == "Darwin" else "app.ico"
@@ -1872,11 +1919,12 @@ def build_app():
         "--noconfirm",
         "--clean",
         "--windowed",
-        "--hidden-import=psutil"
+        "--hidden-import=psutil",
+        f"--paths={project_root}"
     ]
     
-    for folder in data_folders:
-        cmd.append(f"--add-data={folder}{separator}{folder}")
+    for src, dest in data_folders:
+        cmd.append(f"--add-data={src}{separator}{dest}")
         
     if os.path.exists(icon_file):
         cmd.append(f"--icon={icon_file}")
