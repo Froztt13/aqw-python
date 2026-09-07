@@ -10,6 +10,7 @@ class StopBotCmd(BaseCommand):
     
     async def execute(self, bot: Bot, cmd: Command):
         print(Fore.RED + self.msg + Fore.RESET)
+        bot.last_stop_msg = self.msg
         bot.stop_bot()
         
     def to_string(self):

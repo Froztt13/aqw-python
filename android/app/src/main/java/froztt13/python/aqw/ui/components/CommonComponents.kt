@@ -1096,7 +1096,7 @@ fun BackgroundOptimizationCard(
 
 @Composable
 fun LiveLogConsole(
-    modifier: Modifier = Modifier,
+    modifier: Modifier = Modifier.height(300.dp),
     logs: List<LogEntry>,
     onClearLogs: () -> Unit,
     title: String = "Live Console Logs"
@@ -1112,7 +1112,6 @@ fun LiveLogConsole(
     Card(
         modifier = modifier
             .fillMaxWidth()
-            .height(300.dp)
             .border(1.dp, Color(0xFF2E3350), RoundedCornerShape(16.dp)),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = Color(0xFF090A10))

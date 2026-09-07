@@ -24,6 +24,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
+import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
@@ -61,6 +62,7 @@ import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.ui.components.BackgroundOptimizationCard
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.CardDark
+import froztt13.python.aqw.ui.theme.DoomCrimson
 import froztt13.python.aqw.ui.theme.EclipseMagenta
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.PrimaryPurple
@@ -72,11 +74,13 @@ import froztt13.python.aqw.ui.theme.TextSecondary
 fun DashboardScreen(
     onNavigateToTemple: () -> Unit,
     onNavigateToEclipse: () -> Unit,
+    onNavigateToDoom: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     DashboardContent(
         onNavigateToTemple = onNavigateToTemple,
         onNavigateToEclipse = onNavigateToEclipse,
+        onNavigateToDoom = onNavigateToDoom,
         modifier = modifier
     )
 }
@@ -86,6 +90,7 @@ fun DashboardScreen(
 fun DashboardContent(
     onNavigateToTemple: () -> Unit,
     onNavigateToEclipse: () -> Unit,
+    onNavigateToDoom: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -177,7 +182,17 @@ fun DashboardContent(
                 }
             )
 
-            // 1. Temple Shrine Bot Hero Card
+            // 1. Weekly Doom Bot Hero Card
+            BotModuleHeroCard(
+                title = "Weekly Doom Bot",
+                subtitle = "Wheel of Doom Automation",
+                description = "Automates weekly Gear of Doom spins across multiple accounts. Checks bank/inventory, spins Wheel of Doom (Quest 3076), and detects EIODA drops.",
+                icon = Icons.Filled.Casino,
+                accentColor = DoomCrimson,
+                onClick = onNavigateToDoom
+            )
+
+            // 2. Temple Shrine Bot Hero Card
             BotModuleHeroCard(
                 title = "Temple Shrine Bot",
                 subtitle = "Midnight Sun & Solstice Moon Party",
@@ -187,7 +202,7 @@ fun DashboardContent(
                 onClick = onNavigateToTemple
             )
 
-            // 2. Maid Eclipse Client Hero Card
+            // 3. Maid Eclipse Client Hero Card
             BotModuleHeroCard(
                 title = "Maid Eclipse Client",
                 subtitle = "Eclipse Shrine",
@@ -330,7 +345,8 @@ private fun DashboardContentPreview() {
     MyApplicationTheme {
         DashboardContent(
             onNavigateToTemple = {},
-            onNavigateToEclipse = {}
+            onNavigateToEclipse = {},
+            onNavigateToDoom = {}
         )
     }
 }

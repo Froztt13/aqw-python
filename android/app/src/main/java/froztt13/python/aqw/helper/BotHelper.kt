@@ -3,6 +3,8 @@ package froztt13.python.aqw.helper
 import android.util.Log
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
+import froztt13.python.aqw.data.DoomAccount
+import froztt13.python.aqw.data.DoomAccountTelemetry
 import froztt13.python.aqw.data.EclipseConfig
 import froztt13.python.aqw.data.LogEntry
 import froztt13.python.aqw.data.MonsterTelemetry
@@ -10,6 +12,8 @@ import froztt13.python.aqw.data.PartyStats
 import froztt13.python.aqw.data.SlotConfig
 import froztt13.python.aqw.data.SlotTelemetry
 import froztt13.python.aqw.data.TempleConfig
+import froztt13.python.aqw.data.WeeklyDoomConfig
+import froztt13.python.aqw.data.WeeklyDoomTelemetry
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import org.json.JSONArray
@@ -385,5 +389,100 @@ object BotHelper {
             list.add(array.optString(i))
         }
         return list
+    }
+
+    fun parseWeeklyDoomConfig(jsonStr: String): WeeklyDoomConfig {
+        return try {
+            val obj = JSONObject(jsonStr)
+            val server = obj.optString("server", "Alteon")
+            val accountsArr = obj.optJSONArray("accounts")
+            val accounts = mutableListOf<DoomAccount>()
+            if (accountsArr != null) {
+                for (i in 0 until accountsArr.length()) {
+                    val aObj = accountsArr.optJSONObject(i) ?: continue
+                    accounts.add(
+                        DoomAccount(
+                            id = aObj.optString("id", java.util.UUID.randomUUID().toString()),
+                            username = aObj.optString("username", ""),
+                            password = aObj.optString("password", ""),
+                            enabled = aObj.optBoolean("enabled", true)
+                        )
+                    )
+                }
+            }
+            if (accounts.isEmpty()) {
+                accounts.add(DoomAccount())
+            }
+            WeeklyDoomConfig(server = server, accounts = accounts)
+        } catch (e: Exception) {
+            Log.e(TAG, "parseWeeklyDoomConfig error: ${e.message}")
+            WeeklyDoomConfig()
+        }
+    }
+
+    fun serializeWeeklyDoomConfig(cfg: WeeklyDoomConfig): String {
+        val obj = JSONObject()
+        obj.put("server", cfg.server)
+        val accountsArr = JSONArray()
+        for (acc in cfg.accounts) {
+            val aObj = JSONObject()
+            aObj.put("id", acc.id)
+            aObj.put("username", acc.username)
+            aObj.put("password", acc.password)
+            aObj.put("enabled", acc.enabled)
+            accountsArr.put(aObj)
+        }
+        obj.put("accounts", accountsArr)
+        return obj.toString()
+    }
+
+    fun parseWeeklyDoomTelemetry(jsonStr: String): WeeklyDoomTelemetry {
+        return try {
+            val obj = JSONObject(jsonStr)
+            val running = obj.optBoolean("running", false)
+            val currentIndex = obj.optInt("current_index", 0)
+            val currentUsername = obj.optString("current_username", "")
+            val totalAccounts = obj.optInt("total_accounts", 0)
+            val completedAccounts = obj.optInt("completed_accounts", 0)
+            val timeRunning = obj.optLong("time_running", 0L)
+
+            val accountsMap = mutableMapOf<String, DoomAccountTelemetry>()
+            val accObj = obj.optJSONObject("accounts")
+            if (accObj != null) {
+                val keys = accObj.keys()
+                while (keys.hasNext()) {
+                    val k = keys.next()
+                    val a = accObj.optJSONObject(k) ?: continue
+                    val dropsArr = a.optJSONArray("wheel_drops")
+                    val dropsList = mutableListOf<String>()
+                    if (dropsArr != null) {
+                        for (i in 0 until dropsArr.length()) {
+                            dropsList.add(dropsArr.optString(i))
+                        }
+                    }
+                    accountsMap[k] = DoomAccountTelemetry(
+                        id = a.optString("id", k),
+                        username = a.optString("username", ""),
+                        status = a.optString("status", "Idle"),
+                        message = a.optString("message", ""),
+                        hasEioda = a.optBoolean("has_eioda", false),
+                        wheelDrops = dropsList
+                    )
+                }
+            }
+
+            WeeklyDoomTelemetry(
+                running = running,
+                currentIndex = currentIndex,
+                currentUsername = currentUsername,
+                totalAccounts = totalAccounts,
+                completedAccounts = completedAccounts,
+                timeRunning = timeRunning,
+                accounts = accountsMap
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "parseWeeklyDoomTelemetry error: ${e.message}")
+            WeeklyDoomTelemetry()
+        }
     }
 }

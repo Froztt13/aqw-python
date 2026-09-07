@@ -14,6 +14,7 @@ if base_dir not in sys.path:
 from core.bot import Bot
 from bot.templeshrine.temple.core.core_temple import MidnightSunBot, SolsticeMoonBot
 from bot.templeshrine.eclipse.core.core_eclipse import EclipseMasterBot, EclipseSlaveBot
+from bot.doom.weekly_doom import WeeklyDoomManager
 
 # Global log callback to Kotlin
 kotlin_log_callback = None
@@ -683,6 +684,7 @@ class EclipseManager:
 # --- Singletons ---
 temple_mgr = TempleManager()
 eclipse_mgr = EclipseManager()
+doom_mgr = WeeklyDoomManager(global_redirector_out, global_redirector_err, get_config_dir)
 
 # --- Public Kotlin-Chaquopy Bridge Interface ---
 def init_bridge(callback=None):
@@ -744,6 +746,33 @@ def eclipse_stop_party() -> str:
 def eclipse_get_status() -> str:
     return json.dumps(eclipse_mgr.get_status())
 
+# Weekly Doom Bridge Functions
+def doom_load_config() -> str:
+    return json.dumps(doom_mgr.load_config())
+
+def doom_save_config(config_json: str) -> str:
+    try:
+        cfg = json.loads(config_json)
+        return json.dumps(doom_mgr.save_config(cfg))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+def doom_reset_config() -> str:
+    return json.dumps(doom_mgr.reset_config())
+
+def doom_start(config_json: str) -> str:
+    try:
+        cfg = json.loads(config_json)
+        return json.dumps(doom_mgr.start(cfg))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+def doom_stop() -> str:
+    return json.dumps(doom_mgr.stop())
+
+def doom_get_status() -> str:
+    return json.dumps(doom_mgr.get_status())
+
 # Hub Overview Status
 def get_hub_status() -> str:
     active_temple = [s for s, t in temple_mgr.active_threads.items() if t.is_alive()]
@@ -751,6 +780,8 @@ def get_hub_status() -> str:
     
     active_eclipse = [s for s, t in eclipse_mgr.active_threads.items() if t.is_alive()]
     eclipse_time = int(time.time() - eclipse_mgr.start_time) if eclipse_mgr.start_time and active_eclipse else 0
+
+    doom_time = int(time.time() - doom_mgr.start_time) if doom_mgr.start_time and doom_mgr.is_running else 0
 
     status = {
         "temple": {
@@ -764,6 +795,11 @@ def get_hub_status() -> str:
             "count": len(active_eclipse),
             "members": [t.username for t in eclipse_mgr.active_threads.values() if t.is_alive()],
             "time_running": eclipse_time
+        },
+        "doom": {
+            "running": doom_mgr.is_running,
+            "current_username": doom_mgr.current_username,
+            "time_running": doom_time
         }
     }
     return json.dumps(status)

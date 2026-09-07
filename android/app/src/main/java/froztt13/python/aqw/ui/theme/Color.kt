@@ -12,6 +12,8 @@ val PrimaryPurpleGlow = Color(0xFF7C3AED)
 val SunGold = Color(0xFFF59E0B)
 val MoonCyan = Color(0xFF06B6D4)
 val EclipseMagenta = Color(0xFFD946EF)
+val DoomCrimson = Color(0xFFF43F5E)
+val DoomGold = Color(0xFFF59E0B)
 
 val SuccessGreen = Color(0xFF10B981)
 val ErrorRed = Color(0xFFEF4444)

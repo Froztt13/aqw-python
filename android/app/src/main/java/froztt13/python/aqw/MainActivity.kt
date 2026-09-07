@@ -26,6 +26,7 @@ import com.chaquo.python.android.AndroidPlatform
 import froztt13.python.aqw.ui.screens.DashboardScreen
 import froztt13.python.aqw.ui.screens.EclipseScreen
 import froztt13.python.aqw.ui.screens.TempleScreen
+import froztt13.python.aqw.ui.screens.WeeklyDoomBotScreen
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import android.graphics.Color as AndroidColor
@@ -33,7 +34,8 @@ import android.graphics.Color as AndroidColor
 enum class AppScreen {
     DASHBOARD,
     TEMPLE,
-    ECLIPSE
+    ECLIPSE,
+    WEEKLY_DOOM
 }
 
 class MainActivity : ComponentActivity() {
@@ -116,7 +118,8 @@ fun MainAppScreen() {
         when (targetScreen) {
             AppScreen.DASHBOARD -> DashboardScreen(
                 onNavigateToTemple = { currentScreen = AppScreen.TEMPLE },
-                onNavigateToEclipse = { currentScreen = AppScreen.ECLIPSE }
+                onNavigateToEclipse = { currentScreen = AppScreen.ECLIPSE },
+                onNavigateToDoom = { currentScreen = AppScreen.WEEKLY_DOOM }
             )
 
             AppScreen.TEMPLE -> TempleScreen(
@@ -124,6 +127,10 @@ fun MainAppScreen() {
             )
 
             AppScreen.ECLIPSE -> EclipseScreen(
+                onBack = { currentScreen = AppScreen.DASHBOARD }
+            )
+
+            AppScreen.WEEKLY_DOOM -> WeeklyDoomBotScreen(
                 onBack = { currentScreen = AppScreen.DASHBOARD }
             )
         }

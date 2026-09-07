@@ -50,6 +50,7 @@ class BotForegroundService : Service() {
                     try {
                         BotHelper.stopParty("temple_stop_party")
                         BotHelper.stopParty("eclipse_stop_party")
+                        BotHelper.stopParty("doom_stop")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error stopping bots: ${e.message}")
                     } finally {
@@ -108,33 +109,48 @@ class BotForegroundService : Service() {
                 try {
                     val templeStatusJson = BotHelper.getStatus("temple_get_status")
                     val eclipseStatusJson = BotHelper.getStatus("eclipse_get_status")
+                    val doomStatusJson = BotHelper.getStatus("doom_get_status")
 
                     val templeSlots =
                         templeStatusJson?.let { BotHelper.parseSlotTelemetryMap(it) } ?: emptyMap()
                     val eclipseSlots =
                         eclipseStatusJson?.let { BotHelper.parseSlotTelemetryMap(it) } ?: emptyMap()
+                    val doomTelemetry =
+                        doomStatusJson?.let { BotHelper.parseWeeklyDoomTelemetry(it) }
 
                     val isTempleRunning = templeSlots.values.any { it.running }
                     val isEclipseRunning = eclipseSlots.values.any { it.running }
+                    val isDoomRunning = doomTelemetry?.running == true
 
-                    if (!isTempleRunning && !isEclipseRunning) {
+                    if (!isTempleRunning && !isEclipseRunning && !isDoomRunning) {
                         Log.d(TAG, "No active bots running. Stopping foreground service.")
                         stopForegroundNotification()
                         break
                     }
 
-                    val activeTitle =
-                        if (isTempleRunning) "Temple Shrine Bot" else "Maid Eclipse Bot"
-                    val stats = if (isTempleRunning) {
-                        templeStatusJson?.let { BotHelper.parsePartyStats(it) }
-                    } else {
-                        eclipseStatusJson?.let { BotHelper.parsePartyStats(it) }
-                    }
+                    val activeTitle: String
+                    val statusText: String
 
-                    val statusText = if (stats != null && stats.timeRunning > 0L) {
-                        "Running: ${stats.formattedTime} | Cleared: ${stats.clearedCount}"
+                    if (doomTelemetry != null && doomTelemetry.running) {
+                        activeTitle = "Weekly Doom Bot"
+                        statusText =
+                            "Account: ${doomTelemetry.currentUsername} (${doomTelemetry.currentIndex}/${doomTelemetry.totalAccounts}) | ${doomTelemetry.formattedTime}"
+                    } else if (isTempleRunning) {
+                        activeTitle = "Temple Shrine Bot"
+                        val stats = templeStatusJson?.let { BotHelper.parsePartyStats(it) }
+                        statusText = if (stats != null && stats.timeRunning > 0L) {
+                            "Running: ${stats.formattedTime} | Cleared: ${stats.clearedCount}"
+                        } else {
+                            "Party active in background"
+                        }
                     } else {
-                        "Party active in background"
+                        activeTitle = "Maid Eclipse Bot"
+                        val stats = eclipseStatusJson?.let { BotHelper.parsePartyStats(it) }
+                        statusText = if (stats != null && stats.timeRunning > 0L) {
+                            "Running: ${stats.formattedTime} | Cleared: ${stats.clearedCount}"
+                        } else {
+                            "Party active in background"
+                        }
                     }
 
                     currentBotTitle = activeTitle
