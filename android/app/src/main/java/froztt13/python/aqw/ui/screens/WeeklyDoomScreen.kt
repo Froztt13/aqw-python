@@ -88,11 +88,14 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
 import froztt13.python.aqw.data.DoomAccount
 import froztt13.python.aqw.data.DoomAccountTelemetry
+import froztt13.python.aqw.data.LogEntry
+import froztt13.python.aqw.data.WeeklyDoomConfig
 import froztt13.python.aqw.data.WeeklyDoomTelemetry
 import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.service.BotForegroundService
@@ -105,6 +108,7 @@ import froztt13.python.aqw.ui.theme.DoomCrimson
 import froztt13.python.aqw.ui.theme.DoomGold
 import froztt13.python.aqw.ui.theme.ErrorRed
 import froztt13.python.aqw.ui.theme.MoonCyan
+import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.PrimaryPurple
 import froztt13.python.aqw.ui.theme.SuccessGreen
 import froztt13.python.aqw.ui.theme.SunGold
@@ -126,7 +130,6 @@ fun WeeklyDoomBotScreen(
     WeeklyDoomScreen(onBack = onBack, modifier = modifier, viewModel = viewModel)
 }
 
-@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun WeeklyDoomScreen(
     onBack: () -> Unit,
@@ -139,19 +142,6 @@ fun WeeklyDoomScreen(
     val isRunning by viewModel.isRunning.collectAsState()
     val logs by viewModel.doomLogs.collectAsState()
 
-    var showSettings by remember { mutableStateOf(false) }
-    var selectedTabIndex by remember { mutableIntStateOf(0) }
-
-    // Account Add / Edit Dialog State
-    var showAccountDialog by remember { mutableStateOf(false) }
-    var editingAccount by remember { mutableStateOf<DoomAccount?>(null) }
-    var dialogUsername by remember { mutableStateOf("") }
-    var dialogPassword by remember { mutableStateOf("") }
-    var dialogPasswordVisible by remember { mutableStateOf(false) }
-
-    // Delete Confirmation Dialog State
-    var accountToDelete by remember { mutableStateOf<DoomAccount?>(null) }
-
     val notifPermissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestPermission()
     ) { /* Ignored */ }
@@ -162,6 +152,87 @@ fun WeeklyDoomScreen(
             Toast.makeText(context, err, Toast.LENGTH_LONG).show()
         }
     }
+
+    WeeklyDoomContent(
+        config = config,
+        telemetry = telemetry,
+        logs = logs,
+        isRunning = isRunning,
+        onBack = onBack,
+        onStart = {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
+                !BatteryOptimizationHelper.hasNotificationPermission(context)
+            ) {
+                notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+            }
+            viewModel.startDoom { success, _ ->
+                if (success) {
+                    BotForegroundService.start(
+                        context,
+                        "Weekly Doom Bot",
+                        "Processing accounts in background..."
+                    )
+                }
+            }
+        },
+        onStop = {
+            viewModel.stopDoom()
+            BotForegroundService.stop(context)
+        },
+        onUpdateServer = { viewModel.updateServer(it) },
+        onAddAccount = { username, password ->
+            viewModel.addAccount(username, password)
+        },
+        onUpdateAccount = { id, username, password ->
+            viewModel.updateAccount(id, username, password)
+        },
+        onToggleAccount = { id, enabled ->
+            viewModel.toggleAccount(id, enabled)
+        },
+        onRemoveAccount = { id ->
+            viewModel.removeAccount(id)
+        },
+        onMoveAccount = { fromIndex, toIndex ->
+            viewModel.moveAccount(fromIndex, toIndex)
+        },
+        onClearLogs = { viewModel.clearLogs() },
+        modifier = modifier
+    )
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun WeeklyDoomContent(
+    config: WeeklyDoomConfig,
+    telemetry: WeeklyDoomTelemetry,
+    logs: List<LogEntry>,
+    isRunning: Boolean,
+    onBack: () -> Unit,
+    onStart: () -> Unit,
+    onStop: () -> Unit,
+    onUpdateServer: (String) -> Unit,
+    onAddAccount: (username: String, password: String) -> Unit,
+    onUpdateAccount: (id: String, username: String, password: String) -> Unit,
+    onToggleAccount: (id: String, enabled: Boolean) -> Unit,
+    onRemoveAccount: (id: String) -> Unit,
+    onMoveAccount: (fromIndex: Int, toIndex: Int) -> Unit,
+    onClearLogs: () -> Unit,
+    modifier: Modifier = Modifier,
+    initialTabIndex: Int = 0,
+    initialShowSettings: Boolean = false
+) {
+    var showSettings by remember { mutableStateOf(initialShowSettings) }
+    var selectedTabIndex by remember { mutableIntStateOf(initialTabIndex) }
+
+    // Account Add / Edit Dialog State
+    var showAccountDialog by remember { mutableStateOf(false) }
+    var editingAccount by remember { mutableStateOf<DoomAccount?>(null) }
+    var dialogUsername by remember { mutableStateOf("") }
+    var dialogPassword by remember { mutableStateOf("") }
+    var dialogPasswordVisible by remember { mutableStateOf(false) }
+
+    // Delete Confirmation Dialog State
+    var accountToDelete by remember { mutableStateOf<DoomAccount?>(null) }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -231,26 +302,8 @@ fun WeeklyDoomScreen(
             // 2. Start / Stop Action Controls
             WeeklyDoomActionControls(
                 isRunning = isRunning,
-                onStart = {
-                    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
-                        !BatteryOptimizationHelper.hasNotificationPermission(context)
-                    ) {
-                        notifPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                    }
-                    viewModel.startDoom { success, _ ->
-                        if (success) {
-                            BotForegroundService.start(
-                                context,
-                                "Weekly Doom Bot",
-                                "Processing accounts in background..."
-                            )
-                        }
-                    }
-                },
-                onStop = {
-                    viewModel.stopDoom()
-                    BotForegroundService.stop(context)
-                }
+                onStart = onStart,
+                onStop = onStop
             )
 
             // 3. Global Server Configuration (Hideable with TopAppBar Settings button)
@@ -281,7 +334,7 @@ fun WeeklyDoomScreen(
                         ServerDropdown(
                             selectedServer = config.server,
                             enabled = !isRunning,
-                            onServerSelected = { viewModel.updateServer(it) }
+                            onServerSelected = onUpdateServer
                         )
                     }
                 }
@@ -377,12 +430,6 @@ fun WeeklyDoomScreen(
                                     verticalAlignment = Alignment.CenterVertically,
                                     horizontalArrangement = Arrangement.spacedBy(8.dp)
                                 ) {
-                                    Text(
-                                        text = "Target Accounts",
-                                        style = MaterialTheme.typography.titleMedium,
-                                        fontWeight = FontWeight.Bold,
-                                        color = TextPrimary
-                                    )
                                     Box(
                                         modifier = Modifier
                                             .clip(RoundedCornerShape(8.dp))
@@ -390,7 +437,7 @@ fun WeeklyDoomScreen(
                                             .padding(horizontal = 8.dp, vertical = 2.dp)
                                     ) {
                                         Text(
-                                            text = "${config.accounts.count { it.enabled }} / ${config.accounts.size} Active",
+                                            text = "${config.accounts.count { it.enabled }} / ${config.accounts.size} selected",
                                             fontSize = 11.sp,
                                             fontWeight = FontWeight.Medium,
                                             color = TextSecondary
@@ -406,6 +453,10 @@ fun WeeklyDoomScreen(
                                         dialogPasswordVisible = false
                                         showAccountDialog = true
                                     },
+                                    contentPadding = PaddingValues(
+                                        horizontal = 10.dp,
+                                        vertical = 8.dp
+                                    ),
                                     shape = RoundedCornerShape(10.dp),
                                     border = BorderStroke(1.dp, DoomCrimson.copy(alpha = 0.5f)),
                                     colors = ButtonDefaults.outlinedButtonColors(contentColor = DoomCrimson)
@@ -463,7 +514,7 @@ fun WeeklyDoomScreen(
                                 val lazyListState = rememberLazyListState()
                                 val reorderableLazyListState =
                                     rememberReorderableLazyListState(lazyListState) { from, to ->
-                                        viewModel.moveAccount(from.index, to.index)
+                                        onMoveAccount(from.index, to.index)
                                     }
 
                                 LazyColumn(
@@ -500,7 +551,7 @@ fun WeeklyDoomScreen(
                                                     showAccountDialog = true
                                                 },
                                                 onToggle = { enabled ->
-                                                    viewModel.toggleAccount(
+                                                    onToggleAccount(
                                                         account.id,
                                                         enabled
                                                     )
@@ -518,7 +569,7 @@ fun WeeklyDoomScreen(
                         // Live Logs Tab (Isolated Scrollable Console)
                         LiveLogConsole(
                             logs = logs,
-                            onClearLogs = { viewModel.clearLogs() },
+                            onClearLogs = onClearLogs,
                             title = "Weekly Doom Console",
                             modifier = Modifier
                                 .fillMaxSize()
@@ -629,9 +680,9 @@ fun WeeklyDoomScreen(
                         val trimmedPass = dialogPassword.trim()
                         if (trimmedUser.isNotBlank()) {
                             if (editingAccount == null) {
-                                viewModel.addAccount(trimmedUser, trimmedPass)
+                                onAddAccount(trimmedUser, trimmedPass)
                             } else {
-                                viewModel.updateAccount(
+                                onUpdateAccount(
                                     editingAccount!!.id,
                                     trimmedUser,
                                     trimmedPass
@@ -685,7 +736,7 @@ fun WeeklyDoomScreen(
             confirmButton = {
                 Button(
                     onClick = {
-                        viewModel.removeAccount(targetAccount.id)
+                        onRemoveAccount(targetAccount.id)
                         accountToDelete = null
                     },
                     colors = ButtonDefaults.buttonColors(containerColor = ErrorRed)
@@ -724,8 +775,8 @@ fun WeeklyDoomStatsBar(
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
+                .padding(horizontal = 16.dp, vertical = 8.dp),
+            verticalArrangement = Arrangement.spacedBy(2.dp)
         ) {
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -1064,5 +1115,244 @@ fun DoomAccountCard(
                 }
             }
         }
+    }
+}
+
+// =========================================================================
+// Previews
+// =========================================================================
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun WeeklyDoomContentIdlePreview() {
+    MyApplicationTheme {
+        WeeklyDoomContent(
+            config = WeeklyDoomConfig(
+                server = "Alteon",
+                accounts = listOf(
+                    DoomAccount(id = "1", username = "ShadowSlayer", enabled = true),
+                    DoomAccount(id = "2", username = "DoomKnight99", enabled = true),
+                    DoomAccount(id = "3", username = "HeroOfLore", enabled = false)
+                )
+            ),
+            telemetry = WeeklyDoomTelemetry(
+                running = false,
+                totalAccounts = 3,
+                completedAccounts = 0
+            ),
+            logs = emptyList(),
+            isRunning = false,
+            onBack = {},
+            onStart = {},
+            onStop = {},
+            onUpdateServer = {},
+            onAddAccount = { _, _ -> },
+            onUpdateAccount = { _, _, _ -> },
+            onToggleAccount = { _, _ -> },
+            onRemoveAccount = {},
+            onMoveAccount = { _, _ -> },
+            onClearLogs = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun WeeklyDoomContentRunningPreview() {
+    MyApplicationTheme {
+        WeeklyDoomContent(
+            config = WeeklyDoomConfig(
+                server = "Alteon",
+                accounts = listOf(
+                    DoomAccount(id = "1", username = "ShadowSlayer", enabled = true),
+                    DoomAccount(id = "2", username = "DoomKnight99", enabled = true),
+                    DoomAccount(id = "3", username = "HeroOfLore", enabled = true)
+                )
+            ),
+            telemetry = WeeklyDoomTelemetry(
+                running = true,
+                currentIndex = 2,
+                currentUsername = "DoomKnight99",
+                totalAccounts = 3,
+                completedAccounts = 1,
+                timeRunning = 145L,
+                accounts = mapOf(
+                    "1" to DoomAccountTelemetry(
+                        id = "1",
+                        username = "ShadowSlayer",
+                        status = "Completed",
+                        message = "Spin completed. 2 items received.",
+                        hasEioda = true,
+                        wheelDrops = listOf("Doom Blade of Chaos", "1,000 Gold")
+                    ),
+                    "2" to DoomAccountTelemetry(
+                        id = "2",
+                        username = "DoomKnight99",
+                        status = "Running",
+                        message = "Spinning Wheel of Doom..."
+                    ),
+                    "3" to DoomAccountTelemetry(
+                        id = "3",
+                        username = "HeroOfLore",
+                        status = "Idle",
+                        message = "Waiting in queue..."
+                    )
+                )
+            ),
+            logs = emptyList(),
+            isRunning = true,
+            onBack = {},
+            onStart = {},
+            onStop = {},
+            onUpdateServer = {},
+            onAddAccount = { _, _ -> },
+            onUpdateAccount = { _, _, _ -> },
+            onToggleAccount = { _, _ -> },
+            onRemoveAccount = {},
+            onMoveAccount = { _, _ -> },
+            onClearLogs = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun WeeklyDoomContentLogsPreview() {
+    MyApplicationTheme {
+        WeeklyDoomContent(
+            config = WeeklyDoomConfig(
+                server = "Alteon",
+                accounts = listOf(
+                    DoomAccount(id = "1", username = "ShadowSlayer", enabled = true)
+                )
+            ),
+            telemetry = WeeklyDoomTelemetry(
+                running = true,
+                currentIndex = 1,
+                currentUsername = "ShadowSlayer",
+                totalAccounts = 1,
+                completedAccounts = 0
+            ),
+            logs = listOf(
+                LogEntry(
+                    botType = "weekly_doom",
+                    username = "ShadowSlayer",
+                    message = "Connecting to Alteon server..."
+                ),
+                LogEntry(
+                    botType = "weekly_doom",
+                    username = "ShadowSlayer",
+                    message = "Connected and logged in successfully"
+                ),
+                LogEntry(
+                    botType = "weekly_doom",
+                    username = "ShadowSlayer",
+                    message = "Spinning Wheel of Doom..."
+                ),
+                LogEntry(
+                    botType = "weekly_doom",
+                    username = "ShadowSlayer",
+                    message = "Wheel drop: Doom Blade of Chaos"
+                ),
+                LogEntry(
+                    botType = "weekly_doom",
+                    username = "ShadowSlayer",
+                    message = "Spin completed successfully"
+                )
+            ),
+            isRunning = true,
+            initialTabIndex = 1,
+            onBack = {},
+            onStart = {},
+            onStop = {},
+            onUpdateServer = {},
+            onAddAccount = { _, _ -> },
+            onUpdateAccount = { _, _, _ -> },
+            onToggleAccount = { _, _ -> },
+            onRemoveAccount = {},
+            onMoveAccount = { _, _ -> },
+            onClearLogs = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun WeeklyDoomContentSettingsPreview() {
+    MyApplicationTheme {
+        WeeklyDoomContent(
+            config = WeeklyDoomConfig(
+                server = "Alteon",
+                accounts = listOf(
+                    DoomAccount(id = "1", username = "ShadowSlayer", enabled = true)
+                )
+            ),
+            telemetry = WeeklyDoomTelemetry(),
+            logs = emptyList(),
+            isRunning = false,
+            initialShowSettings = true,
+            onBack = {},
+            onStart = {},
+            onStop = {},
+            onUpdateServer = {},
+            onAddAccount = { _, _ -> },
+            onUpdateAccount = { _, _, _ -> },
+            onToggleAccount = { _, _ -> },
+            onRemoveAccount = {},
+            onMoveAccount = { _, _ -> },
+            onClearLogs = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun WeeklyDoomContentEmptyPreview() {
+    MyApplicationTheme {
+        WeeklyDoomContent(
+            config = WeeklyDoomConfig(
+                server = "Alteon",
+                accounts = emptyList()
+            ),
+            telemetry = WeeklyDoomTelemetry(
+                running = false,
+                totalAccounts = 0,
+                completedAccounts = 0
+            ),
+            logs = emptyList(),
+            isRunning = false,
+            onBack = {},
+            onStart = {},
+            onStop = {},
+            onUpdateServer = {},
+            onAddAccount = { _, _ -> },
+            onUpdateAccount = { _, _, _ -> },
+            onToggleAccount = { _, _ -> },
+            onRemoveAccount = {},
+            onMoveAccount = { _, _ -> },
+            onClearLogs = {}
+        )
+    }
+}
+
+@Preview(showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun DoomAccountCardPreview() {
+    MyApplicationTheme {
+        DoomAccountCard(
+            accountIndex = 1,
+            account = DoomAccount(username = "ShadowSlayer", enabled = true),
+            telemetry = DoomAccountTelemetry(
+                status = "Finished",
+                message = "2 rewards dropped",
+                hasEioda = true,
+                wheelDrops = listOf("Doom Blade of Chaos", "1,000 Gold")
+            ),
+            isBotRunning = false,
+            onEdit = {},
+            onToggle = {},
+            onDelete = {},
+            modifier = Modifier.padding(16.dp)
+        )
     }
 }
