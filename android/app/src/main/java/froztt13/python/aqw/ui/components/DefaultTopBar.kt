@@ -5,8 +5,10 @@ import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.RowScope
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Settings
@@ -25,7 +27,9 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import froztt13.python.aqw.ui.theme.BgDark
+import froztt13.python.aqw.ui.theme.BorderDark
 import froztt13.python.aqw.ui.theme.DoomCrimson
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.SuccessGreen
@@ -37,6 +41,7 @@ import froztt13.python.aqw.ui.theme.TextSecondary
 fun DefaultTopBar(
     title: String,
     modifier: Modifier = Modifier,
+    version: String? = null,
     onBack: (() -> Unit)? = null,
     statusDotColor: Color? = null,
     containerColor: Color = BgDark,
@@ -51,7 +56,7 @@ fun DefaultTopBar(
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(10.dp)
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
                 ) {
                     if (statusDotColor != null) {
                         Box(
@@ -67,6 +72,25 @@ fun DefaultTopBar(
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary
                     )
+                    if (!version.isNullOrBlank()) {
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(BorderDark.copy(alpha = 0.6f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = if (version.startsWith(
+                                        "v",
+                                        ignoreCase = true
+                                    )
+                                ) version else "v$version",
+                                fontSize = 11.sp,
+                                fontWeight = FontWeight.SemiBold,
+                                color = TextSecondary
+                            )
+                        }
+                    }
                 }
             }
         },
