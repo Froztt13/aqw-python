@@ -15,6 +15,7 @@ from core.bot import Bot
 from bot.templeshrine.temple.core.core_temple import MidnightSunBot, SolsticeMoonBot
 from bot.templeshrine.eclipse.core.core_eclipse import EclipseMasterBot, EclipseSlaveBot
 from bot.doom.weekly_doom import WeeklyDoomManager
+from bot.slavery.bot_slave import main as slave_main
 
 # Global log callback to Kotlin
 kotlin_log_callback = None
@@ -113,6 +114,10 @@ class TauntCoordinator:
             self.current_index = (self.current_index + 1) % len(self.taunters)
             self.active_taunter = self.taunters[self.current_index]
             self.last_taunt_time = time.time()
+
+    def skip_taunt(self, username):
+        if self.active_taunter == username:
+            self.rotate_taunt()
 
     def request_taunt(self, username):
         now = time.time()
@@ -681,10 +686,297 @@ class EclipseManager:
         self.last_error = None
         return {"success": True}
 
+# --- Slavery Bot Handler ---
+class SlaveryManager:
+    def __init__(self):
+        self.config_path = os.path.join(get_config_dir(), "slavery_config.json")
+        self.active_threads = {}
+        self.start_time = None
+        self.taunt_coordinator = TauntCoordinator()
+        self.last_error = None
+
+    def load_config(self):
+        default_config = {
+            "server": "Gravelyn",
+            "follow_player": "",
+            "default_room_number": 9099,
+            "copy_walk": True,
+            "auto_zone": "none",
+            "targets_priority": "Defense Drone,Staff of Inversion",
+            "whitelist": "Treasure Chest, Void Aura",
+            "locked_zones": "ultraezrajal, ultrawarden, ultraengineer, doomvault, doomvaultb, championdrakath, tercessuinotlim, icestormunder",
+            "slots": {
+                "slot1": {
+                    "enabled": True,
+                    "username": "",
+                    "password": "",
+                    "char_class": "Lord of Order",
+                    "skills": [
+                        {"index": 1, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 2, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 3, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 4, "threshold_type": "NONE", "operator": "<", "threshold_value": 0}
+                    ],
+                    "is_taunter": False
+                },
+                "slot2": {
+                    "enabled": True,
+                    "username": "",
+                    "password": "",
+                    "char_class": "Legion Revenant",
+                    "skills": [
+                        {"index": 1, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 2, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 3, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 4, "threshold_type": "NONE", "operator": "<", "threshold_value": 0}
+                    ],
+                    "is_taunter": False
+                },
+                "slot3": {
+                    "enabled": False,
+                    "username": "",
+                    "password": "",
+                    "char_class": "ArchPaladin",
+                    "skills": [
+                        {"index": 1, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 2, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 3, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 4, "threshold_type": "NONE", "operator": "<", "threshold_value": 0}
+                    ],
+                    "is_taunter": False
+                },
+                "slot4": {
+                    "enabled": False,
+                    "username": "",
+                    "password": "",
+                    "char_class": "StoneCrusher",
+                    "skills": [
+                        {"index": 1, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 2, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 3, "threshold_type": "NONE", "operator": "<", "threshold_value": 0},
+                        {"index": 4, "threshold_type": "NONE", "operator": "<", "threshold_value": 0}
+                    ],
+                    "is_taunter": False
+                }
+            }
+        }
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r") as f:
+                    user_conf = json.load(f)
+                    if "slots" in user_conf:
+                        for sk, sv in user_conf["slots"].items():
+                            if sk in default_config["slots"]:
+                                default_config["slots"][sk].update(sv)
+                        del user_conf["slots"]
+                    default_config.update(user_conf)
+            except Exception:
+                pass
+        return default_config
+
+    def save_config(self, config):
+        try:
+            with open(self.config_path, "w") as f:
+                json.dump(config, f, indent=4)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def reset_config(self):
+        if os.path.exists(self.config_path):
+            try:
+                os.remove(self.config_path)
+            except Exception:
+                pass
+        return self.load_config()
+
+    def get_status(self):
+        from datetime import datetime
+        now = datetime.now()
+        status_data = {}
+        for s_id, t in list(self.active_threads.items()):
+            if t and t.is_alive() and getattr(t, "bot_instance", None):
+                b = t.bot_instance
+                p = getattr(b, "player", None)
+                cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+                if p and hasattr(p, "SKILLS"):
+                    for i in range(0, 6):
+                        if i < len(p.SKILLS):
+                            skill_data = p.SKILLS[i]
+                            next_use = skill_data.get("nextUse")
+                            if next_use and next_use > now:
+                                cooldowns[i] = round((next_use - now).total_seconds(), 1)
+
+                soe_qty = 0
+                if p and hasattr(p, "get_item_inventory"):
+                    item_soe = p.get_item_inventory("Scroll of Enrage")
+                    if item_soe:
+                        soe_qty = getattr(item_soe, "qty", 0)
+
+                cell_monsters = []
+                if hasattr(b, "monsters") and b.monsters and p and getattr(p, "CELL", None):
+                    for mon in b.monsters:
+                        if mon.frame and p.CELL and mon.frame.lower() == p.CELL.lower() and mon.max_hp > 0:
+                            cell_monsters.append({
+                                "id": mon.mon_map_id,
+                                "name": mon.mon_name or f"Monster {mon.mon_map_id}",
+                                "hp": mon.current_hp,
+                                "max_hp": mon.max_hp,
+                                "is_alive": mon.is_alive
+                            })
+
+                target_monsters = getattr(b, "targets_priority", "")
+
+                status_data[s_id] = {
+                    "running": True,
+                    "is_connected": getattr(b, "is_client_connected", False),
+                    "map": getattr(b, "strMapName", "-"),
+                    "cell": p.CELL if p else "-",
+                    "pad": p.PAD if p else "-",
+                    "hp": p.CURRENT_HP if p else 0,
+                    "max_hp": p.MAX_HP if p else 0,
+                    "mp": p.MANA if p else 0,
+                    "max_mp": p.MAX_MP if p else 0,
+                    "is_dead": p.ISDEAD if p else False,
+                    "cooldowns": cooldowns,
+                    "taunt_error": getattr(b, "taunt_error", False),
+                    "soe_qty": soe_qty,
+                    "monsters": cell_monsters,
+                    "target_monsters": target_monsters
+                }
+            else:
+                status_data[s_id] = {"running": False}
+
+        for s_id in ["slot1", "slot2", "slot3", "slot4"]:
+            if s_id not in status_data:
+                status_data[s_id] = {"running": False}
+
+        if self.last_error:
+            status_data["_error"] = self.last_error
+            self.last_error = None
+
+        time_running = int(time.time() - self.start_time) if self.start_time and any(t.is_alive() for t in self.active_threads.values()) else 0
+
+        status_data["_active_taunter"] = self.taunt_coordinator.active_taunter
+        status_data["_stats"] = {
+            "time_running": time_running,
+            "cleared_count": 0
+        }
+        return status_data
+
+    def start_party(self, config):
+        if any(t.is_alive() for t in self.active_threads.values()):
+            return {"success": False, "error": "Party is already running!"}
+
+        self.last_error = None
+
+        follow_player = config.get("follow_player", "").strip()
+        if not follow_player:
+            return {"success": False, "error": "Please specify the Master Account to follow."}
+
+        slots = config.get("slots", {})
+        active_slot_ids = []
+        for s_id in ["slot1", "slot2", "slot3", "slot4"]:
+            s = slots.get(s_id, {})
+            if s.get("enabled", True):
+                if not s.get("username") or not s.get("password") or not s.get("char_class"):
+                    return {"success": False, "error": f"Please fill credentials for enabled {s_id}."}
+                active_slot_ids.append(s_id)
+
+        if not active_slot_ids:
+            return {"success": False, "error": "No enabled account slots configured."}
+
+        self.taunt_coordinator = TauntCoordinator()
+        whitelist_val = config.get("whitelist", "Treasure Chest, Void Aura")
+        if isinstance(whitelist_val, list):
+            whitelist_items = whitelist_val
+        else:
+            whitelist_items = [x.strip() for x in whitelist_val.split(",") if x.strip()]
+
+        locked_zones_val = config.get("locked_zones", "")
+        if isinstance(locked_zones_val, list):
+            locked_zones_list = locked_zones_val
+        else:
+            locked_zones_list = [x.strip() for x in locked_zones_val.split(",") if x.strip()]
+
+        self.start_time = time.time()
+        for s_id in active_slot_ids:
+            s = slots[s_id]
+
+            def make_runner(slot_id, slot_info):
+                def runner():
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+
+                    t_id = threading.get_ident()
+                    global_redirector_out.register_thread(t_id, "slavery", slot_info["username"])
+                    global_redirector_err.register_thread(t_id, "slavery", slot_info["username"])
+
+                    b = Bot(
+                        itemsDropWhiteList=whitelist_items,
+                        cmdDelay=500,
+                        showDebug=True,
+                        autoRelogin=True,
+                        isScriptable=True,
+                        followPlayer=follow_player.lower(),
+                        farmClass=slot_info.get("char_class", ""),
+                        roomNumber=int(config.get("default_room_number", 9099)),
+                        respawnCellPad=["Enter", "Spawn"],
+                        muteSpamWarning=True
+                    )
+                    b.set_login_info(slot_info["username"], slot_info["password"], config.get("server", "Gravelyn"))
+
+                    # Set custom bot properties used by bot_slave.py
+                    b.follow_player = follow_player
+                    b.default_room_number = int(config.get("default_room_number", 9099))
+                    b.targets_priority = config.get("targets_priority", "Defense Drone,Staff of Inversion")
+                    b.copy_walk = config.get("copy_walk", True)
+                    b.auto_zone = config.get("auto_zone", "none")
+                    b.locked_zones = locked_zones_list
+                    b.skills = slot_info.get("skills", [])
+                    b.taunter = slot_info.get("is_taunter", False)
+                    b.taunt_coordinator = self.taunt_coordinator
+                    b.checking_locked_zone = False
+
+                    t_inst = threading.current_thread()
+                    t_inst.bot_instance = b
+
+                    try:
+                        loop.run_until_complete(b.start_bot(slave_main))
+                    except Exception as e:
+                        print(f"[{slot_info['username']}] Slavery Thread Error: {e}")
+                    finally:
+                        global_redirector_out.unregister_thread(t_id)
+                        global_redirector_err.unregister_thread(t_id)
+
+                return runner
+
+            t = threading.Thread(target=make_runner(s_id, s), name=f"Slavery-{s_id}")
+            t.daemon = True
+            t.bot_instance = None
+            t.username = s["username"]
+            self.active_threads[s_id] = t
+            t.start()
+
+        return {"success": True}
+
+    def stop_party(self):
+        for s_id, t in list(self.active_threads.items()):
+            if t and t.bot_instance:
+                try:
+                    t.bot_instance.stop_bot(user_triggered=True)
+                except Exception:
+                    pass
+        self.active_threads.clear()
+        self.start_time = None
+        self.last_error = None
+        return {"success": True}
+
 # --- Singletons ---
 temple_mgr = TempleManager()
 eclipse_mgr = EclipseManager()
 doom_mgr = WeeklyDoomManager(global_redirector_out, global_redirector_err, get_config_dir)
+slavery_mgr = SlaveryManager()
 
 # --- Public Kotlin-Chaquopy Bridge Interface ---
 def init_bridge(callback=None):
@@ -773,6 +1065,33 @@ def doom_stop() -> str:
 def doom_get_status() -> str:
     return json.dumps(doom_mgr.get_status())
 
+# Slavery Bridge Functions
+def slavery_load_config() -> str:
+    return json.dumps(slavery_mgr.load_config())
+
+def slavery_save_config(config_json: str) -> str:
+    try:
+        cfg = json.loads(config_json)
+        return json.dumps(slavery_mgr.save_config(cfg))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+def slavery_reset_config() -> str:
+    return json.dumps(slavery_mgr.reset_config())
+
+def slavery_start_party(config_json: str) -> str:
+    try:
+        cfg = json.loads(config_json)
+        return json.dumps(slavery_mgr.start_party(cfg))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+def slavery_stop_party() -> str:
+    return json.dumps(slavery_mgr.stop_party())
+
+def slavery_get_status() -> str:
+    return json.dumps(slavery_mgr.get_status())
+
 # Hub Overview Status
 def get_hub_status() -> str:
     active_temple = [s for s, t in temple_mgr.active_threads.items() if t.is_alive()]
@@ -782,6 +1101,9 @@ def get_hub_status() -> str:
     eclipse_time = int(time.time() - eclipse_mgr.start_time) if eclipse_mgr.start_time and active_eclipse else 0
 
     doom_time = int(time.time() - doom_mgr.start_time) if doom_mgr.start_time and doom_mgr.is_running else 0
+
+    active_slavery = [s for s, t in slavery_mgr.active_threads.items() if t.is_alive()]
+    slavery_time = int(time.time() - slavery_mgr.start_time) if slavery_mgr.start_time and active_slavery else 0
 
     status = {
         "temple": {
@@ -800,6 +1122,12 @@ def get_hub_status() -> str:
             "running": doom_mgr.is_running,
             "current_username": doom_mgr.current_username,
             "time_running": doom_time
+        },
+        "slavery": {
+            "running": len(active_slavery) > 0,
+            "count": len(active_slavery),
+            "members": [t.username for t in slavery_mgr.active_threads.values() if t.is_alive()],
+            "time_running": slavery_time
         }
     }
     return json.dumps(status)

@@ -51,6 +51,7 @@ class BotForegroundService : Service() {
                         BotHelper.stopParty("temple_stop_party")
                         BotHelper.stopParty("eclipse_stop_party")
                         BotHelper.stopParty("doom_stop")
+                        BotHelper.stopParty("slavery_stop_party")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error stopping bots: ${e.message}")
                     } finally {
@@ -110,6 +111,7 @@ class BotForegroundService : Service() {
                     val templeStatusJson = BotHelper.getStatus("temple_get_status")
                     val eclipseStatusJson = BotHelper.getStatus("eclipse_get_status")
                     val doomStatusJson = BotHelper.getStatus("doom_get_status")
+                    val slaveryStatusJson = BotHelper.getStatus("slavery_get_status")
 
                     val templeSlots =
                         templeStatusJson?.let { BotHelper.parseSlotTelemetryMap(it) } ?: emptyMap()
@@ -117,12 +119,15 @@ class BotForegroundService : Service() {
                         eclipseStatusJson?.let { BotHelper.parseSlotTelemetryMap(it) } ?: emptyMap()
                     val doomTelemetry =
                         doomStatusJson?.let { BotHelper.parseWeeklyDoomTelemetry(it) }
+                    val slaverySlots =
+                        slaveryStatusJson?.let { BotHelper.parseSlotTelemetryMap(it) } ?: emptyMap()
 
                     val isTempleRunning = templeSlots.values.any { it.running }
                     val isEclipseRunning = eclipseSlots.values.any { it.running }
                     val isDoomRunning = doomTelemetry?.running == true
+                    val isSlaveryRunning = slaverySlots.values.any { it.running }
 
-                    if (!isTempleRunning && !isEclipseRunning && !isDoomRunning) {
+                    if (!isTempleRunning && !isEclipseRunning && !isDoomRunning && !isSlaveryRunning) {
                         Log.d(TAG, "No active bots running. Stopping foreground service.")
                         stopForegroundNotification()
                         break
@@ -143,11 +148,19 @@ class BotForegroundService : Service() {
                         } else {
                             "Party active in background"
                         }
-                    } else {
+                    } else if (isEclipseRunning) {
                         activeTitle = "Maid Eclipse Bot"
                         val stats = eclipseStatusJson?.let { BotHelper.parsePartyStats(it) }
                         statusText = if (stats != null && stats.timeRunning > 0L) {
                             "Running: ${stats.formattedTime} | Cleared: ${stats.clearedCount}"
+                        } else {
+                            "Party active in background"
+                        }
+                    } else {
+                        activeTitle = "Slavery Bot"
+                        val stats = slaveryStatusJson?.let { BotHelper.parsePartyStats(it) }
+                        statusText = if (stats != null && stats.timeRunning > 0L) {
+                            "Running: ${stats.formattedTime} | Active: ${slaverySlots.values.count { it.running }}"
                         } else {
                             "Party active in background"
                         }

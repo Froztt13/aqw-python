@@ -82,6 +82,68 @@ data class EclipseConfig(
     )
 )
 
+enum class ThresholdType {
+    NONE, HP, MP
+}
+
+data class Skill(
+    val id: String = java.util.UUID.randomUUID().toString(),
+    val index: Int = 1,
+    val thresholdType: ThresholdType = ThresholdType.NONE,
+    val operator: String = "<",
+    val thresholdValue: Int = 0
+) {
+    fun hasThreshold(): Boolean = thresholdType != ThresholdType.NONE && thresholdValue > 0
+
+    fun thresholdSummary(): String {
+        return if (hasThreshold()) {
+            "${thresholdType.name} $operator $thresholdValue%"
+        } else {
+            "Always"
+        }
+    }
+}
+
+data class SlaveSlotConfig(
+    val enabled: Boolean = true,
+    val username: String = "",
+    val password: String = "",
+    val charClass: String = "Lord of Order",
+    val skills: List<Skill> = listOf(
+        Skill(index = 1),
+        Skill(index = 2),
+        Skill(index = 3),
+        Skill(index = 4)
+    ),
+    val isTaunter: Boolean = false
+)
+
+data class SlaveryConfig(
+    val server: String = "Gravelyn",
+    val followPlayer: String = "",
+    val defaultRoomNumber: Int = 9099,
+    val copyWalk: Boolean = true,
+    val autoZone: String = "none",
+    val targetsPriority: String = "Defense Drone,Staff of Inversion",
+    val whitelist: String = "Treasure Chest, Void Aura",
+    val lockedZones: List<String> = listOf(
+        "ultraezrajal",
+        "ultrawarden",
+        "ultraengineer",
+        "doomvault",
+        "doomvaultb",
+        "championdrakath",
+        "tercessuinotlim",
+        "icestormunder"
+    ),
+    val slots: Map<String, SlaveSlotConfig> = mapOf(
+        "slot1" to SlaveSlotConfig(enabled = true, charClass = "Lord of Order"),
+        "slot2" to SlaveSlotConfig(enabled = true, charClass = "Legion Revenant"),
+        "slot3" to SlaveSlotConfig(enabled = false, charClass = "ArchPaladin"),
+        "slot4" to SlaveSlotConfig(enabled = false, charClass = "StoneCrusher")
+    )
+)
+
 data class MonsterTelemetry(
     val monMapId: String = "",
     val monName: String = "",
@@ -146,7 +208,8 @@ data class BotSummary(
 data class HubOverview(
     val temple: BotSummary = BotSummary(),
     val eclipse: BotSummary = BotSummary(),
-    val doom: BotSummary = BotSummary()
+    val doom: BotSummary = BotSummary(),
+    val slavery: BotSummary = BotSummary()
 )
 
 data class DoomAccount(

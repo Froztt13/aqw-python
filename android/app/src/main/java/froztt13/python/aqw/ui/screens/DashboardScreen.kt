@@ -26,6 +26,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Casino
 import androidx.compose.material.icons.filled.Nightlight
+import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.WbSunny
 import androidx.compose.material3.Button
 import androidx.compose.material3.ButtonDefaults
@@ -51,6 +52,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
@@ -66,6 +68,7 @@ import froztt13.python.aqw.ui.theme.DoomCrimson
 import froztt13.python.aqw.ui.theme.EclipseMagenta
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.PrimaryPurple
+import froztt13.python.aqw.ui.theme.SlaveIndigo
 import froztt13.python.aqw.ui.theme.SunGold
 import froztt13.python.aqw.ui.theme.TextPrimary
 import froztt13.python.aqw.ui.theme.TextSecondary
@@ -75,12 +78,14 @@ fun DashboardScreen(
     onNavigateToTemple: () -> Unit,
     onNavigateToEclipse: () -> Unit,
     onNavigateToDoom: () -> Unit,
+    onNavigateToSlavery: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     DashboardContent(
         onNavigateToTemple = onNavigateToTemple,
         onNavigateToEclipse = onNavigateToEclipse,
         onNavigateToDoom = onNavigateToDoom,
+        onNavigateToSlavery = onNavigateToSlavery,
         modifier = modifier
     )
 }
@@ -91,17 +96,23 @@ fun DashboardContent(
     onNavigateToTemple: () -> Unit,
     onNavigateToEclipse: () -> Unit,
     onNavigateToDoom: () -> Unit,
+    onNavigateToSlavery: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
     val scrollState = rememberScrollState()
 
+    val isPreview = LocalInspectionMode.current
     var isBatteryOptIgnored by remember {
-        mutableStateOf(BatteryOptimizationHelper.isBatteryOptimizationIgnored(context))
+        mutableStateOf(
+            if (isPreview) true else BatteryOptimizationHelper.isBatteryOptimizationIgnored(context)
+        )
     }
     var hasNotificationPerm by remember {
-        mutableStateOf(BatteryOptimizationHelper.hasNotificationPermission(context))
+        mutableStateOf(
+            if (isPreview) true else BatteryOptimizationHelper.hasNotificationPermission(context)
+        )
     }
 
     val notifPermissionLauncher = rememberLauncherForActivityResult(
@@ -182,7 +193,7 @@ fun DashboardContent(
                 }
             )
 
-            // 1. Weekly Doom Bot Hero Card
+            // Weekly Doom Bot Hero Card
             BotModuleHeroCard(
                 title = "Weekly Doom Bot",
                 subtitle = "Wheel of Doom Automation",
@@ -192,7 +203,17 @@ fun DashboardContent(
                 onClick = onNavigateToDoom
             )
 
-            // 2. Temple Shrine Bot Hero Card
+            // Slavery Bot Hero Card
+            BotModuleHeroCard(
+                title = "Slavery Bot",
+                subtitle = "Master & Slave Party Coordination",
+                description = "Synchronizes up to 4 slave accounts to follow a master player with movement mimicking, boss auto-zone mechanics, HP/MP thresholds, and taunt rotations.",
+                icon = Icons.Filled.People,
+                accentColor = SlaveIndigo,
+                onClick = onNavigateToSlavery
+            )
+
+            // Temple Shrine Bot Hero Card
             BotModuleHeroCard(
                 title = "Temple Shrine Bot",
                 subtitle = "Midnight Sun & Solstice Moon Party",
@@ -202,7 +223,7 @@ fun DashboardContent(
                 onClick = onNavigateToTemple
             )
 
-            // 3. Maid Eclipse Client Hero Card
+            // Maid Eclipse Client Hero Card
             BotModuleHeroCard(
                 title = "Maid Eclipse Client",
                 subtitle = "Eclipse Shrine",
@@ -346,7 +367,8 @@ private fun DashboardContentPreview() {
         DashboardContent(
             onNavigateToTemple = {},
             onNavigateToEclipse = {},
-            onNavigateToDoom = {}
+            onNavigateToDoom = {},
+            onNavigateToSlavery = {}
         )
     }
 }

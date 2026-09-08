@@ -9,9 +9,13 @@ import froztt13.python.aqw.data.EclipseConfig
 import froztt13.python.aqw.data.LogEntry
 import froztt13.python.aqw.data.MonsterTelemetry
 import froztt13.python.aqw.data.PartyStats
+import froztt13.python.aqw.data.Skill
+import froztt13.python.aqw.data.SlaveSlotConfig
+import froztt13.python.aqw.data.SlaveryConfig
 import froztt13.python.aqw.data.SlotConfig
 import froztt13.python.aqw.data.SlotTelemetry
 import froztt13.python.aqw.data.TempleConfig
+import froztt13.python.aqw.data.ThresholdType
 import froztt13.python.aqw.data.WeeklyDoomConfig
 import froztt13.python.aqw.data.WeeklyDoomTelemetry
 import kotlinx.coroutines.Dispatchers
@@ -376,6 +380,208 @@ object BotHelper {
             s.put("moon_haze_taunter", v.moonHazeTaunter)
             s.put("sunset_knight_taunter", v.sunsetKnightTaunter)
             s.put("default_target", v.defaultTarget)
+            slotsObj.put(k, s)
+        }
+        obj.put("slots", slotsObj)
+        return obj.toString()
+    }
+
+    fun parseSlaveryConfig(jsonStr: String): SlaveryConfig {
+        return try {
+            val obj = JSONObject(jsonStr)
+            val server = obj.optString("server", "Gravelyn")
+            val followPlayer = obj.optString("follow_player", "")
+            val defaultRoomNumber = obj.optInt("default_room_number", 9099)
+            val copyWalk = obj.optBoolean("copy_walk", true)
+            val autoZone = obj.optString("auto_zone", "none")
+            val targetsPriority =
+                obj.optString("targets_priority", "Defense Drone,Staff of Inversion")
+            val whitelist = obj.optString("whitelist", "")
+            val lockedZonesList = mutableListOf<String>()
+            val lzArr = obj.optJSONArray("locked_zones")
+            if (lzArr != null) {
+                for (i in 0 until lzArr.length()) {
+                    val s = lzArr.optString(i).trim()
+                    if (s.isNotEmpty()) lockedZonesList.add(s)
+                }
+            } else {
+                val lzStr = obj.optString("locked_zones", "")
+                if (lzStr.isNotEmpty()) {
+                    lockedZonesList.addAll(lzStr.split(",").map { it.trim() }
+                        .filter { it.isNotEmpty() })
+                }
+            }
+            if (lockedZonesList.isEmpty()) {
+                lockedZonesList.addAll(
+                    listOf(
+                        "ultraezrajal", "ultrawarden", "ultraengineer", "doomvault",
+                        "doomvaultb", "championdrakath", "tercessuinotlim", "icestormunder"
+                    )
+                )
+            }
+            val slotsObj = obj.optJSONObject("slots") ?: JSONObject()
+
+            val defaultClasses = mapOf(
+                "slot1" to "Lord of Order",
+                "slot2" to "Legion Revenant",
+                "slot3" to "ArchPaladin",
+                "slot4" to "StoneCrusher"
+            )
+            val slots = mutableMapOf<String, SlaveSlotConfig>()
+            for (key in listOf("slot1", "slot2", "slot3", "slot4")) {
+                val sObj = slotsObj.optJSONObject(key) ?: JSONObject()
+                val isDefaultEnabled = key == "slot1" || key == "slot2"
+
+                val skillsList = mutableListOf<Skill>()
+                val skillsArr = sObj.optJSONArray("skills")
+                if (skillsArr != null) {
+                    for (i in 0 until skillsArr.length()) {
+                        val skObj = skillsArr.optJSONObject(i)
+                        if (skObj != null) {
+                            val idx = skObj.optInt("index", 1)
+                            val tTypeStr = skObj.optString("threshold_type", "NONE")
+                            val tType = try {
+                                ThresholdType.valueOf(tTypeStr.uppercase())
+                            } catch (_: Exception) {
+                                ThresholdType.NONE
+                            }
+                            val op = skObj.optString("operator", "<")
+                            val valPct = skObj.optInt("threshold_value", 0)
+                            skillsList.add(
+                                Skill(
+                                    index = idx,
+                                    thresholdType = tType,
+                                    operator = op,
+                                    thresholdValue = valPct
+                                )
+                            )
+                        } else {
+                            val idx = skillsArr.optInt(i, 0)
+                            if (idx in 1..5) {
+                                skillsList.add(Skill(index = idx))
+                            }
+                        }
+                    }
+                } else {
+                    // Fallback for legacy comma-separated string or config: "1,2,3,4"
+                    val skillsStr = sObj.optString("skills", "1,2,3,4")
+                    val legacyHpOp = sObj.optString("hp_operator", "<")
+                    val legacyHpThresh = sObj.optInt("hp_threshold", 0)
+                    val legacyHpSkills = sObj.optString("hp_skills", "")
+                        .split(",")
+                        .mapNotNull { it.trim().toIntOrNull() }
+                        .toSet()
+                    val legacyMpOp = sObj.optString("mp_operator", "<")
+                    val legacyMpThresh = sObj.optInt("mp_threshold", 0)
+                    val legacyMpSkills = sObj.optString("mp_skills", "")
+                        .split(",")
+                        .mapNotNull { it.trim().toIntOrNull() }
+                        .toSet()
+
+                    for (part in skillsStr.split(",")) {
+                        val num = part.trim().toIntOrNull() ?: continue
+                        if (num !in 1..5) continue
+                        val (tType, op, thresh) = when {
+                            legacyHpThresh > 0 && num in legacyHpSkills -> Triple(
+                                ThresholdType.HP,
+                                legacyHpOp,
+                                legacyHpThresh
+                            )
+
+                            legacyMpThresh > 0 && num in legacyMpSkills -> Triple(
+                                ThresholdType.MP,
+                                legacyMpOp,
+                                legacyMpThresh
+                            )
+
+                            else -> Triple(ThresholdType.NONE, "<", 0)
+                        }
+                        skillsList.add(
+                            Skill(
+                                index = num,
+                                thresholdType = tType,
+                                operator = op,
+                                thresholdValue = thresh
+                            )
+                        )
+                    }
+                }
+
+                if (skillsList.isEmpty()) {
+                    skillsList.addAll(
+                        listOf(
+                            Skill(index = 1),
+                            Skill(index = 2),
+                            Skill(index = 3),
+                            Skill(index = 4)
+                        )
+                    )
+                }
+
+                slots[key] = SlaveSlotConfig(
+                    enabled = sObj.optBoolean("enabled", isDefaultEnabled),
+                    username = sObj.optString("username", ""),
+                    password = sObj.optString("password", ""),
+                    charClass = sObj.optString(
+                        "char_class",
+                        defaultClasses[key] ?: "Lord of Order"
+                    ),
+                    skills = skillsList,
+                    isTaunter = sObj.optBoolean("is_taunter", false)
+                )
+            }
+
+            SlaveryConfig(
+                server = server,
+                followPlayer = followPlayer,
+                defaultRoomNumber = defaultRoomNumber,
+                copyWalk = copyWalk,
+                autoZone = autoZone,
+                targetsPriority = targetsPriority,
+                whitelist = whitelist,
+                lockedZones = lockedZonesList,
+                slots = slots
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "parseSlaveryConfig error: ${e.message}")
+            SlaveryConfig()
+        }
+    }
+
+    fun serializeSlaveryConfig(cfg: SlaveryConfig): String {
+        val obj = JSONObject()
+        obj.put("server", cfg.server)
+        obj.put("follow_player", cfg.followPlayer)
+        obj.put("default_room_number", cfg.defaultRoomNumber)
+        obj.put("copy_walk", cfg.copyWalk)
+        obj.put("auto_zone", cfg.autoZone)
+        obj.put("targets_priority", cfg.targetsPriority)
+        obj.put("whitelist", cfg.whitelist)
+        val lzArr = JSONArray()
+        for (z in cfg.lockedZones) {
+            lzArr.put(z)
+        }
+        obj.put("locked_zones", lzArr)
+        val slotsObj = JSONObject()
+        for ((k, v) in cfg.slots) {
+            val s = JSONObject()
+            s.put("enabled", v.enabled)
+            s.put("username", v.username)
+            s.put("password", v.password)
+            s.put("char_class", v.charClass)
+            s.put("is_taunter", v.isTaunter)
+
+            val skillsArr = JSONArray()
+            for (sk in v.skills) {
+                val skObj = JSONObject()
+                skObj.put("index", sk.index)
+                skObj.put("threshold_type", sk.thresholdType.name)
+                skObj.put("operator", sk.operator)
+                skObj.put("threshold_value", sk.thresholdValue)
+                skillsArr.put(skObj)
+            }
+            s.put("skills", skillsArr)
+
             slotsObj.put(k, s)
         }
         obj.put("slots", slotsObj)

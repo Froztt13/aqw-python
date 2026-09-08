@@ -20,10 +20,14 @@ object BatteryOptimizationHelper {
      * Returns true if optimization is ignored (or on API < 23 where it's not applicable).
      */
     fun isBatteryOptimizationIgnored(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
-            val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
-            powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
-        } else {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+                val powerManager = context.getSystemService(Context.POWER_SERVICE) as? PowerManager
+                powerManager?.isIgnoringBatteryOptimizations(context.packageName) == true
+            } else {
+                true
+            }
+        } catch (t: Throwable) {
             true
         }
     }
@@ -71,12 +75,16 @@ object BatteryOptimizationHelper {
      * Checks if notification permission is granted (Android 13+ / API 33+).
      */
     fun hasNotificationPermission(context: Context): Boolean {
-        return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            ContextCompat.checkSelfPermission(
-                context,
-                Manifest.permission.POST_NOTIFICATIONS
-            ) == PackageManager.PERMISSION_GRANTED
-        } else {
+        return try {
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                ContextCompat.checkSelfPermission(
+                    context,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) == PackageManager.PERMISSION_GRANTED
+            } else {
+                true
+            }
+        } catch (t: Throwable) {
             true
         }
     }
