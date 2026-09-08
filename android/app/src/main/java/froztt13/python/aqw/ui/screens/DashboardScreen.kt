@@ -10,8 +10,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.IntrinsicSize
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -54,6 +56,7 @@ import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -193,47 +196,235 @@ fun DashboardContent(
                 }
             )
 
-            // Weekly Doom Bot Hero Card
-            BotModuleHeroCard(
-                title = "Weekly Doom Bot",
-                subtitle = "Wheel of Doom Automation",
-                description = "Automates weekly Gear of Doom spins across multiple accounts. Checks bank/inventory, spins Wheel of Doom (Quest 3076), and detects EIODA drops.",
-                icon = Icons.Filled.Casino,
-                accentColor = DoomCrimson,
-                onClick = onNavigateToDoom
-            )
+            // Bot Modules Section Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Bot Modules",
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(Color(0xFF1E2438))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "4 Modules",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold,
+                        color = PrimaryPurple
+                    )
+                }
+            }
 
-            // Slavery Bot Hero Card
-            BotModuleHeroCard(
-                title = "Slavery Bot",
-                subtitle = "Master & Slave Party Coordination",
-                description = "Synchronizes up to 4 slave accounts to follow a master player with movement mimicking, boss auto-zone mechanics, HP/MP thresholds, and taunt rotations.",
-                icon = Icons.Filled.People,
-                accentColor = SlaveIndigo,
-                onClick = onNavigateToSlavery
-            )
+            // Grid Row 1: Weekly Doom & Slavery Bot
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                BotModuleGridCard(
+                    title = "Weekly Doom",
+                    category = "Wheel of Doom",
+                    description = "Automates weekly Gear spins across multiple accounts & detects EIODA.",
+                    icon = Icons.Filled.Casino,
+                    accentColor = DoomCrimson,
+                    onClick = onNavigateToDoom,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
 
-            // Temple Shrine Bot Hero Card
-            BotModuleHeroCard(
-                title = "Temple Shrine Bot",
-                subtitle = "Midnight Sun & Solstice Moon Party",
-                description = "Coordinates 4 accounts with distinct battle roles. Automates rotation, sun/moon phases, taunts, and item drops.",
-                icon = Icons.Filled.WbSunny,
-                accentColor = SunGold,
-                onClick = onNavigateToTemple
-            )
+                BotModuleGridCard(
+                    title = "Slavery Bot",
+                    category = "Party Sync",
+                    description = "Follows master, mimics movement, auto-zones & taunt rotation.",
+                    icon = Icons.Filled.People,
+                    accentColor = SlaveIndigo,
+                    onClick = onNavigateToSlavery,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+            }
 
-            // Maid Eclipse Client Hero Card
-            BotModuleHeroCard(
-                title = "Maid Eclipse Client",
-                subtitle = "Eclipse Shrine",
-                description = "Dedicated 4-player team coordination bot specifically built for defeating the Eclipse boss with optimized taunt rotations.",
-                icon = Icons.Filled.Nightlight,
-                accentColor = EclipseMagenta,
-                onClick = onNavigateToEclipse
-            )
+            // Grid Row 2: Temple Shrine & Maid Eclipse
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max),
+                horizontalArrangement = Arrangement.spacedBy(12.dp)
+            ) {
+                BotModuleGridCard(
+                    title = "Temple Shrine",
+                    category = "Sun & Moon",
+                    description = "4-player Midnight Sun & Solstice Moon raid party.",
+                    icon = Icons.Filled.WbSunny,
+                    accentColor = SunGold,
+                    onClick = onNavigateToTemple,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+
+                BotModuleGridCard(
+                    title = "Maid Eclipse",
+                    category = "Ascended Eclipse",
+                    description = "Dedicated 4-player team bot with optimized Eclipse boss taunts.",
+                    icon = Icons.Filled.Nightlight,
+                    accentColor = EclipseMagenta,
+                    onClick = onNavigateToEclipse,
+                    modifier = Modifier
+                        .weight(1f)
+                        .fillMaxHeight()
+                )
+            }
 
             Spacer(modifier = Modifier.height(20.dp))
+        }
+    }
+}
+
+@Composable
+fun BotModuleGridCard(
+    title: String,
+    category: String,
+    description: String,
+    icon: ImageVector,
+    accentColor: Color,
+    onClick: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                1.dp,
+                accentColor.copy(alpha = 0.35f),
+                RoundedCornerShape(16.dp)
+            )
+            .clickable { onClick() },
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(containerColor = CardDark)
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(14.dp),
+            verticalArrangement = Arrangement.SpaceBetween
+        ) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                // Top Row: Icon Container & Arrow Button
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(42.dp)
+                            .clip(RoundedCornerShape(12.dp))
+                            .background(accentColor.copy(alpha = 0.15f))
+                            .border(
+                                1.dp,
+                                accentColor.copy(alpha = 0.3f),
+                                RoundedCornerShape(12.dp)
+                            ),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = icon,
+                            contentDescription = null,
+                            tint = accentColor,
+                            modifier = Modifier.size(22.dp)
+                        )
+                    }
+
+                    Box(
+                        modifier = Modifier
+                            .size(28.dp)
+                            .clip(CircleShape)
+                            .background(Color(0xFF161928))
+                            .border(1.dp, Color(0xFF2E3350), CircleShape),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Icon(
+                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                            contentDescription = "Open $title",
+                            tint = accentColor,
+                            modifier = Modifier.size(14.dp)
+                        )
+                    }
+                }
+
+                // Category Badge
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(accentColor.copy(alpha = 0.12f))
+                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                ) {
+                    Text(
+                        text = category.uppercase(),
+                        fontSize = 9.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                // Title
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.titleMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+
+                // Description
+                Text(
+                    text = description,
+                    fontSize = 11.sp,
+                    color = TextSecondary,
+                    lineHeight = 16.sp,
+                    maxLines = 3,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+
+            Spacer(modifier = Modifier.height(12.dp))
+
+            // Action footer pill
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(8.dp))
+                    .background(accentColor.copy(alpha = 0.1f))
+                    .border(
+                        1.dp,
+                        accentColor.copy(alpha = 0.25f),
+                        RoundedCornerShape(8.dp)
+                    )
+                    .padding(vertical = 7.dp),
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text(
+                    text = "Launch Bot",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
+            }
         }
     }
 }
