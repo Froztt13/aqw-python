@@ -25,6 +25,7 @@ import com.chaquo.python.Python
 import com.chaquo.python.android.AndroidPlatform
 import froztt13.python.aqw.ui.screens.DashboardScreen
 import froztt13.python.aqw.ui.screens.EclipseScreen
+import froztt13.python.aqw.ui.screens.GeneralBotScreen
 import froztt13.python.aqw.ui.screens.SlaveryScreen
 import froztt13.python.aqw.ui.screens.TempleScreen
 import froztt13.python.aqw.ui.screens.WeeklyDoomBotScreen
@@ -37,7 +38,8 @@ enum class AppScreen {
     TEMPLE,
     ECLIPSE,
     WEEKLY_DOOM,
-    SLAVERY
+    SLAVERY,
+    GENERAL_BOT
 }
 
 class MainActivity : ComponentActivity() {
@@ -122,7 +124,8 @@ fun MainAppScreen() {
                 onNavigateToTemple = { currentScreen = AppScreen.TEMPLE },
                 onNavigateToEclipse = { currentScreen = AppScreen.ECLIPSE },
                 onNavigateToDoom = { currentScreen = AppScreen.WEEKLY_DOOM },
-                onNavigateToSlavery = { currentScreen = AppScreen.SLAVERY }
+                onNavigateToSlavery = { currentScreen = AppScreen.SLAVERY },
+                onNavigateToGeneral = { currentScreen = AppScreen.GENERAL_BOT }
             )
 
             AppScreen.TEMPLE -> TempleScreen(
@@ -138,6 +141,10 @@ fun MainAppScreen() {
             )
 
             AppScreen.SLAVERY -> SlaveryScreen(
+                onBack = { currentScreen = AppScreen.DASHBOARD }
+            )
+
+            AppScreen.GENERAL_BOT -> GeneralBotScreen(
                 onBack = { currentScreen = AppScreen.DASHBOARD }
             )
         }

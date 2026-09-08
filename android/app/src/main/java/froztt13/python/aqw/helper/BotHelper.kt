@@ -6,6 +6,10 @@ import com.chaquo.python.Python
 import froztt13.python.aqw.data.DoomAccount
 import froztt13.python.aqw.data.DoomAccountTelemetry
 import froztt13.python.aqw.data.EclipseConfig
+import froztt13.python.aqw.data.GeneralBotConfig
+import froztt13.python.aqw.data.GeneralBotTelemetry
+import froztt13.python.aqw.data.GeneralSubModuleInfo
+import froztt13.python.aqw.data.GeneralTaskInfo
 import froztt13.python.aqw.data.LogEntry
 import froztt13.python.aqw.data.MonsterTelemetry
 import froztt13.python.aqw.data.PartyStats
@@ -144,6 +148,17 @@ object BotHelper {
         } catch (e: Exception) {
             Log.e(TAG, "resetConfig error ($methodName): ${e.message}", e)
             null
+        }
+    }
+
+    suspend fun resetState(methodName: String): Boolean = withContext(Dispatchers.IO) {
+        try {
+            val bridge = getBridge() ?: return@withContext false
+            bridge.callAttr(methodName)
+            true
+        } catch (e: Exception) {
+            Log.e(TAG, "resetState error ($methodName): ${e.message}", e)
+            false
         }
     }
 
@@ -690,5 +705,125 @@ object BotHelper {
             Log.e(TAG, "parseWeeklyDoomTelemetry error: ${e.message}")
             WeeklyDoomTelemetry()
         }
+    }
+
+    fun parseGeneralBotConfig(jsonStr: String): GeneralBotConfig {
+        return try {
+            val obj = JSONObject(jsonStr)
+            GeneralBotConfig(
+                server = obj.optString("server", "Alteon"),
+                roomNumber = obj.optInt("room_number", 9099),
+                username = obj.optString("username", ""),
+                password = obj.optString("password", ""),
+                subModule = obj.optString("sub_module", "lr"),
+                task = obj.optString("task", "spellscroll"),
+                targetQty = obj.optInt("target_qty", 20),
+                soloClass = obj.optString("solo_class", "Void Highlord"),
+                farmClass = obj.optString("farm_class", "Legion Revenant")
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "parseGeneralBotConfig error: ${e.message}")
+            GeneralBotConfig()
+        }
+    }
+
+    fun serializeGeneralBotConfig(cfg: GeneralBotConfig): String {
+        val obj = JSONObject()
+        obj.put("server", cfg.server)
+        obj.put("room_number", cfg.roomNumber)
+        obj.put("username", cfg.username)
+        obj.put("password", cfg.password)
+        obj.put("sub_module", cfg.subModule)
+        obj.put("task", cfg.task)
+        obj.put("target_qty", cfg.targetQty)
+        obj.put("solo_class", cfg.soloClass)
+        obj.put("farm_class", cfg.farmClass)
+        return obj.toString()
+    }
+
+    fun parseGeneralBotTelemetry(jsonStr: String): GeneralBotTelemetry {
+        return try {
+            val obj = JSONObject(jsonStr)
+            val cooldownsMap = mutableMapOf<Int, Double>()
+            val cooldownsObj = obj.optJSONObject("cooldowns")
+            if (cooldownsObj != null) {
+                val keys = cooldownsObj.keys()
+                while (keys.hasNext()) {
+                    val kStr = keys.next()
+                    val kInt = kStr.toIntOrNull()
+                    if (kInt != null) {
+                        cooldownsMap[kInt] = cooldownsObj.optDouble(kStr, 0.0)
+                    }
+                }
+            }
+
+            GeneralBotTelemetry(
+                running = obj.optBoolean("running", false),
+                isConnected = obj.optBoolean("is_connected", false),
+                username = obj.optString("username", ""),
+                subModule = obj.optString("sub_module", ""),
+                subModuleName = obj.optString("sub_module_name", ""),
+                task = obj.optString("task", ""),
+                taskName = obj.optString("task_name", ""),
+                trackedItem = obj.optString("tracked_item", ""),
+                currentQty = obj.optInt("current_qty", 0),
+                targetQty = obj.optInt("target_qty", 0),
+                status = obj.optString("status", "Idle"),
+                message = obj.optString("message", ""),
+                map = obj.optString("map", "-"),
+                cell = obj.optString("cell", "-"),
+                pad = obj.optString("pad", "-"),
+                hp = obj.optInt("hp", 0),
+                maxHp = obj.optInt("max_hp", 0),
+                mp = obj.optInt("mp", 0),
+                maxMp = obj.optInt("max_mp", 0),
+                isDead = obj.optBoolean("is_dead", false),
+                cooldowns = cooldownsMap,
+                timeRunning = obj.optLong("time_running", 0L)
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "parseGeneralBotTelemetry error: ${e.message}")
+            GeneralBotTelemetry()
+        }
+    }
+
+    fun parseGeneralSubModules(jsonStr: String): List<GeneralSubModuleInfo> {
+        val result = mutableListOf<GeneralSubModuleInfo>()
+        try {
+            val obj = JSONObject(jsonStr)
+            val arr = obj.optJSONArray("submodules") ?: return emptyList()
+            for (i in 0 until arr.length()) {
+                val subObj = arr.optJSONObject(i) ?: continue
+                val tasksList = mutableListOf<GeneralTaskInfo>()
+                val tasksArr = subObj.optJSONArray("tasks")
+                if (tasksArr != null) {
+                    for (j in 0 until tasksArr.length()) {
+                        val tObj = tasksArr.optJSONObject(j) ?: continue
+                        tasksList.add(
+                            GeneralTaskInfo(
+                                id = tObj.optString("id", ""),
+                                name = tObj.optString("name", ""),
+                                description = tObj.optString("description", ""),
+                                defaultQty = tObj.optInt("default_qty", 1),
+                                trackedItem = tObj.optString("tracked_item", ""),
+                                questId = tObj.optInt("quest_id", 0)
+                            )
+                        )
+                    }
+                }
+                result.add(
+                    GeneralSubModuleInfo(
+                        id = subObj.optString("id", ""),
+                        name = subObj.optString("name", ""),
+                        category = subObj.optString("category", ""),
+                        description = subObj.optString("description", ""),
+                        tasks = tasksList
+                    )
+                )
+            }
+        } catch (e: Exception) {
+            Log.e(TAG, "parseGeneralSubModules error: ${e.message}")
+        }
+        return result
     }
 }

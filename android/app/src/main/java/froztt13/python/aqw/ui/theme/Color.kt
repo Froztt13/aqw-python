@@ -15,6 +15,8 @@ val EclipseMagenta = Color(0xFFD946EF)
 val DoomCrimson = Color(0xFFF43F5E)
 val DoomGold = Color(0xFFF59E0B)
 val SlaveIndigo = Color(0xFF6366F1)
+val LegionBlue = Color(0xFF38BDF8)
+val GeneralTeal = Color(0xFF0D9488)
 
 val SuccessGreen = Color(0xFF10B981)
 val ErrorRed = Color(0xFFEF4444)

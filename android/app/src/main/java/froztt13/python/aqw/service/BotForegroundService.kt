@@ -52,6 +52,7 @@ class BotForegroundService : Service() {
                         BotHelper.stopParty("eclipse_stop_party")
                         BotHelper.stopParty("doom_stop")
                         BotHelper.stopParty("slavery_stop_party")
+                        BotHelper.stopParty("general_stop")
                     } catch (e: Exception) {
                         Log.e(TAG, "Error stopping bots: ${e.message}")
                     } finally {
@@ -112,6 +113,7 @@ class BotForegroundService : Service() {
                     val eclipseStatusJson = BotHelper.getStatus("eclipse_get_status")
                     val doomStatusJson = BotHelper.getStatus("doom_get_status")
                     val slaveryStatusJson = BotHelper.getStatus("slavery_get_status")
+                    val generalStatusJson = BotHelper.getStatus("general_get_status")
 
                     val templeSlots =
                         templeStatusJson?.let { BotHelper.parseSlotTelemetryMap(it) } ?: emptyMap()
@@ -121,13 +123,16 @@ class BotForegroundService : Service() {
                         doomStatusJson?.let { BotHelper.parseWeeklyDoomTelemetry(it) }
                     val slaverySlots =
                         slaveryStatusJson?.let { BotHelper.parseSlotTelemetryMap(it) } ?: emptyMap()
+                    val generalTelemetry =
+                        generalStatusJson?.let { BotHelper.parseGeneralBotTelemetry(it) }
 
                     val isTempleRunning = templeSlots.values.any { it.running }
                     val isEclipseRunning = eclipseSlots.values.any { it.running }
                     val isDoomRunning = doomTelemetry?.running == true
                     val isSlaveryRunning = slaverySlots.values.any { it.running }
+                    val isGeneralRunning = generalTelemetry?.running == true
 
-                    if (!isTempleRunning && !isEclipseRunning && !isDoomRunning && !isSlaveryRunning) {
+                    if (!isTempleRunning && !isEclipseRunning && !isDoomRunning && !isSlaveryRunning && !isGeneralRunning) {
                         Log.d(TAG, "No active bots running. Stopping foreground service.")
                         stopForegroundNotification()
                         break
@@ -136,7 +141,12 @@ class BotForegroundService : Service() {
                     val activeTitle: String
                     val statusText: String
 
-                    if (doomTelemetry != null && doomTelemetry.running) {
+                    if (generalTelemetry != null && isGeneralRunning) {
+                        activeTitle =
+                            "General Bot: ${generalTelemetry.subModuleName.ifEmpty { "Farm" }}"
+                        statusText =
+                            "${generalTelemetry.taskName}: ${generalTelemetry.currentQty}/${generalTelemetry.targetQty} | ${generalTelemetry.formattedTime}"
+                    } else if (doomTelemetry != null && doomTelemetry.running) {
                         activeTitle = "Weekly Doom Bot"
                         statusText =
                             "Account: ${doomTelemetry.currentUsername} (${doomTelemetry.currentIndex}/${doomTelemetry.totalAccounts}) | ${doomTelemetry.formattedTime}"

@@ -374,7 +374,7 @@ fun SlaverySettingsScreen(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(14.dp),
-                    verticalArrangement = Arrangement.spacedBy(12.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Text(
                         text = "Combat & Mechanics",

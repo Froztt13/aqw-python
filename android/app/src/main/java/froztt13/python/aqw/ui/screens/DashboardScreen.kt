@@ -27,6 +27,7 @@ import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowForward
 import androidx.compose.material.icons.filled.Casino
+import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Nightlight
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.WbSunny
@@ -69,6 +70,7 @@ import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.CardDark
 import froztt13.python.aqw.ui.theme.DoomCrimson
 import froztt13.python.aqw.ui.theme.EclipseMagenta
+import froztt13.python.aqw.ui.theme.GeneralTeal
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.PrimaryPurple
 import froztt13.python.aqw.ui.theme.SlaveIndigo
@@ -82,6 +84,7 @@ fun DashboardScreen(
     onNavigateToEclipse: () -> Unit,
     onNavigateToDoom: () -> Unit,
     onNavigateToSlavery: () -> Unit,
+    onNavigateToGeneral: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     DashboardContent(
@@ -89,6 +92,7 @@ fun DashboardScreen(
         onNavigateToEclipse = onNavigateToEclipse,
         onNavigateToDoom = onNavigateToDoom,
         onNavigateToSlavery = onNavigateToSlavery,
+        onNavigateToGeneral = onNavigateToGeneral,
         modifier = modifier
     )
 }
@@ -100,6 +104,7 @@ fun DashboardContent(
     onNavigateToEclipse: () -> Unit,
     onNavigateToDoom: () -> Unit,
     onNavigateToSlavery: () -> Unit,
+    onNavigateToGeneral: () -> Unit,
     modifier: Modifier = Modifier
 ) {
     val context = LocalContext.current
@@ -215,7 +220,7 @@ fun DashboardContent(
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
                     Text(
-                        text = "4 Modules",
+                        text = "5 Modules",
                         fontSize = 11.sp,
                         fontWeight = FontWeight.SemiBold,
                         color = PrimaryPurple
@@ -283,6 +288,25 @@ fun DashboardContent(
                     onClick = onNavigateToEclipse,
                     modifier = Modifier
                         .weight(1f)
+                        .fillMaxHeight()
+                )
+            }
+
+            // Grid Row 3: General Bot (Modular Farm Engine)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(IntrinsicSize.Max)
+            ) {
+                BotModuleGridCard(
+                    title = "General Bot",
+                    category = "Modular Farms",
+                    description = "Multi-purpose modular engine. Features Legion Revenant farm (Fealty 1-3) & Nulgath Nation farm (Larva, Uni 13, Diamonds, etc.).",
+                    icon = Icons.Filled.Extension,
+                    accentColor = GeneralTeal,
+                    onClick = onNavigateToGeneral,
+                    modifier = Modifier
+                        .fillMaxWidth()
                         .fillMaxHeight()
                 )
             }
@@ -559,7 +583,8 @@ private fun DashboardContentPreview() {
             onNavigateToTemple = {},
             onNavigateToEclipse = {},
             onNavigateToDoom = {},
-            onNavigateToSlavery = {}
+            onNavigateToSlavery = {},
+            onNavigateToGeneral = {}
         )
     }
 }

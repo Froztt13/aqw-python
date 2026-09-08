@@ -16,6 +16,7 @@ from bot.templeshrine.temple.core.core_temple import MidnightSunBot, SolsticeMoo
 from bot.templeshrine.eclipse.core.core_eclipse import EclipseMasterBot, EclipseSlaveBot
 from bot.doom.weekly_doom import WeeklyDoomManager
 from bot.slavery.bot_slave import main as slave_main
+from bot.general.general_bot import GeneralBotManager
 
 # Global log callback to Kotlin
 kotlin_log_callback = None
@@ -977,6 +978,7 @@ temple_mgr = TempleManager()
 eclipse_mgr = EclipseManager()
 doom_mgr = WeeklyDoomManager(global_redirector_out, global_redirector_err, get_config_dir)
 slavery_mgr = SlaveryManager()
+general_mgr = GeneralBotManager(global_redirector_out, global_redirector_err, get_config_dir)
 
 # --- Public Kotlin-Chaquopy Bridge Interface ---
 def init_bridge(callback=None):
@@ -1092,6 +1094,39 @@ def slavery_stop_party() -> str:
 def slavery_get_status() -> str:
     return json.dumps(slavery_mgr.get_status())
 
+# General Bot Bridge Functions
+def general_load_config() -> str:
+    return json.dumps(general_mgr.load_config())
+
+def general_save_config(config_json: str) -> str:
+    try:
+        cfg = json.loads(config_json)
+        return json.dumps(general_mgr.save_config(cfg))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+def general_reset_config() -> str:
+    return json.dumps(general_mgr.reset_config())
+
+def general_start(config_json: str) -> str:
+    try:
+        cfg = json.loads(config_json)
+        return json.dumps(general_mgr.start(cfg))
+    except Exception as e:
+        return json.dumps({"success": False, "error": str(e)})
+
+def general_stop() -> str:
+    return json.dumps(general_mgr.stop())
+
+def general_reset_state() -> str:
+    return json.dumps(general_mgr.reset_state())
+
+def general_get_status() -> str:
+    return json.dumps(general_mgr.get_status())
+
+def general_get_submodules() -> str:
+    return json.dumps(general_mgr.get_submodules())
+
 # Hub Overview Status
 def get_hub_status() -> str:
     active_temple = [s for s, t in temple_mgr.active_threads.items() if t.is_alive()]
@@ -1104,6 +1139,8 @@ def get_hub_status() -> str:
 
     active_slavery = [s for s, t in slavery_mgr.active_threads.items() if t.is_alive()]
     slavery_time = int(time.time() - slavery_mgr.start_time) if slavery_mgr.start_time and active_slavery else 0
+
+    general_time = int(time.time() - general_mgr.start_time) if general_mgr.start_time and general_mgr.is_running else 0
 
     status = {
         "temple": {
@@ -1128,6 +1165,13 @@ def get_hub_status() -> str:
             "count": len(active_slavery),
             "members": [t.username for t in slavery_mgr.active_threads.values() if t.is_alive()],
             "time_running": slavery_time
+        },
+        "general": {
+            "running": general_mgr.is_running,
+            "current_username": general_mgr.current_username,
+            "sub_module": general_mgr.current_sub_module,
+            "task": general_mgr.current_task,
+            "time_running": general_time
         }
     }
     return json.dumps(status)
