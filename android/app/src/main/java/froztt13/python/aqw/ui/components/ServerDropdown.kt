@@ -36,7 +36,7 @@ fun ServerDropdown(
     enabled: Boolean,
     onServerSelected: (String) -> Unit,
     modifier: Modifier = Modifier,
-    contentPadding: PaddingValues = OutlinedTextFieldDefaults.contentPadding()
+    contentPadding: PaddingValues? = null
 ) {
     var expanded by remember { mutableStateOf(false) }
 

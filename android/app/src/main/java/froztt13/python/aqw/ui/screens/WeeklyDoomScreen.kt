@@ -32,7 +32,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.automirrored.filled.List
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Delete
@@ -42,7 +41,6 @@ import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.People
 import androidx.compose.material.icons.filled.Person
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
@@ -69,8 +67,6 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -99,8 +95,10 @@ import froztt13.python.aqw.data.WeeklyDoomConfig
 import froztt13.python.aqw.data.WeeklyDoomTelemetry
 import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.service.BotForegroundService
+import froztt13.python.aqw.ui.components.DefaultTopBar
 import froztt13.python.aqw.ui.components.LiveLogConsole
 import froztt13.python.aqw.ui.components.ServerDropdown
+import froztt13.python.aqw.ui.components.TopBarSettingsButton
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.BorderDark
 import froztt13.python.aqw.ui.theme.CardDark
@@ -238,51 +236,17 @@ fun WeeklyDoomContent(
         modifier = modifier.fillMaxSize(),
         containerColor = BgDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(10.dp)
-                    ) {
-                        Box(
-
-                            modifier = Modifier
-                                .size(10.dp)
-                                .clip(CircleShape)
-                                .background(if (isRunning) SuccessGreen else DoomCrimson)
-                        )
-                        Text(
-                            text = "WEEKLY DOOM BOT",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary
-                        )
-                    }
-                },
+            DefaultTopBar(
+                title = "WEEKLY DOOM BOT",
+                statusDotColor = if (isRunning) SuccessGreen else DoomCrimson,
+                onBack = onBack,
                 actions = {
-                    IconButton(
+                    TopBarSettingsButton(
+                        active = showSettings,
                         onClick = { showSettings = !showSettings },
-                        modifier = Modifier
-                            .clip(CircleShape)
-                            .background(if (showSettings) DoomCrimson.copy(alpha = 0.2f) else Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Toggle Settings",
-                            tint = if (showSettings) DoomCrimson else TextSecondary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
+                        tintColor = DoomCrimson
+                    )
+                }
             )
         }
     ) { innerPadding ->

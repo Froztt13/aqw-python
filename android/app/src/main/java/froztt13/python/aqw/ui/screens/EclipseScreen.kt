@@ -31,11 +31,9 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Lock
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
@@ -59,8 +57,6 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -90,10 +86,13 @@ import froztt13.python.aqw.data.SlotTelemetry
 import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.service.BotForegroundService
 import froztt13.python.aqw.ui.components.BotSessionStatsBar
+import froztt13.python.aqw.ui.components.CustomOutlinedTextField
+import froztt13.python.aqw.ui.components.DefaultTopBar
 import froztt13.python.aqw.ui.components.LiveLogConsole
 import froztt13.python.aqw.ui.components.MonsterTelemetryCard
 import froztt13.python.aqw.ui.components.ServerDropdown
 import froztt13.python.aqw.ui.components.SlotCard
+import froztt13.python.aqw.ui.components.TopBarSettingsButton
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.CardDark
 import froztt13.python.aqw.ui.theme.EclipseMagenta
@@ -193,8 +192,6 @@ fun EclipseContent(
     var passwordError by remember { mutableStateOf(false) }
     var passwordVisible by remember { mutableStateOf(false) }
 
-    val themeColor = EclipseMagenta
-
     val slotKeys = listOf("slot1", "slot2", "slot3", "slot4")
     val slotLabels = listOf("Slot 1", "Slot 2", "Slot 3", "Slot 4")
     val slotFullTitles = listOf(
@@ -210,41 +207,17 @@ fun EclipseContent(
         modifier = modifier.fillMaxSize(),
         containerColor = BgDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Maid Eclipse Client",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary
-                        )
-                    }
-                },
+            DefaultTopBar(
+                title = "Maid Eclipse Client",
+                statusDotColor = EclipseMagenta,
+                onBack = onBack,
                 actions = {
-                    // Settings Toggle Button
-                    IconButton(
+                    TopBarSettingsButton(
+                        active = showSettings,
                         onClick = { showSettings = !showSettings },
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (showSettings) themeColor.copy(alpha = 0.2f) else Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Toggle Settings",
-                            tint = if (showSettings) themeColor else TextSecondary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
+                        tintColor = EclipseMagenta
+                    )
+                }
             )
         }
     ) { innerPadding ->
@@ -265,7 +238,7 @@ fun EclipseContent(
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .border(1.dp, themeColor.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
+                        .border(1.dp, EclipseMagenta.copy(alpha = 0.4f), RoundedCornerShape(16.dp)),
                     shape = RoundedCornerShape(16.dp),
                     colors = CardDefaults.cardColors(containerColor = CardDark)
                 ) {
@@ -284,7 +257,7 @@ fun EclipseContent(
                                 text = "Global Session Settings",
                                 fontSize = 13.sp,
                                 fontWeight = FontWeight.Bold,
-                                color = themeColor
+                                color = EclipseMagenta
                             )
                             Text(
                                 text = "Tap gear icon to hide",
@@ -304,7 +277,7 @@ fun EclipseContent(
                                 modifier = Modifier.weight(1f)
                             )
 
-                            OutlinedTextField(
+                            CustomOutlinedTextField(
                                 value = config.roomNumber.toString(),
                                 onValueChange = {
                                     val num = it.toIntOrNull() ?: 1
@@ -316,7 +289,7 @@ fun EclipseContent(
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = themeColor,
+                                    focusedBorderColor = EclipseMagenta,
                                     unfocusedBorderColor = Color(0xFF334155),
                                     focusedTextColor = TextPrimary,
                                     unfocusedTextColor = TextPrimary
@@ -403,7 +376,7 @@ fun EclipseContent(
                 stats = partyStats,
                 isRunning = isRunning,
                 botType = "Maid Eclipse",
-                accentColor = themeColor
+                accentColor = EclipseMagenta
             )
 
             // Start / Stop CTA Button
@@ -449,7 +422,7 @@ fun EclipseContent(
                         Icon(
                             imageVector = Icons.Filled.Lock,
                             contentDescription = "Security Authorization",
-                            tint = themeColor,
+                            tint = EclipseMagenta,
                             modifier = Modifier.size(28.dp)
                         )
                     },
@@ -503,7 +476,7 @@ fun EclipseContent(
                                 },
                                 modifier = Modifier.fillMaxWidth(),
                                 colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = themeColor,
+                                    focusedBorderColor = EclipseMagenta,
                                     unfocusedBorderColor = Color(0xFF334155),
                                     errorBorderColor = ErrorRed,
                                     focusedTextColor = TextPrimary,
@@ -524,7 +497,7 @@ fun EclipseContent(
                                     passwordError = true
                                 }
                             },
-                            colors = ButtonDefaults.buttonColors(containerColor = themeColor),
+                            colors = ButtonDefaults.buttonColors(containerColor = EclipseMagenta),
                             shape = RoundedCornerShape(8.dp)
                         ) {
                             Text(
@@ -582,7 +555,7 @@ fun EclipseContent(
                     if (pagerState.currentPage < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
                             Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                            color = themeColor
+                            color = EclipseMagenta
                         )
                     }
                 },
@@ -618,7 +591,7 @@ fun EclipseContent(
                                     text = label,
                                     fontSize = 12.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) themeColor else TextSecondary
+                                    color = if (selected) EclipseMagenta else TextSecondary
                                 )
                             }
                         }
@@ -661,7 +634,7 @@ fun EclipseContent(
                         config = slotConf,
                         telemetry = slotTel,
                         isPartyRunning = isRunning,
-                        accentColor = themeColor,
+                        accentColor = EclipseMagenta,
                         showTauntToggle = false,
                         showEclipseTauntToggles = true,
                         onConfigChange = { onUpdateSlot(slotKey, it) }

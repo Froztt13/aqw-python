@@ -35,7 +35,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Bolt
 import androidx.compose.material.icons.filled.Close
@@ -73,8 +72,6 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -111,6 +108,7 @@ import froztt13.python.aqw.data.ThresholdType
 import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.service.BotForegroundService
 import froztt13.python.aqw.ui.components.BotSessionStatsBar
+import froztt13.python.aqw.ui.components.DefaultTopBar
 import froztt13.python.aqw.ui.components.LiveLogConsole
 import froztt13.python.aqw.ui.components.MonsterTelemetryCard
 import froztt13.python.aqw.ui.theme.BgDark
@@ -240,7 +238,6 @@ fun SlaveryContent(
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
 
-    val themeColor = SlaveIndigo
     val slotKeys = listOf("slot1", "slot2", "slot3", "slot4")
     val slotLabels = listOf("Slot 1", "Slot 2", "Slot 3", "Slot 4")
     val slotFullTitles = listOf(
@@ -274,28 +271,10 @@ fun SlaveryContent(
         modifier = modifier.fillMaxSize(),
         containerColor = BgDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        IconButton(onClick = onBack) {
-                            Icon(
-                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                                contentDescription = "Back",
-                                tint = TextPrimary
-                            )
-                        }
-                        Text(
-                            text = "Slavery Bot",
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = TextPrimary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
+            DefaultTopBar(
+                title = "Slavery Bot",
+                statusDotColor = SlaveIndigo,
+                onBack = onBack
             )
         }
     ) { innerPadding ->
@@ -311,7 +290,7 @@ fun SlaveryContent(
             Card(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .border(1.dp, themeColor.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
+                    .border(1.dp, SlaveIndigo.copy(alpha = 0.4f), RoundedCornerShape(16.dp))
                     .clickable(enabled = !isRunning) { onOpenSettings() },
                 shape = RoundedCornerShape(16.dp),
                 colors = CardDefaults.cardColors(containerColor = CardDark)
@@ -363,7 +342,7 @@ fun SlaveryContent(
                             Icon(
                                 imageVector = Icons.Filled.Settings,
                                 contentDescription = "Settings",
-                                tint = themeColor,
+                                tint = SlaveIndigo,
                                 modifier = Modifier.size(20.dp)
                             )
                         }
@@ -432,7 +411,7 @@ fun SlaveryContent(
                     stats = partyStats,
                     isRunning = isRunning,
                     botType = "Slavery Party",
-                    accentColor = themeColor
+                    accentColor = SlaveIndigo
                 )
 
             // Start / Stop CTA Button
@@ -492,7 +471,7 @@ fun SlaveryContent(
                     if (pagerState.currentPage < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
                             Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                            color = themeColor
+                            color = SlaveIndigo
                         )
                     }
                 },
@@ -526,7 +505,7 @@ fun SlaveryContent(
                                         .background(
                                             when {
                                                 slotTel.running -> SuccessGreen
-                                                slotConf.enabled -> themeColor
+                                                slotConf.enabled -> SlaveIndigo
                                                 else -> TextMuted
                                             }
                                         )
@@ -535,7 +514,7 @@ fun SlaveryContent(
                                     text = label,
                                     fontSize = 12.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) themeColor else TextSecondary
+                                    color = if (selected) SlaveIndigo else TextSecondary
                                 )
                             }
                         }
@@ -577,7 +556,7 @@ fun SlaveryContent(
                         config = slotConf,
                         telemetry = slotTel,
                         isPartyRunning = isRunning,
-                        accentColor = themeColor,
+                        accentColor = SlaveIndigo,
                         onConfigChange = { onUpdateSlot(slotKey, it) }
                     )
 

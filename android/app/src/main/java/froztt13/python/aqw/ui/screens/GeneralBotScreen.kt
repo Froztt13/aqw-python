@@ -25,7 +25,6 @@ import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.AutoAwesome
 import androidx.compose.material.icons.filled.Extension
 import androidx.compose.material.icons.filled.Favorite
@@ -63,8 +62,6 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -95,6 +92,7 @@ import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.service.BotForegroundService
 import froztt13.python.aqw.ui.components.ClassDropdown
 import froztt13.python.aqw.ui.components.CustomOutlinedTextField
+import froztt13.python.aqw.ui.components.DefaultTopBar
 import froztt13.python.aqw.ui.components.LiveLogConsole
 import froztt13.python.aqw.ui.components.ServerDropdown
 import froztt13.python.aqw.ui.theme.BgDark
@@ -254,29 +252,11 @@ fun GeneralBotContent(
         modifier = modifier,
         containerColor = BgDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Row(
-                        verticalAlignment = Alignment.CenterVertically,
-                        horizontalArrangement = Arrangement.spacedBy(8.dp)
-                    ) {
-                        Text(
-                            text = "General Bot",
-                            color = TextPrimary,
-                            fontWeight = FontWeight.Bold,
-                            fontSize = 18.sp
-                        )
-                    }
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary
-                        )
-                    }
-                },
+            DefaultTopBar(
+                title = "General Bot",
+                onBack = onBack,
+                containerColor = SurfaceDark,
+                statusDotColor = GeneralTeal,
                 actions = {
                     IconButton(
                         onClick = { showResetConfirmDialog = true }
@@ -287,10 +267,7 @@ fun GeneralBotContent(
                             tint = TextSecondary
                         )
                     }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(
-                    containerColor = SurfaceDark
-                )
+                }
             )
         }
     ) { padding ->
@@ -992,7 +969,7 @@ fun SetupTabContent(
                     modifier = Modifier
                         .fillMaxWidth()
                         .padding(16.dp),
-                    verticalArrangement = Arrangement.spacedBy(14.dp)
+                    verticalArrangement = Arrangement.spacedBy(16.dp)
                 ) {
                     Row(
                         verticalAlignment = Alignment.CenterVertically,
@@ -1022,7 +999,7 @@ fun SetupTabContent(
                             selectedServer = config.server,
                             enabled = !isRunning,
                             onServerSelected = onUpdateServer,
-                            modifier = Modifier.weight(1.2f)
+                            modifier = Modifier.weight(1f)
                         )
 
                         CustomOutlinedTextField(
@@ -1034,7 +1011,7 @@ fun SetupTabContent(
                             enabled = !isRunning,
                             label = { Text("Room #") },
                             keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
-                            modifier = Modifier.weight(0.8f),
+                            modifier = Modifier.weight(1f),
                         )
                     }
 

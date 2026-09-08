@@ -333,8 +333,7 @@ fun BotModuleGridCard(
                 1.dp,
                 accentColor.copy(alpha = 0.35f),
                 RoundedCornerShape(16.dp)
-            )
-            .clickable { onClick() },
+            ),
         shape = RoundedCornerShape(16.dp),
         colors = CardDefaults.cardColors(containerColor = CardDark)
     ) {
@@ -373,17 +372,18 @@ fun BotModuleGridCard(
 
                     Box(
                         modifier = Modifier
-                            .size(28.dp)
+                            .size(32.dp)
                             .clip(CircleShape)
                             .background(Color(0xFF161928))
-                            .border(1.dp, Color(0xFF2E3350), CircleShape),
+                            .border(1.dp, Color(0xFF2E3350), CircleShape)
+                            .clickable { onClick() },
                         contentAlignment = Alignment.Center
                     ) {
                         Icon(
                             imageVector = Icons.AutoMirrored.Filled.ArrowForward,
                             contentDescription = "Open $title",
                             tint = accentColor,
-                            modifier = Modifier.size(14.dp)
+                            modifier = Modifier.size(16.dp)
                         )
                     }
                 }
@@ -438,7 +438,8 @@ fun BotModuleGridCard(
                         accentColor.copy(alpha = 0.25f),
                         RoundedCornerShape(8.dp)
                     )
-                    .padding(vertical = 7.dp),
+                    .clickable { onClick() }
+                    .padding(vertical = 6.dp, horizontal = 10.dp),
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {

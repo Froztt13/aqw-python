@@ -52,12 +52,7 @@ fun CustomOutlinedTextField(
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     shape: Shape = OutlinedTextFieldDefaults.shape,
     colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
-    contentPadding: PaddingValues = OutlinedTextFieldDefaults.contentPadding(
-        start = 14.dp,
-        end = 14.dp,
-        top = 14.dp,
-        bottom = 12.dp
-    )
+    contentPadding: PaddingValues? = null
 ) {
     val isFocused by interactionSource.collectIsFocusedAsState()
     val textColor = textStyle.color.takeOrElse {
@@ -104,7 +99,12 @@ fun CustomOutlinedTextField(
                     suffix = suffix,
                     supportingText = supportingText,
                     colors = colors,
-                    contentPadding = contentPadding,
+                    contentPadding = contentPadding ?: OutlinedTextFieldDefaults.contentPadding(
+                        start = 14.dp,
+                        end = 14.dp,
+                        top = 14.dp,
+                        bottom = 12.dp
+                    ),
                     container = {
                         OutlinedTextFieldDefaults.Container(
                             enabled = enabled,

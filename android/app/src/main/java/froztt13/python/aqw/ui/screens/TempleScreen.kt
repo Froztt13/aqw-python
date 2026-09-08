@@ -31,10 +31,8 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
@@ -47,8 +45,6 @@ import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
-import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
@@ -60,8 +56,6 @@ import androidx.compose.material3.TabRowDefaults
 import androidx.compose.material3.TabRowDefaults.tabIndicatorOffset
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
-import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -89,10 +83,13 @@ import froztt13.python.aqw.data.TempleConfig
 import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.service.BotForegroundService
 import froztt13.python.aqw.ui.components.BotSessionStatsBar
+import froztt13.python.aqw.ui.components.CustomOutlinedTextField
+import froztt13.python.aqw.ui.components.DefaultTopBar
 import froztt13.python.aqw.ui.components.LiveLogConsole
 import froztt13.python.aqw.ui.components.MonsterTelemetryCard
 import froztt13.python.aqw.ui.components.ServerDropdown
 import froztt13.python.aqw.ui.components.SlotCard
+import froztt13.python.aqw.ui.components.TopBarSettingsButton
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.CardDark
 import froztt13.python.aqw.ui.theme.ErrorRed
@@ -211,41 +208,17 @@ fun TempleContent(
         modifier = modifier.fillMaxSize(),
         containerColor = BgDark,
         topBar = {
-            TopAppBar(
-                title = {
-                    Text(
-                        text = "Temple Shrine Bot",
-                        style = MaterialTheme.typography.titleMedium,
-                        fontWeight = FontWeight.Bold,
-                        color = TextPrimary
-                    )
-                },
-                navigationIcon = {
-                    IconButton(onClick = onBack) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowBack,
-                            contentDescription = "Back",
-                            tint = TextPrimary
-                        )
-                    }
-                },
+            DefaultTopBar(
+                title = "Temple Shrine Bot",
+                statusDotColor = themeColor,
+                onBack = onBack,
                 actions = {
-                    // Settings Toggle Button
-                    IconButton(
+                    TopBarSettingsButton(
+                        active = showSettings,
                         onClick = { showSettings = !showSettings },
-                        modifier = Modifier
-                            .padding(end = 4.dp)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (showSettings) themeColor.copy(alpha = 0.2f) else Color.Transparent)
-                    ) {
-                        Icon(
-                            imageVector = Icons.Filled.Settings,
-                            contentDescription = "Toggle Settings",
-                            tint = if (showSettings) themeColor else TextSecondary
-                        )
-                    }
-                },
-                colors = TopAppBarDefaults.topAppBarColors(containerColor = BgDark)
+                        tintColor = themeColor
+                    )
+                }
             )
         }
     ) { innerPadding ->
@@ -311,7 +284,7 @@ fun TempleContent(
                                 modifier = Modifier.weight(1f)
                             )
 
-                            OutlinedTextField(
+                            CustomOutlinedTextField(
                                 value = config.roomNumber.toString(),
                                 onValueChange = {
                                     val num = it.toIntOrNull() ?: 1
