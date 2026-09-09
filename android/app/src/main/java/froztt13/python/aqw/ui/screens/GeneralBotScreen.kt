@@ -1507,6 +1507,21 @@ private fun GeneralBotContentIdlePreview() {
                             ""
                         )
                     )
+                ),
+                GeneralSubModuleInfo(
+                    id = "va",
+                    name = "Void Aura (NSOD)",
+                    category = "Necrotic Sword",
+                    description = "Automated Void Aura farming via Quest 4432 (Retrieve Void Auras)",
+                    tasks = listOf(
+                        GeneralTaskInfo(
+                            "retrieve_va",
+                            "Retrieve Void Auras (Quest 4432)",
+                            "Farms 10 essences and turns in 4432",
+                            100,
+                            "Void Aura"
+                        )
+                    )
                 )
             ),
             logs = listOf(

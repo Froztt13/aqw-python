@@ -287,7 +287,7 @@ fun DashboardContent(
                 BotModuleGridCard(
                     title = "General Bot",
                     category = "Modular Farms",
-                    description = "Multi-purpose modular engine. Features Legion Revenant farm (Fealty 1-3) & Nulgath Nation farm (Larva, Uni 13, Diamonds, etc.).",
+                    description = "Multi-purpose modular engine. Features Legion Revenant (Fealty 1-3), Nulgath Nation (Larva), & Void Aura (NSOD Quest 4432).",
                     icon = Icons.Filled.Extension,
                     accentColor = GeneralTeal,
                     onClick = onNavigateToGeneral,
