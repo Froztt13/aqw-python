@@ -392,10 +392,10 @@ class EclipseManager:
             "server": "Alteon",
             "room_number": 9099,
             "slots": {
-                "slot1": {"username": "", "password": "", "char_class": "Legion Revenant", "role": "master", "is_taunter": True, "moon_haze_taunter": False, "sunset_knight_taunter": False, "default_target": "Ascended Solstice,Blessless Deer"},
-                "slot2": {"username": "", "password": "", "char_class": "StoneCrusher", "role": "slave", "is_taunter": False, "moon_haze_taunter": False, "sunset_knight_taunter": False, "default_target": "Ascended Solstice"},
+                "slot1": {"username": "", "password": "", "char_class": "Legion Revenant", "role": "master", "is_taunter": True, "moon_haze_taunter": False, "sunset_knight_taunter": True, "default_target": "Ascended Solstice,Blessless Deer"},
+                "slot2": {"username": "", "password": "", "char_class": "StoneCrusher", "role": "slave", "is_taunter": True, "moon_haze_taunter": False, "sunset_knight_taunter": True, "default_target": "Ascended Solstice"},
                 "slot3": {"username": "", "password": "", "char_class": "ArchPaladin", "role": "slave", "is_taunter": True, "moon_haze_taunter": True, "sunset_knight_taunter": False, "default_target": "Ascended Midnight"},
-                "slot4": {"username": "", "password": "", "char_class": "Lord of Order", "role": "slave", "is_taunter": True, "moon_haze_taunter": False, "sunset_knight_taunter": True, "default_target": "Ascended Midnight"}
+                "slot4": {"username": "", "password": "", "char_class": "Lord of Order", "role": "slave", "is_taunter": True, "moon_haze_taunter": True, "sunset_knight_taunter": False, "default_target": "Ascended Midnight"}
             }
         }
         if os.path.exists(self.config_path):
@@ -410,6 +410,23 @@ class EclipseManager:
                     default_config.update(user_conf)
             except Exception:
                 pass
+
+        # Enforce fixed roles and default first priority target
+        for s_id in ["slot1", "slot2", "slot3", "slot4"]:
+            if s_id in default_config["slots"]:
+                is_sun = s_id in ["slot1", "slot2"]
+                first_req = "Ascended Solstice" if is_sun else "Ascended Midnight"
+                slot_data = default_config["slots"][s_id]
+                slot_data["is_taunter"] = True
+                slot_data["sunset_knight_taunter"] = is_sun
+                slot_data["moon_haze_taunter"] = not is_sun
+                cur_targets = [t.strip() for t in slot_data.get("default_target", "").split(",") if t.strip()]
+                if not cur_targets:
+                    slot_data["default_target"] = "Ascended Solstice,Blessless Deer" if s_id == "slot1" else first_req
+                elif cur_targets[0].lower() != first_req.lower():
+                    remaining = [t for t in cur_targets if t.lower() != first_req.lower()]
+                    slot_data["default_target"] = ",".join([first_req] + remaining)
+
         return default_config
 
     def save_config(self, config):
@@ -539,14 +556,8 @@ class EclipseManager:
         master_user = slots["slot1"]["username"]
         slave_users = [slots[s]["username"] for s in ["slot2", "slot3", "slot4"]]
 
-        moon_haze_slots = [
-            s_id for s_id in ["slot1", "slot2", "slot3", "slot4"]
-            if slots[s_id].get("moon_haze_taunter", s_id == "slot3")
-        ]
-        sunset_knight_slots = [
-            s_id for s_id in ["slot1", "slot2", "slot3", "slot4"]
-            if slots[s_id].get("sunset_knight_taunter", s_id == "slot4")
-        ]
+        moon_haze_slots = ["slot3", "slot4"]
+        sunset_knight_slots = ["slot1", "slot2"]
 
         self.start_time = time.time()
         for s_id in ["slot1", "slot2", "slot3", "slot4"]:
@@ -595,7 +606,17 @@ class EclipseManager:
                             "slot3": "Ascended Midnight",
                             "slot4": "Ascended Midnight",
                         }
-                        target_mon = slot_info.get("default_target") or default_targets_preset.get(slot_id, "")
+                        raw_target = slot_info.get("default_target") or default_targets_preset.get(slot_id, "")
+                        is_sun = slot_id in ["slot1", "slot2"]
+                        first_req = "Ascended Solstice" if is_sun else "Ascended Midnight"
+                        targets_list = [t.strip() for t in raw_target.split(",") if t.strip()]
+                        if not targets_list:
+                            target_mon = default_targets_preset.get(slot_id, first_req)
+                        elif targets_list[0].lower() != first_req.lower():
+                            remaining = [t for t in targets_list if t.lower() != first_req.lower()]
+                            target_mon = ",".join([first_req] + remaining)
+                        else:
+                            target_mon = raw_target
 
                         if slot_id == "slot1":
                             inst = EclipseMasterBot(

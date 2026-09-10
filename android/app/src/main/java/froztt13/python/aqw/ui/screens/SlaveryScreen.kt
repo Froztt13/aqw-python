@@ -59,8 +59,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Slider
@@ -76,16 +74,17 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.key
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.font.FontWeight
@@ -108,9 +107,12 @@ import froztt13.python.aqw.data.ThresholdType
 import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.service.BotForegroundService
 import froztt13.python.aqw.ui.components.BotSessionStatsBar
+import froztt13.python.aqw.ui.components.ClassDropdown
+import froztt13.python.aqw.ui.components.CustomOutlinedTextField
 import froztt13.python.aqw.ui.components.DefaultTopBar
 import froztt13.python.aqw.ui.components.LiveLogConsole
 import froztt13.python.aqw.ui.components.MonsterTelemetryCard
+import froztt13.python.aqw.ui.components.defaultTextFieldColors
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.CardDark
 import froztt13.python.aqw.ui.theme.ErrorRed
@@ -128,7 +130,6 @@ import sh.calvin.reorderable.ReorderableColumn
 
 val AUTO_ZONE_OPTIONS =
     listOf("none", "Astral Empyrean", "Dark Carnax", "Ultra Dage", "Queen Iona", "Vordred")
-val OPERATOR_OPTIONS = listOf("<", ">")
 
 @Composable
 fun SlaveryScreen(
@@ -234,7 +235,6 @@ fun SlaveryContent(
     onClearLogs: () -> Unit,
     modifier: Modifier = Modifier
 ) {
-    val context = LocalContext.current
     val scrollState = rememberScrollState()
     val coroutineScope = rememberCoroutineScope()
 
@@ -248,24 +248,6 @@ fun SlaveryContent(
     )
 
     val pagerState = rememberPagerState(pageCount = { 4 })
-
-    val isPreview = LocalInspectionMode.current
-    var isBatteryOptIgnored by remember {
-        mutableStateOf(
-            if (isPreview) true else BatteryOptimizationHelper.isBatteryOptimizationIgnored(context)
-        )
-    }
-    var hasNotificationPerm by remember {
-        mutableStateOf(
-            if (isPreview) true else BatteryOptimizationHelper.hasNotificationPermission(context)
-        )
-    }
-
-    val notifPermissionLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.RequestPermission()
-    ) { isGranted ->
-        hasNotificationPerm = isGranted
-    }
 
     Scaffold(
         modifier = modifier.fillMaxSize(),
@@ -310,14 +292,22 @@ fun SlaveryContent(
                             verticalAlignment = Alignment.CenterVertically,
                             horizontalArrangement = Arrangement.spacedBy(10.dp)
                         ) {
-                            Image(
-                                painter = painterResource(R.drawable.icon),
-                                contentDescription = null,
-                                alpha = 0.9f,
-                                modifier = Modifier
-                                    .size(38.dp)
-                                    .clip(CircleShape)
-                            )
+                            Box {
+                                Image(
+                                    painter = painterResource(R.drawable.icon),
+                                    contentDescription = null,
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(CircleShape)
+                                        .alpha(0.2f)
+                                        .background(color = MoonCyan)
+                                        .size(38.dp)
+                                )
+                            }
                             Column {
                                 Text(
                                     text = "FOLLOWING MASTER",
@@ -356,42 +346,24 @@ fun SlaveryContent(
                         // Server
                         Box(
                             modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(Color(0xFF161928))
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                                .clip(RoundedCornerShape(4.dp))
+                                .background(MoonCyan.copy(alpha = 0.15f))
+                                .padding(horizontal = 6.dp, vertical = 2.dp)
                         ) {
                             Text(
                                 text = "${config.server.ifEmpty { "Artix" }} #${config.defaultRoomNumber}",
                                 fontSize = 11.sp,
-                                color = TextPrimary
+                                color = MoonCyan
                             )
                         }
 
-                        // Copy Walk
-                        /*Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(
-                                    if (config.copyWalk) SuccessGreen.copy(alpha = 0.15f)
-                                    else Color(0xFF161928)
-                                )
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = if (config.copyWalk) "Copy Walk: ON" else "Copy Walk: OFF",
-                                fontSize = 11.sp,
-                                color = if (config.copyWalk) SuccessGreen else TextMuted,
-                                fontWeight = FontWeight.SemiBold
-                            )
-                        }*/
-
                         // Auto Zone if set
-                        /*if (config.autoZone.isNotEmpty() && config.autoZone != "none") {
+                        if (config.autoZone.isNotEmpty() && config.autoZone != "none") {
                             Box(
                                 modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
+                                    .clip(RoundedCornerShape(4.dp))
                                     .background(MoonCyan.copy(alpha = 0.15f))
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
                             ) {
                                 Text(
                                     text = config.autoZone,
@@ -400,7 +372,23 @@ fun SlaveryContent(
                                     fontWeight = FontWeight.SemiBold
                                 )
                             }
-                        }*/
+                        }
+
+                        // Copy Walk
+                        if (config.copyWalk)
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(4.dp))
+                                    .background(MoonCyan.copy(alpha = 0.15f))
+                                    .padding(horizontal = 6.dp, vertical = 2.dp)
+                            ) {
+                                Text(
+                                    text = "Copy Walk",
+                                    fontSize = 11.sp,
+                                    color = MoonCyan,
+                                    fontWeight = FontWeight.SemiBold
+                                )
+                            }
                     }
                 }
             }
@@ -409,7 +397,7 @@ fun SlaveryContent(
             if (isRunning)
                 BotSessionStatsBar(
                     stats = partyStats,
-                    isRunning = isRunning,
+                    isRunning = true,
                     botType = "Slavery Party",
                     accentColor = SlaveIndigo
                 )
@@ -968,25 +956,20 @@ fun SlaveSlotCard(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.spacedBy(10.dp)
                     ) {
-                        OutlinedTextField(
+                        CustomOutlinedTextField(
                             value = config.username,
                             onValueChange = { onConfigChange(config.copy(username = it)) },
                             label = { Text("Username") },
                             singleLine = true,
                             enabled = true,
                             modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = accentColor,
-                                unfocusedBorderColor = Color(0xFF334155),
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            )
+                            colors = defaultTextFieldColors(accentColor)
                         )
 
-                        OutlinedTextField(
+                        CustomOutlinedTextField(
                             value = config.password,
                             onValueChange = { onConfigChange(config.copy(password = it)) },
-                            label = { Text("***", overflow = TextOverflow.Ellipsis) },
+                            label = { Text("Password", overflow = TextOverflow.Ellipsis) },
                             singleLine = true,
                             enabled = true,
                             visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
@@ -1001,29 +984,17 @@ fun SlaveSlotCard(
                                 }
                             },
                             modifier = Modifier.weight(1f),
-                            colors = OutlinedTextFieldDefaults.colors(
-                                focusedBorderColor = accentColor,
-                                unfocusedBorderColor = Color(0xFF334155),
-                                focusedTextColor = TextPrimary,
-                                unfocusedTextColor = TextPrimary
-                            )
+                            colors = defaultTextFieldColors(accentColor)
                         )
                     }
 
+                    Spacer(Modifier.height(4.dp))
+
                     // Character Class
-                    OutlinedTextField(
-                        value = config.charClass,
-                        onValueChange = { onConfigChange(config.copy(charClass = it)) },
-                        label = { Text("Class (e.g. Lord of Order, ArchPaladin)") },
-                        singleLine = true,
-                        enabled = true,
+                    ClassDropdown(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = OutlinedTextFieldDefaults.colors(
-                            focusedBorderColor = accentColor,
-                            unfocusedBorderColor = Color(0xFF334155),
-                            focusedTextColor = TextPrimary,
-                            unfocusedTextColor = TextPrimary
-                        )
+                        selectedClass = config.charClass,
+                        onClassSelected = { onConfigChange(config.copy(charClass = it)) }
                     )
 
                     // Taunter Toggle
@@ -1287,12 +1258,12 @@ private fun CombinedCombatSkillsSection(
 // ---------------------------------------------------------------------------
 @Composable
 private fun SkillVerticalItem(
+    dragHandleModifier: Modifier,
     stepIndex: Int,
     skill: Skill,
     accentColor: Color,
     isDragging: Boolean,
     enabled: Boolean,
-    dragHandleModifier: Modifier,
     onClick: () -> Unit,
     onRemove: () -> Unit
 ) {
@@ -1504,7 +1475,7 @@ private fun SkillEditorDialog(
     onConfirm: (Skill) -> Unit
 ) {
     val isEditing = initialSkill != null
-    var selectedIndex by remember { mutableStateOf(initialSkill?.index ?: 1) }
+    var selectedIndex by remember { mutableIntStateOf(initialSkill?.index ?: 1) }
     var selectedThresholdType by remember {
         mutableStateOf(
             initialSkill?.thresholdType ?: ThresholdType.NONE
@@ -1512,7 +1483,7 @@ private fun SkillEditorDialog(
     }
     var selectedOperator by remember { mutableStateOf(initialSkill?.operator ?: "<") }
     var selectedThresholdValue by remember {
-        mutableStateOf(if (initialSkill != null && initialSkill.thresholdValue > 0) initialSkill.thresholdValue else 50)
+        mutableIntStateOf(if (initialSkill != null && initialSkill.thresholdValue > 0) initialSkill.thresholdValue else 50)
     }
 
     AlertDialog(
@@ -1881,7 +1852,7 @@ private fun SlaveryContentIdlePreview() {
                 followPlayer = "MasterPlayer",
                 defaultRoomNumber = 9099,
                 copyWalk = true,
-                autoZone = "none",
+                autoZone = "Astral Empyrean",
                 targetsPriority = "Defense Drone,Staff of Inversion",
                 slots = mapOf(
                     "slot1" to SlaveSlotConfig(
@@ -2064,7 +2035,7 @@ private fun SlaveryContentActivePreview() {
                     targetMonsters = "Defense Drone"
                 )
             ),
-            partyStats = PartyStats(timeRunning = 425L, clearedCount = 8),
+            partyStats = PartyStats(timeRunning = 425L),
             logs = listOf(
                 LogEntry(
                     botType = "slavery",

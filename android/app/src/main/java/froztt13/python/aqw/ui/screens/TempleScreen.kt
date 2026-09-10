@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -48,7 +49,6 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.MenuAnchorType
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
@@ -90,8 +90,10 @@ import froztt13.python.aqw.ui.components.MonsterTelemetryCard
 import froztt13.python.aqw.ui.components.ServerDropdown
 import froztt13.python.aqw.ui.components.SlotCard
 import froztt13.python.aqw.ui.components.TopBarSettingsButton
+import froztt13.python.aqw.ui.components.defaultTextFieldColors
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.CardDark
+import froztt13.python.aqw.ui.theme.DoomCrimson
 import froztt13.python.aqw.ui.theme.ErrorRed
 import froztt13.python.aqw.ui.theme.MoonCyan
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
@@ -299,12 +301,7 @@ fun TempleContent(
                                 enabled = !isRunning,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = themeColor,
-                                    unfocusedBorderColor = Color(0xFF334155),
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
-                                )
+                                colors = defaultTextFieldColors(themeColor)
                             )
                         }
 
@@ -330,12 +327,7 @@ fun TempleContent(
                                         true
                                     )
                                     .fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = themeColor,
-                                    unfocusedBorderColor = Color(0xFF334155),
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
-                                )
+                                colors = defaultTextFieldColors(themeColor)
                             )
 
                             ExposedDropdownMenu(
@@ -490,6 +482,15 @@ fun TempleContent(
                 )
             }
 
+            // Compute active tab's taunt role and animated indicator color
+            val activeSlotKey = slotKeys.getOrNull(pagerState.currentPage) ?: "slot1"
+            val activeSlotConf = config.slots[activeSlotKey] ?: SlotConfig()
+            val targetIndicatorColor = if (activeSlotConf.isTaunter) DoomCrimson else themeColor
+            val indicatorColor by animateColorAsState(
+                targetValue = targetIndicatorColor,
+                label = "TempleTabIndicatorColor"
+            )
+
             // --- Slot Account ViewPager Tab Navigation ---
             ScrollableTabRow(
                 selectedTabIndex = pagerState.currentPage,
@@ -500,7 +501,8 @@ fun TempleContent(
                     if (pagerState.currentPage < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
                             Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                            color = themeColor
+                            height = 3.dp,
+                            color = indicatorColor
                         )
                     }
                 },
@@ -512,7 +514,9 @@ fun TempleContent(
                 slotLabels.forEachIndexed { index, label ->
                     val slotKey = slotKeys[index]
                     val slotTel = telemetryMap[slotKey] ?: SlotTelemetry()
+                    val slotConf = config.slots[slotKey] ?: SlotConfig()
                     val selected = pagerState.currentPage == index
+                    val tabRoleColor = if (slotConf.isTaunter) DoomCrimson else themeColor
 
                     Tab(
                         selected = selected,
@@ -533,11 +537,26 @@ fun TempleContent(
                                         .background(if (slotTel.running) SuccessGreen else TextMuted)
                                 )
                                 Text(
-                                    text = label,
+                                    text = "P${index + 1}",
                                     fontSize = 12.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) themeColor else TextSecondary
+                                    color = if (selected) tabRoleColor else TextSecondary
                                 )
+                                if (slotConf.isTaunter) {
+                                    Box(
+                                        modifier = Modifier
+                                            .clip(RoundedCornerShape(4.dp))
+                                            .background(DoomCrimson.copy(alpha = 0.2f))
+                                            .padding(horizontal = 4.dp, vertical = 1.dp)
+                                    ) {
+                                        Text(
+                                            text = "Taunt",
+                                            fontSize = 9.sp,
+                                            fontWeight = FontWeight.Bold,
+                                            color = DoomCrimson
+                                        )
+                                    }
+                                }
                             }
                         }
                     )
@@ -567,6 +586,8 @@ fun TempleContent(
                     }
                 }
 
+                val slotAccentColor = if (slotConf.isTaunter) DoomCrimson else themeColor
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -579,7 +600,7 @@ fun TempleContent(
                         config = slotConf,
                         telemetry = slotTel,
                         isPartyRunning = isRunning,
-                        accentColor = themeColor,
+                        accentColor = slotAccentColor,
                         onConfigChange = { onUpdateSlot(slotKey, it) }
                     )
 

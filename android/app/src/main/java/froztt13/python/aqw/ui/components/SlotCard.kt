@@ -1,6 +1,7 @@
 package froztt13.python.aqw.ui.components
 
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -24,12 +25,11 @@ import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.LinearProgressIndicator
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Switch
 import androidx.compose.material3.SwitchDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -70,6 +70,9 @@ fun SlotCard(
     accentColor: Color = PrimaryPurple,
     showTauntToggle: Boolean = true,
     showEclipseTauntToggles: Boolean = false,
+    fixedTauntRoleText: String? = null,
+    fixedTauntRoleColor: Color = accentColor,
+    fixedPrimaryTarget: String? = null,
     onConfigChange: (SlotConfig) -> Unit
 ) {
     var passwordVisible by remember { mutableStateOf(false) }
@@ -89,7 +92,7 @@ fun SlotCard(
             modifier = Modifier
                 .fillMaxWidth()
                 .padding(16.dp),
-            verticalArrangement = Arrangement.spacedBy(12.dp)
+            verticalArrangement = Arrangement.spacedBy(16.dp)
         ) {
             // Header Row: Title, Role Badge, Status
             Row(
@@ -330,78 +333,194 @@ fun SlotCard(
 
             // Input Fields
             if (telemetry.running.not()) {
-                OutlinedTextField(
-                    value = config.username,
-                    onValueChange = { onConfigChange(config.copy(username = it)) },
-                    label = { Text("Username") },
-                    singleLine = true,
-                    enabled = !isPartyRunning,
+                Row(
                     modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = accentColor,
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    CustomOutlinedTextField(
+                        value = config.username,
+                        onValueChange = { onConfigChange(config.copy(username = it)) },
+                        label = { Text("Username") },
+                        singleLine = true,
+                        enabled = !isPartyRunning,
+                        modifier = Modifier.weight(1f),
+                        colors = defaultTextFieldColors(accentColor)
                     )
-                )
 
-                OutlinedTextField(
-                    value = config.password,
-                    onValueChange = { onConfigChange(config.copy(password = it)) },
-                    label = { Text("Password") },
-                    singleLine = true,
-                    enabled = !isPartyRunning,
-                    visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                    keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
-                    trailingIcon = {
-                        IconButton(onClick = { passwordVisible = !passwordVisible }) {
-                            Icon(
-                                imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
-                                contentDescription = if (passwordVisible) "Hide password" else "Show password",
-                                tint = TextMuted
-                            )
-                        }
-                    },
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = accentColor,
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                    CustomOutlinedTextField(
+                        value = config.password,
+                        onValueChange = { onConfigChange(config.copy(password = it)) },
+                        label = { Text("Password") },
+                        singleLine = true,
+                        enabled = !isPartyRunning,
+                        visualTransformation = if (passwordVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                        keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Password),
+                        trailingIcon = {
+                            IconButton(onClick = { passwordVisible = !passwordVisible }) {
+                                Icon(
+                                    imageVector = if (passwordVisible) Icons.Filled.Visibility else Icons.Filled.VisibilityOff,
+                                    contentDescription = if (passwordVisible) "Hide password" else "Show password",
+                                    tint = TextMuted
+                                )
+                            }
+                        },
+                        modifier = Modifier.weight(1f),
+                        colors = defaultTextFieldColors(accentColor)
                     )
-                )
+                }
 
                 // Class Picker Dropdown
                 ClassDropdown(
                     selectedClass = config.charClass,
                     enabled = !isPartyRunning,
+                    accentColor = accentColor,
                     onClassSelected = { onConfigChange(config.copy(charClass = it)) }
                 )
 
-                // Default Target Monsters Input
-                OutlinedTextField(
-                    value = config.defaultTarget,
-                    onValueChange = { onConfigChange(config.copy(defaultTarget = it)) },
-                    label = { Text("Default Target Monsters") },
-                    placeholder = {
-                        Text(
-                            "e.g. Ascended Solstice,Blessless Deer",
-                            color = TextMuted
+                // Target Monsters Input
+                if (fixedPrimaryTarget != null) {
+                    val parsedExtra = remember(config.defaultTarget, fixedPrimaryTarget) {
+                        if (config.defaultTarget.startsWith(
+                                fixedPrimaryTarget,
+                                ignoreCase = true
+                            )
+                        ) {
+                            config.defaultTarget.substring(fixedPrimaryTarget.length)
+                                .trimStart(',', ' ')
+                        } else {
+                            config.defaultTarget
+                        }
+                    }
+                    var localExtra by remember(slotKey) { mutableStateOf(parsedExtra) }
+
+                    LaunchedEffect(parsedExtra) {
+                        if (parsedExtra != localExtra.trim()) {
+                            localExtra = parsedExtra
+                        }
+                    }
+
+                    Column(verticalArrangement = Arrangement.spacedBy(16.dp)) {
+                        Row(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .clip(RoundedCornerShape(8.dp))
+                                .background(Color(0xFF161928))
+                                .border(1.dp, Color(0xFF2E3350), RoundedCornerShape(8.dp))
+                                .padding(horizontal = 10.dp, vertical = 8.dp),
+                            verticalAlignment = Alignment.CenterVertically,
+                            horizontalArrangement = Arrangement.SpaceBetween
+                        ) {
+                            Row(
+                                verticalAlignment = Alignment.CenterVertically,
+                                horizontalArrangement = Arrangement.spacedBy(8.dp)
+                            ) {
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(accentColor.copy(alpha = 0.2f))
+                                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                                ) {
+                                    Text(
+                                        text = "#1 Priority",
+                                        fontSize = 10.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = accentColor
+                                    )
+                                }
+                                Text(
+                                    text = fixedPrimaryTarget,
+                                    fontSize = 13.sp,
+                                    fontWeight = FontWeight.SemiBold,
+                                    color = TextPrimary
+                                )
+                            }
+                        }
+
+                        CustomOutlinedTextField(
+                            value = localExtra,
+                            onValueChange = { newVal ->
+                                localExtra = newVal
+                                val clean = newVal.trim()
+                                val fullTarget = if (clean.isEmpty()) {
+                                    fixedPrimaryTarget
+                                } else {
+                                    "$fixedPrimaryTarget,$clean"
+                                }
+                                onConfigChange(config.copy(defaultTarget = fullTarget))
+                            },
+                            label = { Text("Additional Target Monsters") },
+                            placeholder = { Text("e.g. Blessless Deer", color = TextMuted) },
+                            supportingText = {
+                                Text(
+                                    text = "Target Order: $fixedPrimaryTarget${if (localExtra.isNotBlank()) ", $localExtra" else ""}",
+                                    fontSize = 10.sp,
+                                    color = TextMuted
+                                )
+                            },
+                            singleLine = true,
+                            enabled = !isPartyRunning,
+                            modifier = Modifier.fillMaxWidth(),
+                            colors = defaultTextFieldColors(accentColor)
                         )
-                    },
-                    singleLine = true,
-                    enabled = !isPartyRunning,
-                    modifier = Modifier.fillMaxWidth(),
-                    colors = OutlinedTextFieldDefaults.colors(
-                        focusedBorderColor = accentColor,
-                        unfocusedBorderColor = Color(0xFF334155),
-                        focusedTextColor = TextPrimary,
-                        unfocusedTextColor = TextPrimary
+                    }
+                } else {
+                    CustomOutlinedTextField(
+                        value = config.defaultTarget,
+                        onValueChange = { onConfigChange(config.copy(defaultTarget = it)) },
+                        label = { Text("Default Target Monsters") },
+                        placeholder = {
+                            Text(
+                                "e.g. Ascended Solstice,Blessless Deer",
+                                color = TextMuted
+                            )
+                        },
+                        singleLine = true,
+                        enabled = !isPartyRunning,
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = defaultTextFieldColors(accentColor)
                     )
-                )
+                }
+
+                // Fixed Taunt Role Display (when fixedTauntRoleText != null)
+                if (fixedTauntRoleText != null) {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        shape = RoundedCornerShape(10.dp),
+                        colors = CardDefaults.cardColors(
+                            containerColor = fixedTauntRoleColor.copy(alpha = 0.08f)
+                        ),
+                        border = BorderStroke(1.dp, fixedTauntRoleColor.copy(alpha = 0.3f))
+                    ) {
+                        Column(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(12.dp)
+                        ) {
+                            Text(
+                                text = fixedTauntRoleText,
+                                fontSize = 13.sp,
+                                fontWeight = FontWeight.Bold,
+                                color = fixedTauntRoleColor
+                            )
+                            Text(
+                                text = if (fixedTauntRoleText.contains(
+                                        "Sunset",
+                                        ignoreCase = true
+                                    )
+                                ) {
+                                    "Taunts monster when Sun's Warmth occurs"
+                                } else {
+                                    "Taunts monster when Moonlight Gaze occurs"
+                                },
+                                fontSize = 11.sp,
+                                color = TextMuted
+                            )
+                        }
+                    }
+                }
 
                 // Taunter Toggle Switch
-                if (showTauntToggle) {
+                if (showTauntToggle && fixedTauntRoleText == null) {
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -417,7 +536,7 @@ fun SlotCard(
                                 color = TextPrimary
                             )
                             Text(
-                                text = "Casts scroll/taunt on boss",
+                                text = "Casts scroll/taunt on monster",
                                 fontSize = 11.sp,
                                 color = TextMuted
                             )
@@ -436,8 +555,16 @@ fun SlotCard(
                     }
                 }
 
-                // Eclipse Taunt Role Toggles (Moon Haze & Sunset Knight)
-                if (showEclipseTauntToggles) {
+                // Eclipse Taunt Role Toggles (deprecated / ignored if fixedTauntRoleText != null)
+                if (showEclipseTauntToggles && fixedTauntRoleText == null) {
+                    Text(
+                        text = "Eclipse Taunt Role (Select Max 1)",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor,
+                        modifier = Modifier.padding(top = 4.dp, bottom = 2.dp)
+                    )
+
                     Row(
                         modifier = Modifier
                             .fillMaxWidth()
@@ -460,7 +587,15 @@ fun SlotCard(
                         }
                         Switch(
                             checked = config.moonHazeTaunter,
-                            onCheckedChange = { onConfigChange(config.copy(moonHazeTaunter = it)) },
+                            onCheckedChange = { checked ->
+                                onConfigChange(
+                                    config.copy(
+                                        moonHazeTaunter = checked,
+                                        sunsetKnightTaunter = if (checked) false else config.sunsetKnightTaunter,
+                                        isTaunter = checked || (config.sunsetKnightTaunter)
+                                    )
+                                )
+                            },
                             enabled = !isPartyRunning,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
@@ -493,7 +628,15 @@ fun SlotCard(
                         }
                         Switch(
                             checked = config.sunsetKnightTaunter,
-                            onCheckedChange = { onConfigChange(config.copy(sunsetKnightTaunter = it)) },
+                            onCheckedChange = { checked ->
+                                onConfigChange(
+                                    config.copy(
+                                        sunsetKnightTaunter = checked,
+                                        moonHazeTaunter = if (checked) false else config.moonHazeTaunter,
+                                        isTaunter = checked || (config.moonHazeTaunter)
+                                    )
+                                )
+                            },
                             enabled = !isPartyRunning,
                             colors = SwitchDefaults.colors(
                                 checkedThumbColor = Color.White,
@@ -537,7 +680,7 @@ private fun SlotCardActivePreview() {
     MyApplicationTheme {
         SlotCard(
             slotKey = "slot1",
-            title = "Slot 1 (Lord of Order / Lead)",
+            title = "Slot 1",
             config = SlotConfig(
                 username = "LordLead",
                 charClass = "Lord of Order",

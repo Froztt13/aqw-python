@@ -6,6 +6,7 @@ import android.widget.Toast
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.expandVertically
 import androidx.compose.animation.fadeIn
 import androidx.compose.animation.fadeOut
@@ -49,7 +50,6 @@ import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.ScrollableTabRow
 import androidx.compose.material3.Tab
@@ -93,12 +93,15 @@ import froztt13.python.aqw.ui.components.MonsterTelemetryCard
 import froztt13.python.aqw.ui.components.ServerDropdown
 import froztt13.python.aqw.ui.components.SlotCard
 import froztt13.python.aqw.ui.components.TopBarSettingsButton
+import froztt13.python.aqw.ui.components.defaultTextFieldColors
 import froztt13.python.aqw.ui.theme.BgDark
 import froztt13.python.aqw.ui.theme.CardDark
 import froztt13.python.aqw.ui.theme.EclipseMagenta
 import froztt13.python.aqw.ui.theme.ErrorRed
+import froztt13.python.aqw.ui.theme.MoonCyan
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.SuccessGreen
+import froztt13.python.aqw.ui.theme.SunGold
 import froztt13.python.aqw.ui.theme.TextMuted
 import froztt13.python.aqw.ui.theme.TextPrimary
 import froztt13.python.aqw.ui.theme.TextSecondary
@@ -288,12 +291,7 @@ fun EclipseContent(
                                 enabled = !isRunning,
                                 keyboardOptions = KeyboardOptions(keyboardType = KeyboardType.Number),
                                 modifier = Modifier.weight(1f),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = EclipseMagenta,
-                                    unfocusedBorderColor = Color(0xFF334155),
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
-                                )
+                                colors = defaultTextFieldColors(EclipseMagenta)
                             )
                         }
 
@@ -475,13 +473,7 @@ fun EclipseContent(
                                     }
                                 },
                                 modifier = Modifier.fillMaxWidth(),
-                                colors = OutlinedTextFieldDefaults.colors(
-                                    focusedBorderColor = EclipseMagenta,
-                                    unfocusedBorderColor = Color(0xFF334155),
-                                    errorBorderColor = ErrorRed,
-                                    focusedTextColor = TextPrimary,
-                                    unfocusedTextColor = TextPrimary
-                                )
+                                colors = defaultTextFieldColors(EclipseMagenta)
                             )
                         }
                     },
@@ -545,6 +537,14 @@ fun EclipseContent(
                 )
             }
 
+            // Compute active tab's taunt role and animated indicator color
+            val activePage = pagerState.currentPage
+            val targetIndicatorColor = if (activePage in 0..1) SunGold else MoonCyan
+            val indicatorColor by animateColorAsState(
+                targetValue = targetIndicatorColor,
+                label = "EclipseTabIndicatorColor"
+            )
+
             // --- Slot Account ViewPager Tab Navigation ---
             ScrollableTabRow(
                 selectedTabIndex = pagerState.currentPage,
@@ -555,7 +555,8 @@ fun EclipseContent(
                     if (pagerState.currentPage < tabPositions.size) {
                         TabRowDefaults.SecondaryIndicator(
                             Modifier.tabIndicatorOffset(tabPositions[pagerState.currentPage]),
-                            color = EclipseMagenta
+                            height = 3.dp,
+                            color = indicatorColor
                         )
                     }
                 },
@@ -564,10 +565,13 @@ fun EclipseContent(
                     .clip(RoundedCornerShape(12.dp))
                     .border(1.dp, Color(0xFF2E3350), RoundedCornerShape(12.dp))
             ) {
-                slotLabels.forEachIndexed { index, label ->
+                slotLabels.forEachIndexed { index, _ ->
                     val slotKey = slotKeys[index]
                     val slotTel = telemetryMap[slotKey] ?: SlotTelemetry()
                     val selected = pagerState.currentPage == index
+                    val isSun = index in 0..1
+                    val tabRoleColor = if (isSun) SunGold else MoonCyan
+                    val tabRoleTag = if (isSun) "Sun" else "Moon"
 
                     Tab(
                         selected = selected,
@@ -588,11 +592,24 @@ fun EclipseContent(
                                         .background(if (slotTel.running) SuccessGreen else TextMuted)
                                 )
                                 Text(
-                                    text = label,
+                                    text = "P${index + 1}",
                                     fontSize = 12.sp,
                                     fontWeight = if (selected) FontWeight.Bold else FontWeight.Medium,
-                                    color = if (selected) EclipseMagenta else TextSecondary
+                                    color = if (selected) tabRoleColor else TextSecondary
                                 )
+                                Box(
+                                    modifier = Modifier
+                                        .clip(RoundedCornerShape(4.dp))
+                                        .background(tabRoleColor.copy(alpha = 0.2f))
+                                        .padding(horizontal = 4.dp, vertical = 1.dp)
+                                ) {
+                                    Text(
+                                        text = tabRoleTag,
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = tabRoleColor
+                                    )
+                                }
                             }
                         }
                     )
@@ -622,6 +639,11 @@ fun EclipseContent(
                     }
                 }
 
+                val isSunSlot = (page == 0 || page == 1)
+                val slotAccentColor = if (isSunSlot) SunGold else MoonCyan
+                val fixedRoleText = if (isSunSlot) "Sunset Knight Taunter" else "Moon Haze Taunter"
+                val fixedPrimaryTarget = if (isSunSlot) "Ascended Solstice" else "Ascended Midnight"
+
                 Column(
                     modifier = Modifier
                         .fillMaxWidth(),
@@ -634,10 +656,15 @@ fun EclipseContent(
                         config = slotConf,
                         telemetry = slotTel,
                         isPartyRunning = isRunning,
-                        accentColor = EclipseMagenta,
+                        accentColor = slotAccentColor,
                         showTauntToggle = false,
-                        showEclipseTauntToggles = true,
-                        onConfigChange = { onUpdateSlot(slotKey, it) }
+                        showEclipseTauntToggles = false,
+                        fixedTauntRoleText = fixedRoleText,
+                        fixedTauntRoleColor = slotAccentColor,
+                        fixedPrimaryTarget = fixedPrimaryTarget,
+                        onConfigChange = { updatedConfig ->
+                            onUpdateSlot(slotKey, updatedConfig)
+                        }
                     )
 
                     // 2. Dedicated Log Console for this Slot
@@ -665,27 +692,39 @@ private fun EclipseContentIdlePreview() {
                 slots = mapOf(
                     "slot1" to SlotConfig(
                         username = "LordLead",
-                        charClass = "Lord of Order",
+                        charClass = "Legion Revenant",
                         role = "master",
-                        isTaunter = true
+                        isTaunter = true,
+                        sunsetKnightTaunter = true,
+                        moonHazeTaunter = false,
+                        defaultTarget = "Ascended Solstice,Blessless Deer"
                     ),
                     "slot2" to SlotConfig(
-                        username = "APTaunt",
-                        charClass = "ArchPaladin",
-                        role = "slave",
-                        isTaunter = true
-                    ),
-                    "slot3" to SlotConfig(
                         username = "SCBuff",
                         charClass = "StoneCrusher",
                         role = "slave",
-                        isTaunter = false
+                        isTaunter = true,
+                        sunsetKnightTaunter = true,
+                        moonHazeTaunter = false,
+                        defaultTarget = "Ascended Solstice"
+                    ),
+                    "slot3" to SlotConfig(
+                        username = "APTaunt",
+                        charClass = "ArchPaladin",
+                        role = "slave",
+                        isTaunter = true,
+                        sunsetKnightTaunter = false,
+                        moonHazeTaunter = true,
+                        defaultTarget = "Ascended Midnight"
                     ),
                     "slot4" to SlotConfig(
-                        username = "LRDps",
-                        charClass = "Legion Revenant",
+                        username = "LORDps",
+                        charClass = "Lord of Order",
                         role = "slave",
-                        isTaunter = false
+                        isTaunter = true,
+                        sunsetKnightTaunter = false,
+                        moonHazeTaunter = true,
+                        defaultTarget = "Ascended Midnight"
                     )
                 )
             ),
@@ -713,27 +752,39 @@ private fun EclipseContentRunningPreview() {
                 slots = mapOf(
                     "slot1" to SlotConfig(
                         username = "LordLead",
-                        charClass = "Lord of Order",
+                        charClass = "Legion Revenant",
                         role = "master",
-                        isTaunter = true
+                        isTaunter = true,
+                        sunsetKnightTaunter = true,
+                        moonHazeTaunter = false,
+                        defaultTarget = "Ascended Solstice,Blessless Deer"
                     ),
                     "slot2" to SlotConfig(
-                        username = "APTaunt",
-                        charClass = "ArchPaladin",
-                        role = "slave",
-                        isTaunter = true
-                    ),
-                    "slot3" to SlotConfig(
                         username = "SCBuff",
                         charClass = "StoneCrusher",
                         role = "slave",
-                        isTaunter = false
+                        isTaunter = true,
+                        sunsetKnightTaunter = true,
+                        moonHazeTaunter = false,
+                        defaultTarget = "Ascended Solstice"
+                    ),
+                    "slot3" to SlotConfig(
+                        username = "APTaunt",
+                        charClass = "ArchPaladin",
+                        role = "slave",
+                        isTaunter = true,
+                        sunsetKnightTaunter = false,
+                        moonHazeTaunter = true,
+                        defaultTarget = "Ascended Midnight"
                     ),
                     "slot4" to SlotConfig(
-                        username = "LRDps",
-                        charClass = "Legion Revenant",
+                        username = "LORDps",
+                        charClass = "Lord of Order",
                         role = "slave",
-                        isTaunter = false
+                        isTaunter = true,
+                        sunsetKnightTaunter = false,
+                        moonHazeTaunter = true,
+                        defaultTarget = "Ascended Midnight"
                     )
                 )
             ),

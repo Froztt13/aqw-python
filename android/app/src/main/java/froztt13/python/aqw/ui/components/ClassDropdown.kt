@@ -1,15 +1,15 @@
 package froztt13.python.aqw.ui.components
 
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MenuAnchorType
-import androidx.compose.material3.OutlinedTextField
-import androidx.compose.material3.OutlinedTextFieldDefaults
 import androidx.compose.material3.Text
+import androidx.compose.material3.TextFieldColors
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -35,10 +35,13 @@ val AQW_CLASS_OPTIONS = listOf(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ClassDropdown(
+    modifier: Modifier = Modifier,
+    enabled: Boolean = true,
     selectedClass: String,
-    enabled: Boolean,
     onClassSelected: (String) -> Unit,
-    modifier: Modifier = Modifier
+    accentColor: Color = PrimaryPurple,
+    contentPadding: PaddingValues? = null,
+    colors: TextFieldColors = defaultTextFieldColors(accentColor)
 ) {
     var expanded by remember { mutableStateOf(false) }
 
@@ -56,7 +59,7 @@ fun ClassDropdown(
         onExpandedChange = { if (enabled) expanded = it },
         modifier = modifier.fillMaxWidth()
     ) {
-        OutlinedTextField(
+        CustomOutlinedTextField(
             value = selectedClass,
             onValueChange = {
                 onClassSelected(it)
@@ -69,12 +72,8 @@ fun ClassDropdown(
             modifier = Modifier
                 .menuAnchor(MenuAnchorType.PrimaryEditable, enabled)
                 .fillMaxWidth(),
-            colors = OutlinedTextFieldDefaults.colors(
-                focusedBorderColor = PrimaryPurple,
-                unfocusedBorderColor = Color(0xFF334155),
-                focusedTextColor = TextPrimary,
-                unfocusedTextColor = TextPrimary
-            )
+            contentPadding = contentPadding,
+            colors = colors
         )
 
         if (filteredOptions.isNotEmpty()) {

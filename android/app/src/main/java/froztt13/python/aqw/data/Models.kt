@@ -52,15 +52,15 @@ data class EclipseConfig(
             role = "master",
             isTaunter = true,
             moonHazeTaunter = false,
-            sunsetKnightTaunter = false,
+            sunsetKnightTaunter = true,
             defaultTarget = "Ascended Solstice,Blessless Deer"
         ),
         "slot2" to SlotConfig(
             charClass = "StoneCrusher",
             role = "slave",
-            isTaunter = false,
+            isTaunter = true,
             moonHazeTaunter = false,
-            sunsetKnightTaunter = false,
+            sunsetKnightTaunter = true,
             defaultTarget = "Ascended Solstice"
         ),
         "slot3" to SlotConfig(
@@ -75,12 +75,36 @@ data class EclipseConfig(
             charClass = "Lord of Order",
             role = "slave",
             isTaunter = true,
-            moonHazeTaunter = false,
-            sunsetKnightTaunter = true,
+            moonHazeTaunter = true,
+            sunsetKnightTaunter = false,
             defaultTarget = "Ascended Midnight"
         )
     )
-)
+) {
+    fun enforceFixedRoles(): EclipseConfig {
+        val updatedSlots = slots.mapValues { (key, config) ->
+            val isSun = key in listOf("slot1", "slot2")
+            val fixedPrimary = if (isSun) "Ascended Solstice" else "Ascended Midnight"
+            val targets =
+                config.defaultTarget.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+            val normalizedTarget = if (targets.isEmpty()) {
+                if (key == "slot1") "Ascended Solstice,Blessless Deer" else fixedPrimary
+            } else if (!targets.first().equals(fixedPrimary, ignoreCase = true)) {
+                val remaining = targets.filterNot { it.equals(fixedPrimary, ignoreCase = true) }
+                (listOf(fixedPrimary) + remaining).joinToString(",")
+            } else {
+                config.defaultTarget
+            }
+            config.copy(
+                isTaunter = true,
+                sunsetKnightTaunter = isSun,
+                moonHazeTaunter = !isSun,
+                defaultTarget = normalizedTarget
+            )
+        }
+        return copy(slots = updatedSlots)
+    }
+}
 
 enum class ThresholdType {
     NONE, HP, MP

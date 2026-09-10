@@ -17,6 +17,7 @@ import androidx.compose.runtime.CompositionLocalProvider
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.Shape
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.graphics.takeOrElse
@@ -24,7 +25,33 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
+import froztt13.python.aqw.ui.theme.ErrorRed
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
+import froztt13.python.aqw.ui.theme.PrimaryPurple
+import froztt13.python.aqw.ui.theme.TextPrimary
+import froztt13.python.aqw.ui.theme.TextSecondary
+
+@Composable
+fun defaultTextFieldColors(
+    accentColor: Color = PrimaryPurple,
+    unfocusedBorderColor: Color = Color(0xFF334155),
+    textColor: Color = TextPrimary,
+    unfocusedLabelColor: Color = TextSecondary,
+    cursorColor: Color = accentColor,
+    errorColor: Color = ErrorRed
+): TextFieldColors = OutlinedTextFieldDefaults.colors(
+    focusedBorderColor = accentColor,
+    unfocusedBorderColor = unfocusedBorderColor,
+    focusedLabelColor = accentColor,
+    unfocusedLabelColor = unfocusedLabelColor,
+    focusedTextColor = textColor,
+    unfocusedTextColor = textColor,
+    cursorColor = cursorColor,
+    errorBorderColor = errorColor,
+    errorLabelColor = errorColor,
+    errorTextColor = textColor,
+    errorCursorColor = errorColor
+)
 
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
@@ -51,7 +78,7 @@ fun CustomOutlinedTextField(
     minLines: Int = 1,
     interactionSource: MutableInteractionSource = remember { MutableInteractionSource() },
     shape: Shape = OutlinedTextFieldDefaults.shape,
-    colors: TextFieldColors = OutlinedTextFieldDefaults.colors(),
+    colors: TextFieldColors = defaultTextFieldColors(),
     contentPadding: PaddingValues? = null
 ) {
     val isFocused by interactionSource.collectIsFocusedAsState()

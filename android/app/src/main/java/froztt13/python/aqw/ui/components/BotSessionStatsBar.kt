@@ -32,7 +32,6 @@ import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.PrimaryPurple
 import froztt13.python.aqw.ui.theme.SuccessGreen
 import froztt13.python.aqw.ui.theme.SunGold
-import froztt13.python.aqw.ui.theme.TextMuted
 import froztt13.python.aqw.ui.theme.TextPrimary
 import froztt13.python.aqw.ui.theme.TextSecondary
 
@@ -87,43 +86,45 @@ fun BotSessionStatsBar(
                 verticalAlignment = Alignment.CenterVertically
             ) {
                 // Time Running
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.Timer,
-                        contentDescription = "Time Running",
-                        tint = TextSecondary,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text = if (isRunning) stats.formattedTime else "00:00",
-                        fontSize = 12.sp,
-                        fontFamily = FontFamily.Monospace,
-                        fontWeight = FontWeight.SemiBold,
-                        color = if (isRunning) TextPrimary else TextMuted
-                    )
-                }
+                if (isRunning)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.Timer,
+                            contentDescription = "Time Running",
+                            tint = TextSecondary,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = stats.formattedTime,
+                            fontSize = 12.sp,
+                            fontFamily = FontFamily.Monospace,
+                            fontWeight = FontWeight.SemiBold,
+                            color = TextPrimary
+                        )
+                    }
 
                 // Total Cleared Loops
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(4.dp)
-                ) {
-                    Icon(
-                        imageVector = Icons.Filled.CheckCircle,
-                        contentDescription = "Cleared Count",
-                        tint = SuccessGreen,
-                        modifier = Modifier.size(15.dp)
-                    )
-                    Text(
-                        text = "${stats.clearedCount} Clears",
-                        fontSize = 12.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = SuccessGreen
-                    )
-                }
+                if (stats.clearedCount > 0)
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        Icon(
+                            imageVector = Icons.Filled.CheckCircle,
+                            contentDescription = "Cleared Count",
+                            tint = SuccessGreen,
+                            modifier = Modifier.size(15.dp)
+                        )
+                        Text(
+                            text = "${stats.clearedCount} Clears",
+                            fontSize = 12.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = SuccessGreen
+                        )
+                    }
             }
         }
     }

@@ -59,7 +59,7 @@ class EclipseViewModel : ViewModel() {
             val jsonStr = BotHelper.loadConfig("eclipse_load_config")
             if (jsonStr != null) {
                 try {
-                    _eclipseConfig.value = BotHelper.parseEclipseConfig(jsonStr)
+                    _eclipseConfig.value = BotHelper.parseEclipseConfig(jsonStr).enforceFixedRoles()
                 } catch (e: Exception) {
                     Log.e("EclipseViewModel", "Error parsing eclipse config: ${e.message}")
                 }
@@ -86,9 +86,27 @@ class EclipseViewModel : ViewModel() {
     }
 
     fun updateEclipseSlot(slotKey: String, slotConfig: SlotConfig) {
+        val isSun = slotKey in listOf("slot1", "slot2")
+        val fixedPrimary = if (isSun) "Ascended Solstice" else "Ascended Midnight"
+        val targets =
+            slotConfig.defaultTarget.split(",").map { it.trim() }.filter { it.isNotEmpty() }
+        val normalizedTarget = if (targets.isEmpty()) {
+            if (slotKey == "slot1") "Ascended Solstice,Blessless Deer" else fixedPrimary
+        } else if (!targets.first().equals(fixedPrimary, ignoreCase = true)) {
+            val remaining = targets.filterNot { it.equals(fixedPrimary, ignoreCase = true) }
+            (listOf(fixedPrimary) + remaining).joinToString(",")
+        } else {
+            slotConfig.defaultTarget
+        }
+        val fixedConfig = slotConfig.copy(
+            isTaunter = true,
+            sunsetKnightTaunter = isSun,
+            moonHazeTaunter = !isSun,
+            defaultTarget = normalizedTarget
+        )
         _eclipseConfig.update {
             val newSlots = it.slots.toMutableMap()
-            newSlots[slotKey] = slotConfig
+            newSlots[slotKey] = fixedConfig
             it.copy(slots = newSlots)
         }
         saveEclipseConfig()
@@ -106,12 +124,12 @@ class EclipseViewModel : ViewModel() {
             val jsonStr = BotHelper.resetConfig("eclipse_reset_config")
             if (jsonStr != null) {
                 try {
-                    _eclipseConfig.value = BotHelper.parseEclipseConfig(jsonStr)
+                    _eclipseConfig.value = BotHelper.parseEclipseConfig(jsonStr).enforceFixedRoles()
                 } catch (e: Exception) {
-                    _eclipseConfig.value = EclipseConfig()
+                    _eclipseConfig.value = EclipseConfig().enforceFixedRoles()
                 }
             } else {
-                _eclipseConfig.value = EclipseConfig()
+                _eclipseConfig.value = EclipseConfig().enforceFixedRoles()
                 saveEclipseConfig()
             }
         }
