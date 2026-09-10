@@ -43,6 +43,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -199,7 +200,6 @@ fun SlotCard(
                             Row(
                                 verticalAlignment = Alignment.CenterVertically,
                                 horizontalArrangement = Arrangement.spacedBy(6.dp),
-                                modifier = Modifier.weight(1f, fill = false)
                             ) {
                                 Box(
                                     modifier = Modifier
@@ -216,9 +216,11 @@ fun SlotCard(
                             }
                             Spacer(modifier = Modifier.size(8.dp))
                             Text(
+                                modifier = Modifier.weight(1f),
                                 text = activeTarget,
                                 fontSize = 11.sp,
                                 fontWeight = FontWeight.Bold,
+                                textAlign = TextAlign.End,
                                 color = TextPrimary
                             )
                         }
@@ -699,7 +701,7 @@ private fun SlotCardActivePreview() {
                 mp = 80,
                 maxMp = 100,
                 soeQty = 150,
-                targetMonsters = "Ascended Solstice"
+                targetMonsters = "Ascended Solstice,Blessless Deer,Dawn Knight"
             ),
             isPartyRunning = true,
             accentColor = PrimaryPurple,

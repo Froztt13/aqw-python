@@ -1150,49 +1150,53 @@ def general_get_submodules() -> str:
 
 # Hub Overview Status
 def get_hub_status() -> str:
-    active_temple = [s for s, t in temple_mgr.active_threads.items() if t.is_alive()]
-    temple_time = int(time.time() - temple_mgr.start_time) if temple_mgr.start_time and active_temple else 0
-    
-    active_eclipse = [s for s, t in eclipse_mgr.active_threads.items() if t.is_alive()]
-    eclipse_time = int(time.time() - eclipse_mgr.start_time) if eclipse_mgr.start_time and active_eclipse else 0
+    try:
+        active_temple = [s for s, t in temple_mgr.active_threads.items() if t and t.is_alive()]
+        temple_time = int(time.time() - temple_mgr.start_time) if temple_mgr.start_time and active_temple else 0
+        
+        active_eclipse = [s for s, t in eclipse_mgr.active_threads.items() if t and t.is_alive()]
+        eclipse_time = int(time.time() - eclipse_mgr.start_time) if eclipse_mgr.start_time and active_eclipse else 0
 
-    doom_time = int(time.time() - doom_mgr.start_time) if doom_mgr.start_time and doom_mgr.is_running else 0
+        doom_time = int(time.time() - doom_mgr.start_time) if doom_mgr.start_time and doom_mgr.is_running else 0
 
-    active_slavery = [s for s, t in slavery_mgr.active_threads.items() if t.is_alive()]
-    slavery_time = int(time.time() - slavery_mgr.start_time) if slavery_mgr.start_time and active_slavery else 0
+        active_slavery = [s for s, t in slavery_mgr.active_threads.items() if t and t.is_alive()]
+        slavery_time = int(time.time() - slavery_mgr.start_time) if slavery_mgr.start_time and active_slavery else 0
 
-    general_time = int(time.time() - general_mgr.start_time) if general_mgr.start_time and general_mgr.is_running else 0
+        general_time = int(time.time() - general_mgr.start_time) if general_mgr.start_time and general_mgr.is_running else 0
 
-    status = {
-        "temple": {
-            "running": len(active_temple) > 0,
-            "count": len(active_temple),
-            "members": [t.username for t in temple_mgr.active_threads.values() if t.is_alive()],
-            "time_running": temple_time
-        },
-        "eclipse": {
-            "running": len(active_eclipse) > 0,
-            "count": len(active_eclipse),
-            "members": [t.username for t in eclipse_mgr.active_threads.values() if t.is_alive()],
-            "time_running": eclipse_time
-        },
-        "doom": {
-            "running": doom_mgr.is_running,
-            "current_username": doom_mgr.current_username,
-            "time_running": doom_time
-        },
-        "slavery": {
-            "running": len(active_slavery) > 0,
-            "count": len(active_slavery),
-            "members": [t.username for t in slavery_mgr.active_threads.values() if t.is_alive()],
-            "time_running": slavery_time
-        },
-        "general": {
-            "running": general_mgr.is_running,
-            "current_username": general_mgr.current_username,
-            "sub_module": general_mgr.current_sub_module,
-            "task": general_mgr.current_task,
-            "time_running": general_time
+        status = {
+            "temple": {
+                "running": len(active_temple) > 0,
+                "count": len(active_temple),
+                "members": [t.username for t in temple_mgr.active_threads.values() if t and t.is_alive() and hasattr(t, "username")],
+                "time_running": temple_time
+            },
+            "eclipse": {
+                "running": len(active_eclipse) > 0,
+                "count": len(active_eclipse),
+                "members": [t.username for t in eclipse_mgr.active_threads.values() if t and t.is_alive() and hasattr(t, "username")],
+                "time_running": eclipse_time
+            },
+            "doom": {
+                "running": getattr(doom_mgr, "is_running", False),
+                "current_username": getattr(doom_mgr, "current_username", "") or "",
+                "time_running": doom_time
+            },
+            "slavery": {
+                "running": len(active_slavery) > 0,
+                "count": len(active_slavery),
+                "members": [t.username for t in slavery_mgr.active_threads.values() if t and t.is_alive() and hasattr(t, "username")],
+                "time_running": slavery_time
+            },
+            "general": {
+                "running": getattr(general_mgr, "is_running", False),
+                "current_username": getattr(general_mgr, "current_username", "") or "",
+                "sub_module": getattr(general_mgr, "current_sub_module", "") or "",
+                "task": getattr(general_mgr, "current_task", "") or "",
+                "time_running": general_time
+            }
         }
-    }
-    return json.dumps(status)
+        return json.dumps(status)
+    except Exception as e:
+        return json.dumps({})
+

@@ -100,7 +100,7 @@ fun BackgroundOptimizationCard(
                         modifier = Modifier.size(20.dp)
                     )
                     Text(
-                        text = "Background & Battery Settings",
+                        text = "Background Settings",
                         fontSize = 14.sp,
                         fontWeight = FontWeight.Bold,
                         color = TextPrimary

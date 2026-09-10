@@ -41,9 +41,7 @@ import androidx.compose.material.icons.filled.Close
 import androidx.compose.material.icons.filled.DragHandle
 import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Favorite
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
@@ -393,42 +391,17 @@ fun SlaveryContent(
                 }
             }
 
-            // Session Stats Bar
-            if (isRunning)
-                BotSessionStatsBar(
-                    stats = partyStats,
-                    isRunning = true,
-                    botType = "Slavery Party",
-                    accentColor = SlaveIndigo
-                )
-
-            // Start / Stop CTA Button
-            Button(
-                onClick = {
-                    if (isRunning) {
-                        onStopParty()
-                    } else {
-                        onStartParty()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRunning) ErrorRed else SuccessGreen
-                )
-            ) {
-                Icon(
-                    imageVector = if (isRunning) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = if (isRunning) "STOP PARTY" else "START PARTY",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+            // Session Stats & Control Bar
+            BotSessionStatsBar(
+                stats = partyStats,
+                isRunning = isRunning,
+                botType = "Slavery Party",
+                accentColor = SlaveIndigo,
+                startLabel = "START",
+                stopLabel = "STOP",
+                onStart = onStartParty,
+                onStop = onStopParty
+            )
 
             // Real-time Monster HP
             val activeMonsters =
@@ -1172,7 +1145,7 @@ private fun CombinedCombatSkillsSection(
                             accentColor = accentColor,
                             isDragging = isDragging,
                             enabled = !isPartyRunning,
-                            dragHandleModifier = Modifier.draggableHandle(enabled = !isPartyRunning),
+                            modifier = Modifier.draggableHandle(enabled = !isPartyRunning),
                             onClick = {
                                 if (!isPartyRunning) {
                                     skillToEdit = skillItem
@@ -1258,7 +1231,7 @@ private fun CombinedCombatSkillsSection(
 // ---------------------------------------------------------------------------
 @Composable
 private fun SkillVerticalItem(
-    dragHandleModifier: Modifier,
+    modifier: Modifier,
     stepIndex: Int,
     skill: Skill,
     accentColor: Color,
@@ -1309,7 +1282,7 @@ private fun SkillVerticalItem(
                                 0xFF1E2235
                             )
                         )
-                        .then(dragHandleModifier),
+                        .then(modifier),
                     contentAlignment = Alignment.Center
                 ) {
                     Icon(

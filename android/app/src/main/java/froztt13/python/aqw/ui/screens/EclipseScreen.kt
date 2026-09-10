@@ -33,9 +33,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Visibility
 import androidx.compose.material.icons.filled.VisibilityOff
 import androidx.compose.material.icons.filled.Warning
@@ -369,44 +367,20 @@ fun EclipseContent(
                 )
             }
 
-            // Session Summary: Time Running & Cleared Loops
+            // Session Summary & Control Bar
             BotSessionStatsBar(
                 stats = partyStats,
                 isRunning = isRunning,
                 botType = "Maid Eclipse",
-                accentColor = EclipseMagenta
-            )
-
-            // Start / Stop CTA Button
-            Button(
-                onClick = {
-                    if (isRunning) {
-                        onStopParty()
-                    } else {
-                        passwordInput = ""
-                        passwordError = false
-                        passwordVisible = false
-                        showPasswordDialog = true
-                    }
+                accentColor = EclipseMagenta,
+                onStart = {
+                    passwordInput = ""
+                    passwordError = false
+                    passwordVisible = false
+                    showPasswordDialog = true
                 },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRunning) ErrorRed else SuccessGreen
-                )
-            ) {
-                Icon(
-                    imageVector = if (isRunning) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = if (isRunning) "STOP" else "START",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
+                onStop = onStopParty
+            )
 
             // Password Confirmation Dialog to Start Bot
             if (showPasswordDialog) {

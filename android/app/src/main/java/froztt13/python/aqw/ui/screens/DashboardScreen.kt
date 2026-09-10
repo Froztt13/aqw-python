@@ -44,6 +44,7 @@ import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.DisposableEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -65,6 +66,11 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.Lifecycle
 import androidx.lifecycle.LifecycleEventObserver
 import androidx.lifecycle.compose.LocalLifecycleOwner
+import androidx.lifecycle.viewmodel.compose.viewModel
+import froztt13.python.aqw.data.BotSummary
+import froztt13.python.aqw.data.HubOverview
+
+
 import froztt13.python.aqw.helper.BatteryOptimizationHelper
 import froztt13.python.aqw.ui.components.BackgroundOptimizationCard
 import froztt13.python.aqw.ui.components.DefaultTopBar
@@ -77,10 +83,13 @@ import froztt13.python.aqw.ui.theme.GeneralTeal
 import froztt13.python.aqw.ui.theme.MyApplicationTheme
 import froztt13.python.aqw.ui.theme.PrimaryPurple
 import froztt13.python.aqw.ui.theme.SlaveIndigo
+import froztt13.python.aqw.ui.theme.SuccessGreen
 import froztt13.python.aqw.ui.theme.SunGold
 import froztt13.python.aqw.ui.theme.TextMuted
 import froztt13.python.aqw.ui.theme.TextPrimary
 import froztt13.python.aqw.ui.theme.TextSecondary
+import froztt13.python.aqw.viewmodel.DashboardViewModel
+
 
 @Composable
 fun DashboardScreen(
@@ -89,9 +98,13 @@ fun DashboardScreen(
     onNavigateToDoom: () -> Unit,
     onNavigateToSlavery: () -> Unit,
     onNavigateToGeneral: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    viewModel: DashboardViewModel = viewModel()
 ) {
+    val hubOverview by viewModel.hubOverview.collectAsState()
+
     DashboardContent(
+        hubOverview = hubOverview,
         onNavigateToTemple = onNavigateToTemple,
         onNavigateToEclipse = onNavigateToEclipse,
         onNavigateToDoom = onNavigateToDoom,
@@ -104,12 +117,13 @@ fun DashboardScreen(
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun DashboardContent(
+    modifier: Modifier = Modifier,
+    hubOverview: HubOverview = HubOverview(),
     onNavigateToTemple: () -> Unit,
     onNavigateToEclipse: () -> Unit,
     onNavigateToDoom: () -> Unit,
     onNavigateToSlavery: () -> Unit,
-    onNavigateToGeneral: () -> Unit,
-    modifier: Modifier = Modifier
+    onNavigateToGeneral: () -> Unit
 ) {
     val context = LocalContext.current
     val lifecycleOwner = LocalLifecycleOwner.current
@@ -155,7 +169,7 @@ fun DashboardContent(
             DefaultTopBar(
                 title = "AQW BOT HUB",
                 version = "0.1",
-                statusDotColor = PrimaryPurple
+                statusDotColor = if (hubOverview.anyRunning) SuccessGreen else PrimaryPurple
             )
         }
     ) { innerPadding ->
@@ -187,6 +201,18 @@ fun DashboardContent(
                 }
             )
 
+            // Active Bot Sessions Banner (shown when one or more bots are running)
+            if (hubOverview.anyRunning) {
+                ActiveBotSessionsCard(
+                    hubOverview = hubOverview,
+                    onNavigateToTemple = onNavigateToTemple,
+                    onNavigateToEclipse = onNavigateToEclipse,
+                    onNavigateToDoom = onNavigateToDoom,
+                    onNavigateToSlavery = onNavigateToSlavery,
+                    onNavigateToGeneral = onNavigateToGeneral
+                )
+            }
+
             // Bot Modules Section Header
             Row(
                 modifier = Modifier.fillMaxWidth(),
@@ -202,15 +228,37 @@ fun DashboardContent(
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(6.dp))
-                        .background(Color(0xFF1E2438))
+                        .background(
+                            if (hubOverview.anyRunning) SuccessGreen.copy(alpha = 0.15f)
+                            else Color(0xFF1E2438)
+                        )
+                        .border(
+                            1.dp,
+                            if (hubOverview.anyRunning) SuccessGreen.copy(alpha = 0.4f)
+                            else Color.Transparent,
+                            RoundedCornerShape(6.dp)
+                        )
                         .padding(horizontal = 8.dp, vertical = 3.dp)
                 ) {
-                    Text(
-                        text = "5 Modules",
-                        fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold,
-                        color = PrimaryPurple
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    ) {
+                        if (hubOverview.anyRunning) {
+                            Box(
+                                modifier = Modifier
+                                    .size(6.dp)
+                                    .clip(CircleShape)
+                                    .background(SuccessGreen)
+                            )
+                        }
+                        Text(
+                            text = if (hubOverview.anyRunning) "${hubOverview.activeCount} RUNNING" else "5 Modules",
+                            fontSize = 11.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = if (hubOverview.anyRunning) SuccessGreen else PrimaryPurple
+                        )
+                    }
                 }
             }
 
@@ -228,6 +276,14 @@ fun DashboardContent(
                     icon = Icons.Filled.Casino,
                     accentColor = DoomCrimson,
                     onClick = onNavigateToDoom,
+                    isRunning = hubOverview.doom.running,
+                    runningDetail = if (hubOverview.doom.running) {
+                        if (hubOverview.doom.currentUsername.isNotEmpty()) {
+                            "${hubOverview.doom.currentUsername} • ${hubOverview.doom.formattedTime}"
+                        } else {
+                            hubOverview.doom.formattedTime
+                        }
+                    } else null,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -240,6 +296,10 @@ fun DashboardContent(
                     icon = Icons.Filled.People,
                     accentColor = SlaveIndigo,
                     onClick = onNavigateToSlavery,
+                    isRunning = hubOverview.slavery.running,
+                    runningDetail = if (hubOverview.slavery.running) {
+                        "${hubOverview.slavery.count} Active • ${hubOverview.slavery.formattedTime}"
+                    } else null,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -260,6 +320,10 @@ fun DashboardContent(
                     icon = Icons.Filled.WbSunny,
                     accentColor = SunGold,
                     onClick = onNavigateToTemple,
+                    isRunning = hubOverview.temple.running,
+                    runningDetail = if (hubOverview.temple.running) {
+                        "${hubOverview.temple.count} Active • ${hubOverview.temple.formattedTime}"
+                    } else null,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -272,6 +336,10 @@ fun DashboardContent(
                     icon = Icons.Filled.Nightlight,
                     accentColor = EclipseMagenta,
                     onClick = onNavigateToEclipse,
+                    isRunning = hubOverview.eclipse.running,
+                    runningDetail = if (hubOverview.eclipse.running) {
+                        "${hubOverview.eclipse.count} Active • ${hubOverview.eclipse.formattedTime}"
+                    } else null,
                     modifier = Modifier
                         .weight(1f)
                         .fillMaxHeight()
@@ -291,6 +359,10 @@ fun DashboardContent(
                     icon = Icons.Filled.Extension,
                     accentColor = GeneralTeal,
                     onClick = onNavigateToGeneral,
+                    isRunning = hubOverview.general.running,
+                    runningDetail = if (hubOverview.general.running) {
+                        "${if (hubOverview.general.subModule.isNotEmpty()) hubOverview.general.subModule else "Farm"} • ${hubOverview.general.formattedTime}"
+                    } else null,
                     modifier = Modifier
                         .fillMaxWidth()
                         .fillMaxHeight()
@@ -387,6 +459,203 @@ fun DashboardContent(
 }
 
 @Composable
+fun ActiveBotSessionsCard(
+    hubOverview: HubOverview,
+    onNavigateToTemple: () -> Unit,
+    onNavigateToEclipse: () -> Unit,
+    onNavigateToDoom: () -> Unit,
+    onNavigateToSlavery: () -> Unit,
+    onNavigateToGeneral: () -> Unit,
+    modifier: Modifier = Modifier
+) {
+    Card(
+        modifier = modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(16.dp))
+            .border(
+                1.5.dp,
+                SuccessGreen.copy(alpha = 0.5f),
+                RoundedCornerShape(16.dp)
+            ),
+        shape = RoundedCornerShape(16.dp),
+        colors = CardDefaults.cardColors(
+            containerColor = Color(0xFF0F1A1B)
+        )
+    ) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            // Header
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(8.dp)
+                ) {
+                    Box(
+                        modifier = Modifier
+                            .size(10.dp)
+                            .clip(CircleShape)
+                            .background(SuccessGreen)
+                    )
+                    Text(
+                        text = "ACTIVE BOT SESSION${if (hubOverview.activeCount > 1) "S" else ""}",
+                        style = MaterialTheme.typography.titleSmall,
+                        fontWeight = FontWeight.Bold,
+                        color = SuccessGreen,
+                        letterSpacing = 0.5.sp
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(6.dp))
+                        .background(SuccessGreen.copy(alpha = 0.18f))
+                        .padding(horizontal = 8.dp, vertical = 3.dp)
+                ) {
+                    Text(
+                        text = "${hubOverview.activeCount} RUNNING",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = SuccessGreen
+                    )
+                }
+            }
+
+            // Running Bot Rows
+            if (hubOverview.doom.running) {
+                ActiveBotItemRow(
+                    title = "Weekly Doom",
+                    details = if (hubOverview.doom.currentUsername.isNotEmpty()) {
+                        "Account: ${hubOverview.doom.currentUsername} • ${hubOverview.doom.formattedTime}"
+                    } else {
+                        "Running • ${hubOverview.doom.formattedTime}"
+                    },
+                    accentColor = DoomCrimson,
+                    onClick = onNavigateToDoom
+                )
+            }
+
+            if (hubOverview.slavery.running) {
+                ActiveBotItemRow(
+                    title = "Slavery Bot",
+                    details = "${hubOverview.slavery.count} party accounts active • ${hubOverview.slavery.formattedTime}",
+                    accentColor = SlaveIndigo,
+                    onClick = onNavigateToSlavery
+                )
+            }
+
+            if (hubOverview.temple.running) {
+                ActiveBotItemRow(
+                    title = "Temple Shrine",
+                    details = "${hubOverview.temple.count} accounts active • ${hubOverview.temple.formattedTime}",
+                    accentColor = SunGold,
+                    onClick = onNavigateToTemple
+                )
+            }
+
+            if (hubOverview.eclipse.running) {
+                ActiveBotItemRow(
+                    title = "Maid Eclipse",
+                    details = "${hubOverview.eclipse.count} accounts active • ${hubOverview.eclipse.formattedTime}",
+                    accentColor = EclipseMagenta,
+                    onClick = onNavigateToEclipse
+                )
+            }
+
+            if (hubOverview.general.running) {
+                ActiveBotItemRow(
+                    title = "General Bot",
+                    details = "${hubOverview.general.subModule.ifEmpty { "Farm" }} • ${hubOverview.general.formattedTime}",
+                    accentColor = GeneralTeal,
+                    onClick = onNavigateToGeneral
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun ActiveBotItemRow(
+    title: String,
+    details: String,
+    accentColor: Color,
+    onClick: () -> Unit
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(10.dp))
+            .background(CardDark.copy(alpha = 0.75f))
+            .border(1.dp, BorderDark, RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        horizontalArrangement = Arrangement.SpaceBetween,
+        verticalAlignment = Alignment.CenterVertically
+    ) {
+        Row(
+            modifier = Modifier.weight(1f),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier
+                    .size(8.dp)
+                    .clip(CircleShape)
+                    .background(accentColor)
+            )
+            Column(verticalArrangement = Arrangement.spacedBy(2.dp)) {
+                Text(
+                    text = title,
+                    style = MaterialTheme.typography.bodyMedium,
+                    fontWeight = FontWeight.Bold,
+                    color = TextPrimary
+                )
+                Text(
+                    text = details,
+                    fontSize = 11.sp,
+                    color = TextSecondary,
+                    maxLines = 1,
+                    overflow = TextOverflow.Ellipsis
+                )
+            }
+        }
+
+        Box(
+            modifier = Modifier
+                .clip(RoundedCornerShape(6.dp))
+                .background(accentColor.copy(alpha = 0.18f))
+                .border(1.dp, accentColor.copy(alpha = 0.35f), RoundedCornerShape(6.dp))
+                .padding(horizontal = 10.dp, vertical = 5.dp)
+        ) {
+            Row(
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Text(
+                    text = "Open",
+                    fontSize = 11.sp,
+                    fontWeight = FontWeight.Bold,
+                    color = accentColor
+                )
+                Icon(
+                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                    contentDescription = null,
+                    tint = accentColor,
+                    modifier = Modifier.size(12.dp)
+                )
+            }
+        }
+    }
+}
+
+@Composable
 fun BotModuleGridCard(
     title: String,
     category: String,
@@ -394,18 +663,22 @@ fun BotModuleGridCard(
     icon: ImageVector,
     accentColor: Color,
     onClick: () -> Unit,
-    modifier: Modifier = Modifier
+    modifier: Modifier = Modifier,
+    isRunning: Boolean = false,
+    runningDetail: String? = null
 ) {
     Card(
         modifier = modifier
             .clip(RoundedCornerShape(16.dp))
             .border(
-                1.dp,
-                accentColor.copy(alpha = 0.35f),
-                RoundedCornerShape(16.dp)
+                width = if (isRunning) 1.5.dp else 1.dp,
+                color = if (isRunning) accentColor else accentColor.copy(alpha = 0.35f),
+                shape = RoundedCornerShape(16.dp)
             ),
         shape = RoundedCornerShape(16.dp),
-        colors = CardDefaults.cardColors(containerColor = CardDark)
+        colors = CardDefaults.cardColors(
+            containerColor = if (isRunning) accentColor.copy(alpha = 0.08f) else CardDark
+        )
     ) {
         Column(
             modifier = Modifier
@@ -414,7 +687,7 @@ fun BotModuleGridCard(
             verticalArrangement = Arrangement.SpaceBetween
         ) {
             Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
-                // Top Row: Icon Container & Arrow Button
+                // Top Row: Icon Container & Active Pill / Arrow Button
                 Row(
                     modifier = Modifier.fillMaxWidth(),
                     horizontalArrangement = Arrangement.SpaceBetween,
@@ -427,7 +700,7 @@ fun BotModuleGridCard(
                             .background(accentColor.copy(alpha = 0.15f))
                             .border(
                                 1.dp,
-                                accentColor.copy(alpha = 0.3f),
+                                accentColor.copy(alpha = if (isRunning) 0.6f else 0.3f),
                                 RoundedCornerShape(12.dp)
                             ),
                         contentAlignment = Alignment.Center
@@ -440,38 +713,97 @@ fun BotModuleGridCard(
                         )
                     }
 
-                    Box(
-                        modifier = Modifier
-                            .size(32.dp)
-                            .clip(CircleShape)
-                            .background(Color(0xFF161928))
-                            .border(1.dp, Color(0xFF2E3350), CircleShape)
-                            .clickable { onClick() },
-                        contentAlignment = Alignment.Center
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
-                        Icon(
-                            imageVector = Icons.AutoMirrored.Filled.ArrowForward,
-                            contentDescription = "Open $title",
-                            tint = accentColor,
-                            modifier = Modifier.size(16.dp)
-                        )
+                        if (isRunning) {
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(SuccessGreen.copy(alpha = 0.2f))
+                                    .border(
+                                        1.dp,
+                                        SuccessGreen.copy(alpha = 0.6f),
+                                        RoundedCornerShape(6.dp)
+                                    )
+                                    .padding(horizontal = 6.dp, vertical = 3.dp)
+                            ) {
+                                Row(
+                                    verticalAlignment = Alignment.CenterVertically,
+                                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                ) {
+                                    Box(
+                                        modifier = Modifier
+                                            .size(6.dp)
+                                            .clip(CircleShape)
+                                            .background(SuccessGreen)
+                                            .clickable { onClick() }
+                                    )
+                                    Text(
+                                        text = "ACTIVE",
+                                        fontSize = 9.sp,
+                                        fontWeight = FontWeight.Bold,
+                                        color = SuccessGreen,
+                                        letterSpacing = 0.5.sp
+                                    )
+                                }
+                            }
+                        } else {
+                            Box(
+                                modifier = Modifier
+                                    .size(32.dp)
+                                    .clip(CircleShape)
+                                    .background(Color(0xFF161928))
+                                    .border(
+                                        1.dp,
+                                        Color(0xFF2E3350),
+                                        CircleShape
+                                    )
+                                    .clickable { onClick() },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Icon(
+                                    imageVector = Icons.AutoMirrored.Filled.ArrowForward,
+                                    contentDescription = "Open $title",
+                                    tint = accentColor,
+                                    modifier = Modifier.size(16.dp)
+                                )
+                            }
+                        }
                     }
                 }
 
-                // Category Badge
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(6.dp))
-                        .background(accentColor.copy(alpha = 0.12f))
-                        .padding(horizontal = 6.dp, vertical = 2.dp)
+                // Category Badge & Running Detail
+                Row(
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp)
                 ) {
-                    Text(
-                        text = category.uppercase(),
-                        fontSize = 9.sp,
-                        fontWeight = FontWeight.Bold,
-                        color = accentColor,
-                        letterSpacing = 0.5.sp
-                    )
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(6.dp))
+                            .background(accentColor.copy(alpha = 0.12f))
+                            .padding(horizontal = 6.dp, vertical = 2.dp)
+                    ) {
+                        Text(
+                            text = category.uppercase(),
+                            fontSize = 9.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = accentColor,
+                            letterSpacing = 0.5.sp
+                        )
+                    }
+
+                    if (isRunning && !runningDetail.isNullOrBlank()) {
+                        Text(
+                            text = runningDetail,
+                            fontSize = 10.sp,
+                            fontWeight = FontWeight.SemiBold,
+                            color = SuccessGreen,
+                            maxLines = 1,
+                            overflow = TextOverflow.Ellipsis
+                        )
+                    }
                 }
 
                 // Title
@@ -502,10 +834,12 @@ fun BotModuleGridCard(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(8.dp))
-                    .background(accentColor.copy(alpha = 0.1f))
+                    .background(
+                        if (isRunning) accentColor.copy(alpha = 0.22f) else accentColor.copy(alpha = 0.1f)
+                    )
                     .border(
                         1.dp,
-                        accentColor.copy(alpha = 0.25f),
+                        if (isRunning) accentColor.copy(alpha = 0.6f) else accentColor.copy(alpha = 0.25f),
                         RoundedCornerShape(8.dp)
                     )
                     .clickable { onClick() }
@@ -513,16 +847,33 @@ fun BotModuleGridCard(
                 horizontalArrangement = Arrangement.Center,
                 verticalAlignment = Alignment.CenterVertically
             ) {
-                Text(
-                    text = "Launch Bot",
-                    fontSize = 11.sp,
-                    fontWeight = FontWeight.Bold,
-                    color = accentColor
-                )
+                if (isRunning) {
+                    Box(
+                        modifier = Modifier
+                            .size(6.dp)
+                            .clip(CircleShape)
+                            .background(SuccessGreen)
+                    )
+                    Spacer(modifier = Modifier.width(6.dp))
+                    Text(
+                        text = "RUNNING • OPEN",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = TextPrimary
+                    )
+                } else {
+                    Text(
+                        text = "Launch Bot",
+                        fontSize = 11.sp,
+                        fontWeight = FontWeight.Bold,
+                        color = accentColor
+                    )
+                }
             }
         }
     }
 }
+
 
 @Composable
 fun BotModuleHeroCard(
@@ -646,11 +997,12 @@ fun BotModuleHeroCard(
     }
 }
 
-@Preview(showBackground = true, backgroundColor = 0xFF0B0D14)
+@Preview(name = "Dashboard - Idle", showBackground = true, backgroundColor = 0xFF0B0D14)
 @Composable
-private fun DashboardContentPreview() {
+private fun DashboardContentIdlePreview() {
     MyApplicationTheme {
         DashboardContent(
+            hubOverview = HubOverview(),
             onNavigateToTemple = {},
             onNavigateToEclipse = {},
             onNavigateToDoom = {},
@@ -659,3 +1011,122 @@ private fun DashboardContentPreview() {
         )
     }
 }
+
+@Preview(name = "Dashboard - Active Bots", showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun DashboardContentActivePreview() {
+    val sampleActiveOverview = HubOverview(
+        temple = BotSummary(
+            running = true,
+            count = 4,
+            members = listOf("Slot1_Lead", "Slot2_DPS", "Slot3_Buff", "Slot4_Heal"),
+            timeRunning = 3725L // 01:02:05
+        ),
+        general = BotSummary(
+            running = true,
+            currentUsername = "HeroFarmer",
+            subModule = "Legion Revenant",
+            task = "Fealty 1",
+            timeRunning = 1450L // 24:10
+        ),
+        doom = BotSummary(
+            running = false
+        ),
+        eclipse = BotSummary(
+            running = false
+        ),
+        slavery = BotSummary(
+            running = false
+        )
+    )
+
+    MyApplicationTheme {
+        DashboardContent(
+            hubOverview = sampleActiveOverview,
+            onNavigateToTemple = {},
+            onNavigateToEclipse = {},
+            onNavigateToDoom = {},
+            onNavigateToSlavery = {},
+            onNavigateToGeneral = {}
+        )
+    }
+}
+
+@Preview(name = "Active Bot Sessions Banner", showBackground = true, backgroundColor = 0xFF0B0D14)
+@Composable
+private fun ActiveBotSessionsCardPreview() {
+    val sampleActiveOverview = HubOverview(
+        temple = BotSummary(
+            running = true,
+            count = 4,
+            members = listOf("Slot1_Lead", "Slot2_DPS", "Slot3_Buff", "Slot4_Heal"),
+            timeRunning = 1845L
+        ),
+        doom = BotSummary(
+            running = true,
+            currentUsername = "DoomFarmer99",
+            timeRunning = 340L
+        ),
+        general = BotSummary(
+            running = true,
+            currentUsername = "HeroFarmer",
+            subModule = "Void Aura",
+            timeRunning = 7200L
+        )
+    )
+
+    MyApplicationTheme {
+        Box(modifier = Modifier.padding(16.dp)) {
+            ActiveBotSessionsCard(
+                hubOverview = sampleActiveOverview,
+                onNavigateToTemple = {},
+                onNavigateToEclipse = {},
+                onNavigateToDoom = {},
+                onNavigateToSlavery = {},
+                onNavigateToGeneral = {}
+            )
+        }
+    }
+}
+
+@Preview(
+    name = "Grid Card Active vs Idle",
+    showBackground = true,
+    backgroundColor = 0xFF0B0D14,
+    heightDp = 300
+)
+@Composable
+private fun BotModuleGridCardComparisonPreview() {
+    MyApplicationTheme {
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(16.dp),
+            horizontalArrangement = Arrangement.spacedBy(12.dp)
+        ) {
+            BotModuleGridCard(
+                title = "Weekly Doom",
+                category = "Wheel of Doom",
+                description = "Automates weekly Gear spins across multiple accounts & detects EIODA.",
+                icon = Icons.Filled.Casino,
+                accentColor = DoomCrimson,
+                onClick = {},
+                isRunning = false,
+                modifier = Modifier.weight(1f)
+            )
+
+            BotModuleGridCard(
+                title = "Temple Shrine",
+                category = "Sun & Moon",
+                description = "4-player Midnight Sun & Solstice Moon raid party.",
+                icon = Icons.Filled.WbSunny,
+                accentColor = SunGold,
+                onClick = {},
+                isRunning = true,
+                runningDetail = "4 Active • 00:24:18",
+                modifier = Modifier.weight(1f)
+            )
+        }
+    }
+}
+

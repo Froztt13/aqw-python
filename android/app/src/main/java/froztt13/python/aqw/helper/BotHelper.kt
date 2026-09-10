@@ -3,6 +3,7 @@ package froztt13.python.aqw.helper
 import android.util.Log
 import com.chaquo.python.PyObject
 import com.chaquo.python.Python
+import froztt13.python.aqw.data.BotSummary
 import froztt13.python.aqw.data.DoomAccount
 import froztt13.python.aqw.data.DoomAccountTelemetry
 import froztt13.python.aqw.data.EclipseConfig
@@ -10,6 +11,8 @@ import froztt13.python.aqw.data.GeneralBotConfig
 import froztt13.python.aqw.data.GeneralBotTelemetry
 import froztt13.python.aqw.data.GeneralSubModuleInfo
 import froztt13.python.aqw.data.GeneralTaskInfo
+import froztt13.python.aqw.data.HubOverview
+
 import froztt13.python.aqw.data.LogEntry
 import froztt13.python.aqw.data.MonsterTelemetry
 import froztt13.python.aqw.data.PartyStats
@@ -183,6 +186,49 @@ object BotHelper {
             null
         }
     }
+
+    suspend fun getHubStatus(): HubOverview = withContext(Dispatchers.IO) {
+        val jsonStr = getStatus("get_hub_status") ?: return@withContext HubOverview()
+        parseHubOverview(jsonStr)
+    }
+
+    fun parseBotSummary(obj: JSONObject?): BotSummary {
+        if (obj == null) return BotSummary()
+        val membersList = mutableListOf<String>()
+        val membersArr = obj.optJSONArray("members")
+        if (membersArr != null) {
+            for (i in 0 until membersArr.length()) {
+                val m = membersArr.optString(i, "")
+                if (m.isNotEmpty()) membersList.add(m)
+            }
+        }
+        return BotSummary(
+            running = obj.optBoolean("running", false),
+            count = obj.optInt("count", 0),
+            members = membersList,
+            currentUsername = obj.optString("current_username", ""),
+            subModule = obj.optString("sub_module", ""),
+            task = obj.optString("task", ""),
+            timeRunning = obj.optLong("time_running", 0L)
+        )
+    }
+
+    fun parseHubOverview(jsonStr: String): HubOverview {
+        return try {
+            val obj = JSONObject(jsonStr)
+            HubOverview(
+                temple = parseBotSummary(obj.optJSONObject("temple")),
+                eclipse = parseBotSummary(obj.optJSONObject("eclipse")),
+                doom = parseBotSummary(obj.optJSONObject("doom")),
+                slavery = parseBotSummary(obj.optJSONObject("slavery")),
+                general = parseBotSummary(obj.optJSONObject("general"))
+            )
+        } catch (e: Exception) {
+            Log.e(TAG, "parseHubOverview error: ${e.message}")
+            HubOverview()
+        }
+    }
+
 
     // --- Parsing and Serialization ---
     fun parseSlotTelemetryMap(jsonStr: String): Map<String, SlotTelemetry> {

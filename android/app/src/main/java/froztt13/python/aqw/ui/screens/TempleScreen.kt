@@ -32,9 +32,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material.icons.filled.Refresh
-import androidx.compose.material.icons.filled.Stop
 import androidx.compose.material.icons.filled.Warning
 import androidx.compose.material3.AlertDialog
 import androidx.compose.material3.Button
@@ -427,41 +425,15 @@ fun TempleContent(
                 )
             }
 
-            // Session Summary: Time Running & Cleared Loops
+            // Session Summary & Control Bar
             BotSessionStatsBar(
                 stats = partyStats,
                 isRunning = isRunning,
                 botType = config.templeBotType,
-                accentColor = themeColor
+                accentColor = themeColor,
+                onStart = onStartParty,
+                onStop = onStopParty
             )
-
-            // Start / Stop CTA Button
-            Button(
-                onClick = {
-                    if (isRunning) {
-                        onStopParty()
-                    } else {
-                        onStartParty()
-                    }
-                },
-                modifier = Modifier.fillMaxWidth(),
-                shape = RoundedCornerShape(12.dp),
-                colors = ButtonDefaults.buttonColors(
-                    containerColor = if (isRunning) ErrorRed else SuccessGreen
-                )
-            ) {
-                Icon(
-                    imageVector = if (isRunning) Icons.Filled.Stop else Icons.Filled.PlayArrow,
-                    contentDescription = null,
-                    modifier = Modifier.size(20.dp)
-                )
-                Spacer(modifier = Modifier.size(8.dp))
-                Text(
-                    text = if (isRunning) "STOP" else "START",
-                    fontWeight = FontWeight.Bold,
-                    fontSize = 14.sp
-                )
-            }
 
             val activeMonsters =
                 telemetryMap.values.firstOrNull { it.running && it.monsters.isNotEmpty() }?.monsters
