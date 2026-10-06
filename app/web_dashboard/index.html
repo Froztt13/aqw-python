@@ -82,6 +82,14 @@
                     <p id="page-subtitle">Overview and statistics of all active bots</p>
                 </div>
                 <div class="system-stats">
+                    <div class="stat-pill" id="topbar-timer-pill" style="display: none; border-color: rgba(245, 158, 11, 0.35); background: rgba(245, 158, 11, 0.08);">
+                        <span class="stat-label" style="color: #f59e0b; font-weight: 600;">Time Running</span>
+                        <span class="stat-value" id="topbar-time-val" style="color: #f59e0b; font-family: 'Fira Code', monospace; font-weight: 700;">00:00:00</span>
+                    </div>
+                    <div class="stat-pill" id="topbar-cleared-pill" style="display: none; border-color: rgba(16, 185, 129, 0.35); background: rgba(16, 185, 129, 0.08);">
+                        <span class="stat-label" style="color: #10b981; font-weight: 600;">Cleared</span>
+                        <span class="stat-value" id="topbar-cleared-val" style="color: #10b981; font-family: 'Fira Code', monospace; font-weight: 700;">0</span>
+                    </div>
                     <div class="stat-pill">
                         <span class="stat-label">CPU Usage</span>
                         <span class="stat-value" id="sys-cpu">--%</span>
@@ -210,6 +218,10 @@
                                             <span>Time Running:</span>
                                             <strong id="temple-time-running">-</strong>
                                         </div>
+                                        <div class="detail-row">
+                                            <span>Cleared Count:</span>
+                                            <strong id="temple-cleared-count">0</strong>
+                                        </div>
                                     </div>
                                 </div>
                                 <div class="card-footer">
@@ -245,6 +257,10 @@
                                         <div class="detail-row">
                                             <span>Time Running:</span>
                                             <strong id="eclipse-time-running">-</strong>
+                                        </div>
+                                        <div class="detail-row">
+                                            <span>Cleared Count:</span>
+                                            <strong id="eclipse-cleared-count">0</strong>
                                         </div>
                                     </div>
                                 </div>

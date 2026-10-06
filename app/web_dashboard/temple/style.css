@@ -1039,3 +1039,68 @@ body.theme-green {
     flex-direction: column;
     gap: 12px;
 }
+
+/* Monsters HP Panel */
+.monsters-panel {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid var(--border-color);
+    border-radius: 10px;
+    padding: 12px 16px;
+    margin-bottom: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    box-shadow: inset 0 1px 1px rgba(255, 255, 255, 0.05);
+}
+.monsters-panel-title {
+    font-size: 0.75rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--text-secondary);
+}
+.monsters-list {
+    display: flex;
+    flex-direction: row;
+    flex-wrap: wrap;
+    gap: 16px;
+}
+.monster-hp-card {
+    flex: 1;
+    min-width: 220px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.05);
+    border-radius: 8px;
+    padding: 8px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+}
+.monster-info-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.8rem;
+    font-weight: 600;
+}
+.monster-name {
+    color: var(--text-primary);
+    text-transform: uppercase;
+}
+.monster-hp-text {
+    color: #ef4444;
+    font-family: 'Fira Code', monospace;
+    font-size: 0.75rem;
+}
+.monster-hp-bar-bg {
+    background: rgba(255, 255, 255, 0.05);
+    height: 6px;
+    border-radius: 3px;
+    overflow: hidden;
+}
+.monster-hp-bar-fill {
+    background: linear-gradient(90deg, #ef4444, #f59e0b);
+    height: 100%;
+    width: 0%;
+    transition: width 0.3s ease;
+}

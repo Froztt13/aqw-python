@@ -82,3 +82,17 @@ class DurationCounter extends HTMLElement {
     }
 }
 customElements.define('duration-counter', DurationCounter);
+
+class ClearedCounter extends HTMLElement {
+    connectedCallback() {
+        const id = this.getAttribute('id') || 'cleared-counter';
+        const valId = this.getAttribute('val-id') || 'cleared-val';
+        this.innerHTML = `
+            <div class="cleared-counter hidden" id="${id}" style="color: #10b981; font-family: 'Fira Code', monospace; font-size: 0.85rem; font-weight: 600; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25); background-color: rgba(16, 185, 129, 0.08); display: flex; align-items: center; gap: 6px; height: 38px;" title="Cleared Count">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                <span>Cleared: <strong id="${valId}">0</strong></span>
+            </div>
+        `;
+    }
+}
+customElements.define('cleared-counter', ClearedCounter);

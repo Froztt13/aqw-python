@@ -65,6 +65,10 @@
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><circle cx="12" cy="12" r="10"></circle><polyline points="12 6 12 12 16 14"></polyline></svg>
                     <span id="duration-val">00:00:00</span>
                 </div>
+                <div class="cleared-counter hidden" id="cleared-counter" style="color: #10b981; font-family: 'Fira Code', monospace; font-size: 0.85rem; font-weight: 600; padding: 8px 12px; border-radius: 6px; border: 1px solid rgba(16, 185, 129, 0.25); background-color: rgba(16, 185, 129, 0.08); display: flex; align-items: center; gap: 6px; height: 38px;" title="Cleared Count">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                    <span>Cleared: <strong id="cleared-val">0</strong></span>
+                </div>
                 <button class="btn btn-secondary btn-icon-only" id="btn-toggle-settings" title="General Settings">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
                 </button>
@@ -131,6 +135,11 @@
 
         <!-- Main Workspace -->
         <main class="app-body">
+            <!-- Monsters HP Panel -->
+            <div class="monsters-panel hidden" id="monsters-panel">
+                <div class="monsters-panel-title">Monsters HP</div>
+                <div class="monsters-list" id="monsters-list"></div>
+            </div>
             <div class="slots-grid">
                 
                 <!-- Slot 1: Master -->

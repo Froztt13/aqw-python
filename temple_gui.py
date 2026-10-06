@@ -187,6 +187,7 @@ class TempleBotThread(threading.Thread):
         self.callback = callback
         self.taunt_coordinator = taunt_coordinator
         self.bot_instance = None
+        self.bot_core = None
         self.daemon = True
 
     def run(self):
@@ -224,6 +225,7 @@ class TempleBotThread(threading.Thread):
                 role=self.role,
                 is_taunter=self.is_taunter
             )
+            self.bot_core = bot_inst
             await bot_inst.start()
         
         try:
@@ -271,6 +273,8 @@ class TempleApi:
             self.config_path = os.path.join(get_project_root(), "temple_config.json")
             
         self.active_threads = {}
+        self.start_time = None
+        self.cleared_count = 0
         self.taunt_coordinator = TauntCoordinator()
         global_redirector_out.default_callback = lambda msg: self.handle_slave_log("System", msg)
         global_redirector_err.default_callback = lambda msg: self.handle_slave_log("System", msg)
@@ -280,6 +284,12 @@ class TempleApi:
 
     def handle_slave_log(self, username, message):
         html_msg = ansi_to_html(message)
+        if "Dungeon cleared" in message:
+            import re
+            m = re.search(r"Dungeon cleared (\d+) times", message)
+            if m:
+                self.cleared_count = int(m.group(1))
+
         if self.window:
             try:
                 self.window.evaluate_js(
@@ -287,7 +297,7 @@ class TempleApi:
                 )
                 
                 # Duplicate cleared logs to System logs tab
-                if "Dungeon cleared" in message or "Total time taken" in message:
+                if "Finished in" in message or "Total time taken" in message or "Clear time" in message or "Dungeon cleared" in message or "Total time running" in message:
                     sys_msg = f"[{username}] {message}"
                     html_sys_msg = ansi_to_html(sys_msg)
                     self.window.evaluate_js(
@@ -373,6 +383,8 @@ class TempleApi:
         if self.active_threads:
             return {"success": False, "error": "Party is already running!"}
             
+        self.start_time = time.time()
+        self.cleared_count = 0
         self.taunt_coordinator = TauntCoordinator() # Reset coordinator for new run
         server = config.get("server", "Alteon")
         room_number = int(config.get("room_number", 9099))
@@ -425,6 +437,7 @@ class TempleApi:
         if not self.active_threads:
             return {"success": True}
             
+        self.start_time = None
         # Call stop on each bot instance if it has one
         for s_id, thread in self.active_threads.items():
             if thread.bot_instance:
@@ -438,8 +451,9 @@ class TempleApi:
     def get_status(self):
         from datetime import datetime
         status_data = {}
-        for s_id, thread in self.active_threads.items():
-            if thread.bot_instance:
+        for s_id, thread in list(self.active_threads.items()):
+            running = thread.is_alive()
+            if running and thread.bot_instance:
                 b = thread.bot_instance
                 p = b.player
                 
@@ -461,35 +475,79 @@ class TempleApi:
 
                 scroll_qty = 0
                 if p:
-                    item_enrage = p.get_item_inventory("Scroll of Enrage")
-                    if item_enrage:
-                        scroll_qty = item_enrage.qty
+                    try:
+                        item_enrage = p.get_item_inventory("Scroll of Enrage")
+                        if item_enrage:
+                            scroll_qty = item_enrage.qty
+                    except Exception:
+                        scroll_qty = 0
 
-                status_data[s_id] = {
-                    "running": True,
-                    "is_connected": b.is_client_connected,
-                    "map": getattr(b, "strMapName", "-"),
-                    "cell": p.CELL if p else "-",
-                    "pad": p.PAD if p else "-",
-                    "hp": p.CURRENT_HP if p else 0,
-                    "max_hp": p.MAX_HP if p else 0,
-                    "mp": p.MANA if p else 0,
-                    "max_mp": p.MAX_MP if p else 0,
-                    "is_dead": p.ISDEAD if p else False,
-                    "cooldowns": cooldowns,
-                    "scroll_enrage_qty": scroll_qty,
-                    "taunt_error": getattr(b, "taunt_error", False)
-                }
+                try:
+                    status_data[s_id] = {
+                        "running": running,
+                        "is_connected": b.is_client_connected,
+                        "map": getattr(b, "strMapName", "-"),
+                        "cell": p.CELL if p else "-",
+                        "pad": p.PAD if p else "-",
+                        "hp": p.CURRENT_HP if p else 0,
+                        "max_hp": p.MAX_HP if p else 0,
+                        "mp": p.MANA if p else 0,
+                        "max_mp": p.MAX_MP if p else 0,
+                        "is_dead": p.ISDEAD if p else False,
+                        "cooldowns": cooldowns,
+                        "scroll_enrage_qty": scroll_qty,
+                        "taunt_error": getattr(b, "taunt_error", False)
+                    }
+                except Exception as e:
+                    status_data[s_id] = {
+                        "running": running,
+                        "is_connected": False,
+                        "error": str(e)
+                    }
             else:
-                status_data[s_id] = {"running": False}
+                status_data[s_id] = {"running": False, "is_connected": False}
                 
         # Fill in inactive slots
         for s_id in ["slot1", "slot2", "slot3", "slot4"]:
             if s_id not in status_data:
-                status_data[s_id] = {"running": False}
+                status_data[s_id] = {"running": False, "is_connected": False}
+
+        monsters_info = []
+        for slot_id, thread in list(self.active_threads.items()):
+            if thread.is_alive() and thread.bot_instance:
+                bot = thread.bot_instance
+                player = bot.player
+                current_cell = player.CELL if player else None
+                if current_cell and hasattr(bot, "monsters") and bot.monsters:
+                    for mon in bot.monsters:
+                        if mon.frame == current_cell and mon.current_hp > 0:
+                            monsters_info.append({
+                                "name": mon.mon_name,
+                                "id": mon.mon_map_id,
+                                "hp": mon.current_hp,
+                                "max_hp": mon.max_hp
+                            })
+                    if monsters_info:
+                        break
         
-        status_data["_active_taunter"] = self.taunt_coordinator.active_taunter if hasattr(self, "taunt_coordinator") else None
-        return status_data
+        slot_statuses = {s_id: status_data[s_id] for s_id in ["slot1", "slot2", "slot3", "slot4"]}
+        time_running = int(time.time() - self.start_time) if getattr(self, "start_time", None) else 0
+        active_taunter = self.taunt_coordinator.active_taunter if hasattr(self, "taunt_coordinator") else None
+
+        for thread in self.active_threads.values():
+            if hasattr(thread, "bot_core") and thread.bot_core:
+                c = getattr(thread.bot_core, "cleared_count", 0)
+                if c > self.cleared_count:
+                    self.cleared_count = c
+
+        return {
+            "statuses": slot_statuses,
+            "monsters": monsters_info,
+            "_active_taunter": active_taunter,
+            "_time_running": time_running,
+            "cleared_count": self.cleared_count,
+            **slot_statuses
+        }
 
 def main():
     api = TempleApi()

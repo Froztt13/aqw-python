@@ -289,6 +289,10 @@ function startParty(isAuto = false) {
             const durationCounter = document.getElementById("duration-counter");
             const durationVal = document.getElementById("duration-val");
             if (durationCounter) durationCounter.classList.remove("hidden");
+            const clearedCounter = document.getElementById("cleared-counter");
+            const clearedVal = document.getElementById("cleared-val");
+            if (clearedCounter) clearedCounter.classList.remove("hidden");
+            if (clearedVal) clearedVal.innerText = "0";
             if (durationInterval) clearInterval(durationInterval);
             durationInterval = setInterval(() => {
                 const diff = Date.now() - partyStartTime;
@@ -342,7 +346,13 @@ function stopParty() {
             durationInterval = null;
         }
         const durationCounter = document.getElementById("duration-counter");
+        const durationVal = document.getElementById("duration-val");
         if (durationCounter) durationCounter.classList.add("hidden");
+        if (durationVal) durationVal.innerText = "00:00:00";
+        const clearedCounter = document.getElementById("cleared-counter");
+        const clearedVal = document.getElementById("cleared-val");
+        if (clearedCounter) clearedCounter.classList.add("hidden");
+        if (clearedVal) clearedVal.innerText = "0";
         
         // Show reset config button inside popover
         const btnReset = document.getElementById("btn-reset-config");
@@ -369,6 +379,12 @@ function stopParty() {
                 tel.classList.add("hidden");
             }
         });
+
+        // Hide monsters panel
+        const monstersPanel = document.getElementById("monsters-panel");
+        const monstersList = document.getElementById("monsters-list");
+        if (monstersPanel) monstersPanel.classList.add("hidden");
+        if (monstersList) monstersList.innerHTML = "";
     });
 }
 
@@ -385,10 +401,21 @@ function stopTelemetryPolling() {
     }
 }
 
+function formatHP(value) {
+    if (value >= 1000000) {
+        return (value / 1000000).toFixed(2) + "M";
+    } else if (value >= 1000) {
+        return (value / 1000).toFixed(1) + "K";
+    }
+    return value;
+}
+
 function checkActiveBotStatuses() {
-    window.pywebview.api.get_status().then(statuses => {
-        const activeTaunter = statuses["_active_taunter"];
-        const systemStats = statuses.system_stats || null;
+    window.pywebview.api.get_status().then(data => {
+        const statuses = data.statuses || data;
+        const monsters = data.monsters || statuses.monsters || [];
+        const activeTaunter = statuses["_active_taunter"] || data["_active_taunter"];
+        const systemStats = data.system_stats || statuses.system_stats || null;
 
         // Process CPU/Mem telemetry in header
         if (systemStats) {
@@ -396,6 +423,40 @@ function checkActiveBotStatuses() {
             const memEl = document.getElementById("sys-mem");
             if (cpuEl) cpuEl.innerText = `${systemStats.cpu}%`;
             if (memEl) memEl.innerText = `${systemStats.memory} MB`;
+        }
+
+        // Process Cleared Count
+        const clearedVal = document.getElementById("cleared-val");
+        if (clearedVal && (data.cleared_count !== undefined || statuses.cleared_count !== undefined)) {
+            clearedVal.innerText = data.cleared_count !== undefined ? data.cleared_count : statuses.cleared_count;
+        }
+
+        // Process Monsters HP Panel
+        const monstersPanel = document.getElementById("monsters-panel");
+        const monstersList = document.getElementById("monsters-list");
+        if (monstersPanel && monstersList) {
+            if (monsters.length > 0) {
+                monstersPanel.classList.remove("hidden");
+                monstersList.innerHTML = monsters.map(mon => {
+                    const hpPercent = mon.max_hp > 0 ? Math.round((mon.hp / mon.max_hp) * 100) : 0;
+                    const formattedHp = formatHP(mon.hp);
+                    const formattedMaxHp = formatHP(mon.max_hp);
+                    return `
+                        <div class="monster-hp-card">
+                            <div class="monster-info-row">
+                                <span class="monster-name">${mon.name}</span>
+                                <span class="monster-hp-text">${formattedHp} / ${formattedMaxHp} (${hpPercent}%)</span>
+                            </div>
+                            <div class="monster-hp-bar-bg">
+                                <div class="monster-hp-bar-fill" style="width: ${hpPercent}%"></div>
+                            </div>
+                        </div>
+                    `;
+                }).join("");
+            } else {
+                monstersPanel.classList.add("hidden");
+                monstersList.innerHTML = "";
+            }
         }
         
         // Sync running state from Python backend
@@ -419,6 +480,27 @@ function checkActiveBotStatuses() {
             
             const durationCounter = document.getElementById("duration-counter");
             if (durationCounter) durationCounter.classList.remove("hidden");
+            const clearedCounter = document.getElementById("cleared-counter");
+            if (clearedCounter) clearedCounter.classList.remove("hidden");
+
+            startTelemetryPolling();
+        } else if (!anySlotRunning && isPartyRunning) {
+            isPartyRunning = false;
+            btnStartParty.classList.remove("hidden");
+            btnStopParty.classList.add("hidden");
+            btnStartParty.disabled = false;
+            btnStopParty.disabled = false;
+            toggleFormFieldsLock(false);
+            toggleCredentialsVisibility(false);
+            stopTelemetryPolling();
+            const durationCounter = document.getElementById("duration-counter");
+            if (durationCounter) durationCounter.classList.add("hidden");
+            const clearedCounter = document.getElementById("cleared-counter");
+            if (clearedCounter) clearedCounter.classList.add("hidden");
+            if (durationInterval) {
+                clearInterval(durationInterval);
+                durationInterval = null;
+            }
         }
         
         if (isPartyRunning && statuses["_time_running"] !== undefined) {
@@ -543,20 +625,33 @@ function checkActiveBotStatuses() {
 
         // Monitor client connections and auto-restart if dc is detected
         handleDisconnectMonitoring(statuses);
+    }).catch(err => {
+        console.error("Error fetching bot statuses:", err);
     });
 }
 
 // Appending Logs into console streams
 window.addSlaveLog = function(username, htmlMsg) {
     // If username is not System, check if it maps to any slot username
-    let targetStream = "System";
-    if (username !== "System") {
+    let targetStream = null;
+    if (username === "System") {
+        targetStream = "System";
+    } else {
         slots.forEach(slot => {
             const slotUsername = document.getElementById(`${slot}-username`).value.trim();
             if (slotUsername && slotUsername.toLowerCase() === username.toLowerCase()) {
                 targetStream = slotUsername;
             }
         });
+    }
+
+    if (!targetStream) {
+        const isPerformanceStat = /finished in|total time taken|clear time|dungeon cleared|total time running/i.test(htmlMsg);
+        if (isPerformanceStat) {
+            targetStream = "System";
+        } else {
+            return;
+        }
     }
 
     if (!logStreams[targetStream]) {

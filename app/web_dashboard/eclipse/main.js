@@ -9,10 +9,10 @@ let restartAttempts = 0;
 let lastStartTimestamp = null;
 
 const SLOT_HARDCODED_SETTINGS = {
-    slot1: { converge_type: "sun", taunt_parity: "odd" },
-    slot2: { converge_type: "sun", taunt_parity: "even" },
-    slot3: { converge_type: "moon", taunt_parity: "odd" },
-    slot4: { converge_type: "moon", taunt_parity: "even" }
+    slot1: { converge_type: "sun", taunt_parity: "odd", slot_number: 1 },
+    slot2: { converge_type: "sun", taunt_parity: "even", slot_number: 2 },
+    slot3: { converge_type: "moon", taunt_parity: "odd", slot_number: 3 },
+    slot4: { converge_type: "moon", taunt_parity: "even", slot_number: 4 }
 };
 
 const isEmbedded = window.parent && window.parent !== window;
@@ -251,6 +251,7 @@ function saveConfiguration() {
             char_class: document.getElementById(`${slot}-class`).value.trim(),
             converge_type: SLOT_HARDCODED_SETTINGS[slot].converge_type,
             taunt_parity: SLOT_HARDCODED_SETTINGS[slot].taunt_parity,
+            slot_number: SLOT_HARDCODED_SETTINGS[slot].slot_number,
             light_gather_taunter: document.getElementById(`${slot}-light-gather`).checked
         };
         
@@ -322,6 +323,10 @@ function startParty(isAuto = false) {
             const durationCounter = document.getElementById("duration-counter");
             const durationVal = document.getElementById("duration-val");
             if (durationCounter) durationCounter.classList.remove("hidden");
+            const clearedCounter = document.getElementById("cleared-counter");
+            const clearedVal = document.getElementById("cleared-val");
+            if (clearedCounter) clearedCounter.classList.remove("hidden");
+            if (clearedVal) clearedVal.innerText = "0";
             if (durationInterval) clearInterval(durationInterval);
             durationInterval = setInterval(() => {
                 const diff = Date.now() - partyStartTime;
@@ -378,6 +383,10 @@ function stopParty() {
         const durationVal = document.getElementById("duration-val");
         if (durationCounter) durationCounter.classList.add("hidden");
         if (durationVal) durationVal.innerText = "00:00:00";
+        const clearedCounter = document.getElementById("cleared-counter");
+        const clearedVal = document.getElementById("cleared-val");
+        if (clearedCounter) clearedCounter.classList.add("hidden");
+        if (clearedVal) clearedVal.innerText = "0";
         
         // Show reset button
         const btnReset = document.getElementById("btn-reset-config");
@@ -441,7 +450,13 @@ function checkActiveBotStatuses() {
     window.pywebview.api.get_status().then(data => {
         const statuses = data.statuses || data;
         const monsters = data.monsters || [];
-        const systemStats = data.system_stats || null;
+        const systemStats = data.system_stats || statuses.system_stats || null;
+
+        // Process Cleared Count
+        const clearedVal = document.getElementById("cleared-val");
+        if (clearedVal && (data.cleared_count !== undefined || statuses.cleared_count !== undefined)) {
+            clearedVal.innerText = data.cleared_count !== undefined ? data.cleared_count : statuses.cleared_count;
+        }
 
         // Sync running state from Python backend
         let anySlotRunning = false;
@@ -452,32 +467,61 @@ function checkActiveBotStatuses() {
             }
         });
         
+        const timeRunningSecs = data._time_running !== undefined ? data._time_running : statuses._time_running;
+
         if (anySlotRunning && !isPartyRunning) {
             isPartyRunning = true;
+            lastStartTimestamp = timeRunningSecs ? (Date.now() - (timeRunningSecs * 1000)) : Date.now();
             btnStartParty.classList.add("hidden");
             btnStopParty.classList.remove("hidden");
             toggleFormFieldsLock(true);
-            toggleCredentialsVisibility(true);
+            toggleCredentialsVisibility(true, statuses);
             
             const btnReset = document.getElementById("btn-reset-config");
             if (btnReset) btnReset.classList.add("hidden");
             
             const durationCounter = document.getElementById("duration-counter");
             if (durationCounter) durationCounter.classList.remove("hidden");
+            const clearedCounter = document.getElementById("cleared-counter");
+            if (clearedCounter) clearedCounter.classList.remove("hidden");
+
+            startTelemetryPolling();
+        } else if (!anySlotRunning && isPartyRunning) {
+            isPartyRunning = false;
+            lastStartTimestamp = null;
+            btnStartParty.classList.remove("hidden");
+            btnStopParty.classList.add("hidden");
+            btnStartParty.disabled = false;
+            btnStopParty.disabled = false;
+            toggleFormFieldsLock(false);
+            toggleCredentialsVisibility(false);
+            stopTelemetryPolling();
+            const durationCounter = document.getElementById("duration-counter");
+            if (durationCounter) durationCounter.classList.add("hidden");
+            const clearedCounter = document.getElementById("cleared-counter");
+            if (clearedCounter) clearedCounter.classList.add("hidden");
+            if (durationInterval) {
+                clearInterval(durationInterval);
+                durationInterval = null;
+            }
         }
         
-        const timeRunningSecs = data._time_running || statuses._time_running;
-        if (isPartyRunning && timeRunningSecs !== undefined) {
-            partyStartTime = Date.now() - (timeRunningSecs * 1000);
-            if (!durationInterval) {
-                const durationVal = document.getElementById("duration-val");
-                durationInterval = setInterval(() => {
-                    const diff = Date.now() - partyStartTime;
-                    const hrs = String(Math.floor(diff / 3600000)).padStart(2, '0');
-                    const mins = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
-                    const secs = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
-                    if (durationVal) durationVal.innerText = `${hrs}:${mins}:${secs}`;
-                }, 1000);
+        if (isPartyRunning) {
+            if (!lastStartTimestamp) {
+                lastStartTimestamp = timeRunningSecs ? (Date.now() - (timeRunningSecs * 1000)) : Date.now();
+            }
+            if (timeRunningSecs !== undefined) {
+                partyStartTime = Date.now() - (timeRunningSecs * 1000);
+                if (!durationInterval) {
+                    const durationVal = document.getElementById("duration-val");
+                    durationInterval = setInterval(() => {
+                        const diff = Date.now() - partyStartTime;
+                        const hrs = String(Math.floor(diff / 3600000)).padStart(2, '0');
+                        const mins = String(Math.floor((diff % 3600000) / 60000)).padStart(2, '0');
+                        const secs = String(Math.floor((diff % 60000) / 1000)).padStart(2, '0');
+                        if (durationVal) durationVal.innerText = `${hrs}:${mins}:${secs}`;
+                    }, 1000);
+                }
             }
         }
 
@@ -561,7 +605,7 @@ function checkActiveBotStatuses() {
                 // SoE indicator in running info display
                 if (soeInfoEl) {
                     const qty = status.scroll_enrage_qty !== undefined ? status.scroll_enrage_qty : 0;
-                    soeInfoEl.innerText = qty;
+                    soeInfoEl.innerText = `${qty} SoE`;
                     
                     // Style by quantity
                     if (qty >= 10) {
@@ -611,7 +655,7 @@ function checkActiveBotStatuses() {
                 badge.innerText = "Offline";
                 telemetryPanel.classList.add("hidden");
                 if (soeInfoEl) {
-                    soeInfoEl.innerText = "0";
+                    soeInfoEl.innerText = "0 SoE";
                     soeInfoEl.style.color = "#ef4444";
                 }
             }
@@ -619,14 +663,18 @@ function checkActiveBotStatuses() {
 
         // Monitor client connections and auto-restart if dc is detected
         handleDisconnectMonitoring(statuses);
+    }).catch(err => {
+        console.error("Error fetching eclipse bot statuses:", err);
     });
 }
 
 // Add logs from Python redirector stream
 window.addSlaveLog = function(username, htmlMsg) {
     // Determine mapping target tab
-    let targetTab = "System";
-    if (username !== "System") {
+    let targetTab = null;
+    if (username === "System") {
+        targetTab = "System";
+    } else {
         // Resolve if we match any slot's active username input
         slots.forEach(slot => {
             const inputVal = document.getElementById(`${slot}-username`).value.trim();
@@ -634,6 +682,15 @@ window.addSlaveLog = function(username, htmlMsg) {
                 targetTab = inputVal;
             }
         });
+    }
+
+    if (!targetTab) {
+        const isPerformanceStat = /finished in|total time taken|clear time|dungeon cleared|total time running/i.test(htmlMsg);
+        if (isPerformanceStat) {
+            targetTab = "System";
+        } else {
+            return;
+        }
     }
 
     if (!logStreams[targetTab]) {
@@ -684,7 +741,7 @@ function clearLogs() {
 }
 
 // Toggle inputs fields and show running display
-function toggleCredentialsVisibility(showInfoDisplay) {
+function toggleCredentialsVisibility(showInfoDisplay, currentStatuses = null) {
     slots.forEach((slot, index) => {
         const inputsContainer = document.getElementById(`${slot}-inputs-container`);
         const runningDisplay = document.getElementById(`${slot}-running-display`);
@@ -705,11 +762,15 @@ function toggleCredentialsVisibility(showInfoDisplay) {
             const infoParity = document.getElementById(`${slot}-info-parity`);
             
             if (infoUsername) {
-                const userVal = usernameInput.value.trim() || "-";
+                let userVal = usernameInput ? usernameInput.value.trim() : "";
+                if (!userVal && currentStatuses && currentStatuses[slot] && currentStatuses[slot].username) {
+                    userVal = currentStatuses[slot].username;
+                }
+                userVal = userVal || "-";
                 infoUsername.innerText = isCensorActive ? `Player ${index + 1}` : userVal;
             }
             if (infoClass) {
-                infoClass.innerText = classInput.value.trim() || "Standard class";
+                infoClass.innerText = classInput && classInput.value.trim() ? classInput.value.trim() : "Standard class";
             }
             if (infoConverge) {
                 infoConverge.innerText = SLOT_HARDCODED_SETTINGS[slot].converge_type.toUpperCase();
@@ -746,8 +807,15 @@ function handleDisconnectMonitoring(statuses) {
         return;
     }
 
+    if (!isPartyRunning && !restartTimerActive) {
+        return;
+    }
+
     // Check if we are still within the grace period (45 seconds) to allow login
-    if (lastStartTimestamp && (Date.now() - lastStartTimestamp < 45000)) {
+    if (!lastStartTimestamp || (Date.now() - lastStartTimestamp < 45000)) {
+        if (!lastStartTimestamp) {
+            lastStartTimestamp = Date.now();
+        }
         updateRestartStatusText("");
         return;
     }

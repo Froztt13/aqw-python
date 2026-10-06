@@ -52,6 +52,7 @@
                 </div>
                 
                 <duration-counter id="duration-counter" val-id="duration-val"></duration-counter>
+                <cleared-counter id="cleared-counter" val-id="cleared-val"></cleared-counter>
                 <settings-button id="btn-toggle-settings" title="General Settings"></settings-button>
                 <bot-control-buttons start-id="btn-start-party" stop-id="btn-stop-party" start-label="Start" stop-label="Stop"></bot-control-buttons>
             </div>
@@ -95,6 +96,11 @@
 
         <!-- Main Workspace -->
         <main class="app-body">
+            <!-- Monsters HP Panel -->
+            <div class="monsters-panel hidden" id="monsters-panel">
+                <div class="monsters-panel-title">Monsters HP</div>
+                <div class="monsters-list" id="monsters-list"></div>
+            </div>
             <div class="slots-grid">
                 
                 <!-- Slot 1: Master -->

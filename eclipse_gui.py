@@ -128,6 +128,7 @@ class EclipseBotThread(threading.Thread):
         self.config = config
         self.callback = callback
         self.bot_instance = None
+        self.bot_core = None
         self.daemon = True
 
     def run(self):
@@ -160,6 +161,7 @@ class EclipseBotThread(threading.Thread):
 
         async def run_bot(cmd):
             bot_inst = self.bot_class(cmd, **self.bot_kwargs)
+            self.bot_core = bot_inst
             await bot_inst.prepare_items()    
             if isinstance(bot_inst, EclipseMasterBot):
                 await bot_inst.setup_party()
@@ -212,6 +214,8 @@ class EclipseApi:
             self.config_path = os.path.join(get_project_root(), "eclipse_config.json")
             
         self.active_threads = {}
+        self.start_time = None
+        self.cleared_count = 0
         global_redirector_out.default_callback = lambda msg: self.handle_slave_log("System", msg)
         global_redirector_err.default_callback = lambda msg: self.handle_slave_log("System", msg)
         
@@ -233,6 +237,12 @@ class EclipseApi:
 
     def handle_slave_log(self, username, message):
         html_msg = ansi_to_html(message)
+        if "Dungeon cleared" in message:
+            import re
+            m = re.search(r"Dungeon cleared (\d+) times", message)
+            if m:
+                self.cleared_count = int(m.group(1))
+
         if self.window:
             try:
                 self.window.evaluate_js(
@@ -240,7 +250,7 @@ class EclipseApi:
                 )
                 
                 # Duplicate raid performance statistics to the System logs tab
-                if "Finished in" in message or "Dungeon cleared" in message or "Total time running" in message:
+                if "Finished in" in message or "Total time taken" in message or "Clear time" in message or "Dungeon cleared" in message or "Total time running" in message:
                     sys_msg = f"[{username}] {message}"
                     html_sys_msg = ansi_to_html(sys_msg)
                     self.window.evaluate_js(
@@ -261,7 +271,7 @@ class EclipseApi:
                     "char_class": "Legion Revenant",
                     "taunt_parity": "odd",
                     "converge_type": "sun",
-                    "light_gather_taunter": False
+                    "light_gather_taunter": True
                 },
                 "slot2": {
                     "username": "",
@@ -269,7 +279,7 @@ class EclipseApi:
                     "char_class": "StoneCrusher",
                     "taunt_parity": "even",
                     "converge_type": "sun",
-                    "light_gather_taunter": False
+                    "light_gather_taunter": True
                 },
                 "slot3": {
                     "username": "",
@@ -331,6 +341,8 @@ class EclipseApi:
         if self.active_threads:
             return {"success": False, "error": "Party is already running!"}
             
+        self.start_time = time.time()
+        self.cleared_count = 0
         server = config.get("server", "Alteon")
         room_number = 99999
         slots = config.get("slots", {})
@@ -357,7 +369,8 @@ class EclipseApi:
             "default_target": "Ascended Solstice,Blessless Deer",
             "taunt_parity": "odd",
             "converge_type": "sun",
-            "light_gather_taunter": bool(s1.get("light_gather_taunter", False))
+            "slot_number": 1,
+            "light_gather_taunter": bool(s1.get("light_gather_taunter", True))
         }
         t1 = EclipseBotThread("slot1", s1["username"], s1["password"], s1["char_class"], EclipseMasterBot, s1_kwargs, execution_config, self.handle_slave_log)
         self.active_threads["slot1"] = t1
@@ -369,7 +382,8 @@ class EclipseApi:
             "default_target": "Ascended Solstice",
             "taunt_parity": "even",
             "converge_type": "sun",
-            "light_gather_taunter": bool(s2.get("light_gather_taunter", False)),
+            "slot_number": 2,
+            "light_gather_taunter": bool(s2.get("light_gather_taunter", True)),
             "debug_mon": True
         }
         t2 = EclipseBotThread("slot2", s2["username"], s2["password"], s2["char_class"], EclipseSlaveBot, s2_kwargs, execution_config, self.handle_slave_log)
@@ -382,6 +396,7 @@ class EclipseApi:
             "default_target": "Ascended Midnight",
             "taunt_parity": "odd",
             "converge_type": "moon",
+            "slot_number": 3,
             "light_gather_taunter": bool(s3.get("light_gather_taunter", True)),
             "moon_haze_taunter": bool(s3.get("moon_haze_taunter", True))
         }
@@ -395,6 +410,7 @@ class EclipseApi:
             "default_target": "Ascended Midnight",
             "taunt_parity": "even",
             "converge_type": "moon",
+            "slot_number": 4,
             "light_gather_taunter": bool(s4.get("light_gather_taunter", True)),
             "sunset_knight_taunter": bool(s4.get("sunset_knight_taunter", True))
         }
@@ -408,6 +424,7 @@ class EclipseApi:
         if not self.active_threads:
             return {"success": True}
         
+        self.start_time = None
         # Stop bot loops
         for slot_id, thread in self.active_threads.items():
             if thread.bot_instance:
@@ -450,9 +467,12 @@ class EclipseApi:
 
                 scroll_qty = 0
                 if player:
-                    item_enrage = player.get_item_inventory("Scroll of Enrage")
-                    if item_enrage:
-                        scroll_qty = item_enrage.qty
+                    try:
+                        item_enrage = player.get_item_inventory("Scroll of Enrage")
+                        if item_enrage:
+                            scroll_qty = item_enrage.qty
+                    except Exception:
+                        scroll_qty = 0
 
                 try:
                     hp = player.CURRENT_HP if player else 0
@@ -494,7 +514,7 @@ class EclipseApi:
         # Fill in inactive slots
         for s_id in ["slot1", "slot2", "slot3", "slot4"]:
             if s_id not in statuses:
-                statuses[s_id] = {"running": False}
+                statuses[s_id] = {"running": False, "is_connected": False}
 
         # Collect monsters HP info from the first active bot that has monsters in the current cell
         monsters_info = []
@@ -504,15 +524,18 @@ class EclipseApi:
                 player = bot.player
                 current_cell = player.CELL if player else None
                 if current_cell and hasattr(bot, "monsters") and bot.monsters:
-                    for mon in bot.monsters:
-                        # Only show monsters in the current cell frame and that are alive
-                        if mon.frame == current_cell and mon.current_hp > 0:
-                            monsters_info.append({
-                                "name": mon.mon_name,
-                                "id": mon.mon_map_id,
-                                "hp": mon.current_hp,
-                                "max_hp": mon.max_hp
-                            })
+                    try:
+                        for mon in list(bot.monsters):
+                            # Only show monsters in the current cell frame and that are alive
+                            if mon.frame == current_cell and mon.current_hp > 0:
+                                monsters_info.append({
+                                    "name": mon.mon_name,
+                                    "id": mon.mon_map_id,
+                                    "hp": mon.current_hp,
+                                    "max_hp": mon.max_hp
+                                })
+                    except Exception:
+                        pass
                     if monsters_info:
                         break
 
@@ -526,13 +549,25 @@ class EclipseApi:
             except Exception:
                 pass
 
+        slot_statuses = {s_id: statuses[s_id] for s_id in ["slot1", "slot2", "slot3", "slot4"]}
+        time_running = int(time.time() - self.start_time) if getattr(self, "start_time", None) else 0
+
+        for thread in self.active_threads.values():
+            if hasattr(thread, "bot_core") and thread.bot_core:
+                c = getattr(thread.bot_core, "cleared_count", 0)
+                if c > self.cleared_count:
+                    self.cleared_count = c
+
         return {
-            "statuses": statuses,
+            "statuses": slot_statuses,
             "monsters": monsters_info,
             "system_stats": {
                 "cpu": cpu_pct,
                 "memory": mem_mb
-            }
+            },
+            "_time_running": time_running,
+            "cleared_count": self.cleared_count,
+            **slot_statuses
         }
 
 def main():

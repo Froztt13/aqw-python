@@ -229,6 +229,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (templeTimeEl) {
                     templeTimeEl.textContent = formatTimeRunning(data.temple.time_running);
                 }
+                const templeClearedEl = document.getElementById('temple-cleared-count');
+                if (templeClearedEl) {
+                    templeClearedEl.textContent = data.temple.cleared_count || 0;
+                }
             } else {
                 setBotActiveState('temple', false);
             }
@@ -245,11 +249,65 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (eclipseTimeEl) {
                     eclipseTimeEl.textContent = formatTimeRunning(data.eclipse.time_running);
                 }
+                const eclipseClearedEl = document.getElementById('eclipse-cleared-count');
+                if (eclipseClearedEl) {
+                    eclipseClearedEl.textContent = data.eclipse.cleared_count || 0;
+                }
             } else {
                 setBotActiveState('eclipse', false);
             }
 
-            // 5. Update System Stats
+            // 5. Update Topbar Running Timer & Cleared Pills
+            const topbarTimerPill = document.getElementById('topbar-timer-pill');
+            const topbarTimeVal = document.getElementById('topbar-time-val');
+            const topbarClearedPill = document.getElementById('topbar-cleared-pill');
+            const topbarClearedVal = document.getElementById('topbar-cleared-val');
+
+            let maxTimeRunning = 0;
+            let totalCleared = 0;
+            let hasTimeRunning = false;
+            let hasClears = false;
+
+            if (data.temple && data.temple.running) {
+                if (data.temple.time_running !== undefined && data.temple.time_running > 0) {
+                    maxTimeRunning = Math.max(maxTimeRunning, data.temple.time_running);
+                    hasTimeRunning = true;
+                }
+                if (data.temple.cleared_count !== undefined) {
+                    totalCleared += data.temple.cleared_count;
+                    hasClears = true;
+                }
+            }
+            if (data.eclipse && data.eclipse.running) {
+                if (data.eclipse.time_running !== undefined && data.eclipse.time_running > 0) {
+                    maxTimeRunning = Math.max(maxTimeRunning, data.eclipse.time_running);
+                    hasTimeRunning = true;
+                }
+                if (data.eclipse.cleared_count !== undefined) {
+                    totalCleared += data.eclipse.cleared_count;
+                    hasClears = true;
+                }
+            }
+
+            if (topbarTimerPill && topbarTimeVal) {
+                if (hasTimeRunning) {
+                    topbarTimerPill.style.display = 'flex';
+                    topbarTimeVal.textContent = formatTimeRunning(maxTimeRunning);
+                } else {
+                    topbarTimerPill.style.display = 'none';
+                }
+            }
+
+            if (topbarClearedPill && topbarClearedVal) {
+                if (hasClears && (data.temple?.running || data.eclipse?.running)) {
+                    topbarClearedPill.style.display = 'flex';
+                    topbarClearedVal.textContent = totalCleared;
+                } else {
+                    topbarClearedPill.style.display = 'none';
+                }
+            }
+
+            // 6. Update System Stats
             if (data.system_stats) {
                 sysCpu.textContent = `${data.system_stats.cpu}%`;
                 sysMem.textContent = `${data.system_stats.memory} MB`;
@@ -382,7 +440,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Global Log Forwarding to nested iframes ---
-    window.addSlaveLog = function(username, htmlMsg) {
+    window.addSlaveLog = function(username, htmlMsg, targetBot) {
+        if (targetBot) {
+            const iframe = document.getElementById(`iframe-${targetBot}`);
+            if (iframe && iframe.contentWindow && iframe.contentWindow.addSlaveLog) {
+                iframe.contentWindow.addSlaveLog(username, htmlMsg);
+            }
+            return;
+        }
         document.querySelectorAll('.bot-iframe').forEach(iframe => {
             try {
                 if (iframe.contentWindow && iframe.contentWindow.addSlaveLog) {
