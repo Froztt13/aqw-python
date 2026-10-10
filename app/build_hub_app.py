@@ -128,6 +128,7 @@ class UnifiedThreadRedirector:
         self.log_file = log_file
         self.thread_callbacks = {}  # thread_id -> (username, callback)
         self.combined_api = None
+        self.standalone_callback = None
         self.default_callback = lambda x: None
 
     def register_thread(self, thread_id, username, callback):
@@ -156,6 +157,11 @@ class UnifiedThreadRedirector:
         if current_thread_id in self.thread_callbacks:
             username, callback = self.thread_callbacks[current_thread_id]
             callback(username, message)
+        elif self.standalone_callback:
+            try:
+                self.standalone_callback("System", message)
+            except Exception:
+                pass
         else:
             # Fallback/default logging based on active page
             # CRITICAL: Only check get_current_url if window is loaded and ready,

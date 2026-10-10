@@ -760,6 +760,48 @@ document.addEventListener('DOMContentLoaded', () => {
         if (isRunning && !isPaused) {
             addSlaveForm.classList.add('hidden');
         }
+
+        if (isRunning) {
+            startDurationCounter();
+        } else {
+            stopDurationCounter();
+        }
+    }
+
+    let durationInterval = null;
+    let durationStartTime = null;
+
+    function startDurationCounter() {
+        const counterEl = document.getElementById('duration-counter');
+        const valEl = document.getElementById('duration-val');
+        if (!counterEl || !valEl) return;
+
+        counterEl.classList.remove('hidden');
+        if (!durationStartTime) {
+            durationStartTime = Date.now();
+        }
+
+        if (!durationInterval) {
+            durationInterval = setInterval(() => {
+                const elapsed = Math.floor((Date.now() - durationStartTime) / 1000);
+                const hrs = String(Math.floor(elapsed / 3600)).padStart(2, '0');
+                const mins = String(Math.floor((elapsed % 3600) / 60)).padStart(2, '0');
+                const secs = String(elapsed % 60).padStart(2, '0');
+                valEl.innerText = `${hrs}:${mins}:${secs}`;
+            }, 1000);
+        }
+    }
+
+    function stopDurationCounter() {
+        if (durationInterval) {
+            clearInterval(durationInterval);
+            durationInterval = null;
+        }
+        durationStartTime = null;
+        const counterEl = document.getElementById('duration-counter');
+        const valEl = document.getElementById('duration-val');
+        if (counterEl) counterEl.classList.add('hidden');
+        if (valEl) valEl.innerText = "00:00:00";
     }
 
     // 7. Bot Launchers Control

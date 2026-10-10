@@ -25,20 +25,24 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build macOS App Bundle
+      - name: Build macOS App Bundles
         run: |
           python app/build_hub_app.py build
+          python app/build_slavery_app.py build
 
-      - name: Compress macOS .app Bundle
+      - name: Compress macOS .app Bundles
         run: |
           cd dist
           zip -r -y AQW_Bot_Hub-macOS.zip AQW_Bot_Hub.app
+          zip -r -y AQW_Maid_Slavery-macOS.zip AQW_Maid_Slavery.app
 
-      - name: Upload macOS Artifact
+      - name: Upload macOS Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AQW_Bot_Hub-macOS
-          path: dist/AQW_Bot_Hub-macOS.zip
+          name: macOS-Bundles
+          path: |
+            dist/AQW_Bot_Hub-macOS.zip
+            dist/AQW_Maid_Slavery-macOS.zip
           if-no-files-found: error
 
   build-windows:
@@ -59,15 +63,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -r requirements.txt
 
-      - name: Build Windows Executable
+      - name: Build Windows Executables
         run: |
           python app/build_hub_app_win.py
+          python app/build_slavery_app_win.py
 
-      - name: Upload Windows Artifact
+      - name: Upload Windows Artifacts
         uses: actions/upload-artifact@v4
         with:
-          name: AQW_Bot_Hub-Windows
-          path: dist/AQW_Bot_Hub.exe
+          name: Windows-Binaries
+          path: |
+            dist/AQW_Bot_Hub.exe
+            dist/AQW_Maid_Slavery.exe
           if-no-files-found: error
 
   release:
@@ -78,16 +85,16 @@ jobs:
     permissions:
       contents: write
     steps:
-      - name: Download macOS Artifact
+      - name: Download macOS Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: AQW_Bot_Hub-macOS
+          name: macOS-Bundles
           path: release_assets
 
-      - name: Download Windows Artifact
+      - name: Download Windows Artifacts
         uses: actions/download-artifact@v4
         with:
-          name: AQW_Bot_Hub-Windows
+          name: Windows-Binaries
           path: release_assets
 
       - name: Publish Release
@@ -95,5 +102,7 @@ jobs:
         with:
           files: |
             release_assets/AQW_Bot_Hub-macOS.zip
+            release_assets/AQW_Maid_Slavery-macOS.zip
             release_assets/AQW_Bot_Hub.exe
+            release_assets/AQW_Maid_Slavery.exe
           generate_release_notes: true
