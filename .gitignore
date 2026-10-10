@@ -167,3 +167,4 @@ bot/templeshrine/eclipse/bot_temple_me.py
 bot/templeshrine/temple/bot_temple_me.py
 **/bot_temple_me.py
 *bot_temple_me.py
+bot_cmds/afk.py
