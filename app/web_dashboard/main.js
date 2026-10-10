@@ -96,15 +96,56 @@ document.addEventListener('DOMContentLoaded', () => {
             pageSubtitle.textContent = tabDetails[tabId].subtitle;
         }
 
-        // 4. Lazy Load Iframes
+        // 4. Lazy Load Iframes on-demand with per-feature Loading UI
         if (tabId !== 'dashboard') {
             const iframe = document.getElementById(`iframe-${tabId}`);
-            if (iframe && iframe.src === 'about:blank') {
-                console.log(`Lazy loading iframe for: ${tabId}`);
-                iframe.src = `/${tabId}/`;
-                iframe.onload = () => {
-                    applyThemeToIframe(iframe, currentTheme);
-                };
+            const loader = document.getElementById(`loader-${tabId}`);
+            
+            if (iframe) {
+                const isLoaded = iframe.getAttribute('data-loaded') === 'true';
+                
+                if (!isLoaded && (iframe.src === 'about:blank' || !iframe.src || iframe.src.endsWith('about:blank'))) {
+                    console.log(`[Hub] Lazy loading feature on-demand: ${tabId}`);
+                    
+                    if (loader) {
+                        loader.style.display = 'flex';
+                        loader.classList.remove('fade-out');
+                    }
+                    iframe.classList.remove('loaded');
+                    iframe.src = `/${tabId}/`;
+                    
+                    iframe.onload = () => {
+                        console.log(`[Hub] Feature loaded successfully: ${tabId}`);
+                        iframe.setAttribute('data-loaded', 'true');
+                        applyThemeToIframe(iframe, currentTheme);
+                        
+                        // Smoothly transition from loader to iframe
+                        if (loader) {
+                            loader.classList.add('fade-out');
+                            setTimeout(() => {
+                                loader.style.display = 'none';
+                            }, 360);
+                        }
+                        iframe.classList.add('loaded');
+                    };
+
+                    iframe.onerror = () => {
+                        console.error(`[Hub] Error loading feature: ${tabId}`);
+                        if (loader) {
+                            const statusText = loader.querySelector('.loader-status-text');
+                            if (statusText) {
+                                statusText.textContent = 'Gagal memuat modul. Klik tab kembali untuk mencoba ulang.';
+                                statusText.style.color = '#EF4444';
+                            }
+                        }
+                    };
+                } else if (isLoaded) {
+                    // Feature already loaded, ensure loader is hidden and iframe is visible
+                    if (loader) {
+                        loader.style.display = 'none';
+                    }
+                    iframe.classList.add('loaded');
+                }
             }
         }
     }

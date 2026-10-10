@@ -18,7 +18,7 @@ def generate_windows_icon():
         except Exception as e:
             print(f"Note: Could not generate app.ico: {e}")
 
-def build_windows():
+def build_windows(enable_console=False):
     print("Building AQW Bot Hub Windows standalone executable (.exe)...")
     
     app_name = "AQW_Bot_Hub"
@@ -59,15 +59,38 @@ def build_windows():
     cmd = pyinstaller_bin + [
         f"--name={app_name}",
         "--onefile",
-        "--noconsole",
         "--noconfirm",
         "--clean",
         f"--paths={project_root}",
         f"--add-data={web_dashboard_src};web_dashboard",
         f"--add-data=bot;bot",
-        "--hidden-import=psutil"
+        f"--add-data=commands;commands",
+        f"--add-data=abstracts;abstracts",
+        f"--add-data=templates;templates",
+        f"--add-data=bot_cmds;bot_cmds",
+        "--collect-all=webview",
+        "--collect-all=clr_loader",
+        "--collect-all=pythonnet",
+        "--hidden-import=psutil",
+        "--hidden-import=bottle",
+        "--hidden-import=clr",
+        "--hidden-import=clr_loader",
+        "--hidden-import=pythonnet",
+        "--hidden-import=webview",
+        "--hidden-import=webview.platforms.winforms",
+        "--hidden-import=webview.platforms.edgechromium",
+        "--hidden-import=commands",
+        "--hidden-import=abstracts",
+        "--hidden-import=templates",
+        "--hidden-import=bot_cmds",
+        "--hidden-import=handlers",
+        "--hidden-import=model",
+        "--hidden-import=core"
     ]
     
+    if not enable_console:
+        cmd.append("--noconsole")
+
     ico_file = os.path.join(project_root, "app.ico")
     if os.path.exists(ico_file):
         cmd.append(f"--icon={ico_file}")
@@ -95,6 +118,8 @@ def main():
         sys.path.insert(0, project_root)
         from app.build_hub_app import run_gui
         run_gui()
+    elif len(sys.argv) > 1 and sys.argv[1] == "console":
+        build_windows(enable_console=True)
     else:
         # Default behavior: build Windows .exe
         build_windows()

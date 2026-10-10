@@ -576,10 +576,14 @@ body {
     gap: 20px;
 }
 
-/* Iframe Panes */
+/* Iframe Panes & Feature Loader */
+.pane-feature,
 #pane-aqw, #pane-slavery, #pane-temple, #pane-eclipse {
-    padding: 0;
-    overflow: hidden;
+    padding: 0 !important;
+    overflow: hidden !important;
+    position: relative;
+    width: 100%;
+    height: 100%;
 }
 
 .bot-iframe {
@@ -587,6 +591,230 @@ body {
     height: 100%;
     border: none;
     background: transparent;
+    opacity: 0;
+    transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.bot-iframe.loaded {
+    opacity: 1;
+}
+
+/* Feature Loader Overlay */
+.feature-loader {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 20;
+    background: radial-gradient(circle at center, rgba(14, 16, 26, 0.95) 0%, rgba(9, 10, 16, 0.98) 100%);
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    transition: opacity 0.35s ease, transform 0.35s ease;
+}
+
+.feature-loader.fade-out {
+    opacity: 0;
+    transform: scale(0.97);
+    pointer-events: none;
+}
+
+.loader-backdrop {
+    position: absolute;
+    width: 320px;
+    height: 320px;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--primary-glow) 0%, transparent 70%);
+    opacity: 0.35;
+    pointer-events: none;
+    filter: blur(40px);
+}
+
+.loader-card {
+    position: relative;
+    z-index: 2;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    text-align: center;
+    padding: 36px 40px;
+    max-width: 440px;
+    width: 90%;
+    background: rgba(18, 20, 32, 0.65);
+    border: 1px solid var(--border-color-hover);
+    border-radius: 20px;
+    box-shadow: 0 20px 50px rgba(0, 0, 0, 0.45), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
+    animation: loader-card-float 3s ease-in-out infinite alternate;
+}
+
+@keyframes loader-card-float {
+    0% { transform: translateY(0px); }
+    100% { transform: translateY(-4px); }
+}
+
+.loader-avatar-ring {
+    width: 68px;
+    height: 68px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 20px;
+    position: relative;
+    background: rgba(255, 255, 255, 0.03);
+    border: 2px solid rgba(255, 255, 255, 0.08);
+}
+
+.loader-avatar-ring::after {
+    content: '';
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    border: 2px solid transparent;
+    animation: spin-glow 2s linear infinite;
+}
+
+@keyframes spin-glow {
+    0% { transform: rotate(0deg); }
+    100% { transform: rotate(360deg); }
+}
+
+/* Feature specific glow rings */
+.ring-aqw {
+    border-color: rgba(0, 229, 255, 0.3);
+    background: rgba(0, 229, 255, 0.06);
+    box-shadow: 0 0 25px rgba(0, 229, 255, 0.2);
+}
+.ring-aqw::after {
+    border-top-color: var(--aqw-accent);
+    border-right-color: rgba(0, 229, 255, 0.3);
+}
+
+.ring-slavery {
+    border-color: rgba(255, 51, 102, 0.3);
+    background: rgba(255, 51, 102, 0.06);
+    box-shadow: 0 0 25px rgba(255, 51, 102, 0.2);
+}
+.ring-slavery::after {
+    border-top-color: var(--slavery-accent);
+    border-right-color: rgba(255, 51, 102, 0.3);
+}
+
+.ring-temple {
+    border-color: rgba(255, 179, 0, 0.3);
+    background: rgba(255, 179, 0, 0.06);
+    box-shadow: 0 0 25px rgba(255, 179, 0, 0.2);
+}
+.ring-temple::after {
+    border-top-color: var(--temple-accent);
+    border-right-color: rgba(255, 179, 0, 0.3);
+}
+
+.ring-eclipse {
+    border-color: rgba(192, 38, 211, 0.3);
+    background: rgba(192, 38, 211, 0.06);
+    box-shadow: 0 0 25px rgba(192, 38, 211, 0.2);
+}
+.ring-eclipse::after {
+    border-top-color: var(--eclipse-accent);
+    border-right-color: rgba(192, 38, 211, 0.3);
+}
+
+.loader-icon {
+    width: 32px;
+    height: 32px;
+}
+
+.loader-meta {
+    margin-bottom: 22px;
+}
+
+.loader-tag {
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    display: inline-block;
+    margin-bottom: 8px;
+    padding: 3px 10px;
+    border-radius: 20px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid var(--border-color);
+}
+
+.loader-title {
+    font-family: var(--font-heading);
+    font-size: 19px;
+    font-weight: 700;
+    color: var(--text-primary);
+    margin-bottom: 6px;
+}
+
+.loader-desc {
+    font-size: 13px;
+    color: var(--text-secondary);
+    line-height: 1.5;
+}
+
+.loader-progress-box {
+    width: 100%;
+    height: 6px;
+    background: rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+    margin-bottom: 14px;
+}
+
+.loader-progress-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 45%;
+    border-radius: 10px;
+    animation: indeterminate-progress 1.6s cubic-bezier(0.65, 0.815, 0.735, 0.395) infinite;
+}
+
+@keyframes indeterminate-progress {
+    0% {
+        left: -40%;
+        width: 30%;
+    }
+    50% {
+        width: 60%;
+    }
+    100% {
+        left: 100%;
+        width: 30%;
+    }
+}
+
+.bar-aqw {
+    background: linear-gradient(90deg, transparent, var(--aqw-accent), #80DEEA);
+    box-shadow: 0 0 10px var(--aqw-glow);
+}
+.bar-slavery {
+    background: linear-gradient(90deg, transparent, var(--slavery-accent), #FF80AB);
+    box-shadow: 0 0 10px var(--slavery-glow);
+}
+.bar-temple {
+    background: linear-gradient(90deg, transparent, var(--temple-accent), #FFE082);
+    box-shadow: 0 0 10px var(--temple-glow);
+}
+.bar-eclipse {
+    background: linear-gradient(90deg, transparent, var(--eclipse-accent), #E879F9);
+    box-shadow: 0 0 10px var(--eclipse-glow);
+}
+
+.loader-status-text {
+    font-family: var(--font-mono);
+    font-size: 11px;
+    color: var(--text-muted);
+    letter-spacing: 0.3px;
 }
 
 /* ==================== SUMMARY HERO BANNER ==================== */
