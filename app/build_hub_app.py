@@ -2177,7 +2177,11 @@ def build_app():
                 
     data_folders = [
         ("app/web_dashboard", "web_dashboard"),
-        ("bot", "bot")
+        ("bot", "bot"),
+        ("commands", "commands"),
+        ("abstracts", "abstracts"),
+        ("templates", "templates"),
+        ("bot_cmds", "bot_cmds")
     ]
     
     icon_file = "app.icns"
@@ -2193,7 +2197,17 @@ def build_app():
         "--noconfirm",
         "--clean",
         "--windowed",
+        "--collect-all=webview",
         "--hidden-import=psutil",
+        "--hidden-import=bottle",
+        "--hidden-import=webview",
+        "--hidden-import=commands",
+        "--hidden-import=abstracts",
+        "--hidden-import=templates",
+        "--hidden-import=bot_cmds",
+        "--hidden-import=handlers",
+        "--hidden-import=model",
+        "--hidden-import=core",
         f"--paths={project_root}"
     ]
     
