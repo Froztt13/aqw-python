@@ -1,6 +1,7 @@
 // Real-time variables
 let config = {};
 let isPartyRunning = false;
+let isManualStop = false;
 let statusInterval = null;
 let isCensorActive = false;
 let durationInterval = null;
@@ -56,6 +57,26 @@ const roomInput = {
 };
 const btnStartParty = document.getElementById("btn-start-party");
 const btnStopParty = document.getElementById("btn-stop-party");
+const btnPauseParty = document.getElementById("btn-pause-party");
+let isPausedState = false;
+
+function resetPauseBtnUI() {
+    isPausedState = false;
+    if (!btnPauseParty) return;
+    btnPauseParty.classList.remove('btn-success');
+    btnPauseParty.classList.add('btn-warning');
+    if (!isPartyRunning) {
+        btnPauseParty.classList.add('hidden');
+    }
+    btnPauseParty.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" id="pause-btn-icon">
+            <rect x="6" y="4" width="4" height="16"></rect>
+            <rect x="14" y="4" width="4" height="16"></rect>
+        </svg>
+        <span id="pause-btn-text">Pause</span>
+    `;
+}
+
 const consoleTabsList = document.getElementById("console-tabs-list");
 const consoleViewport = document.getElementById("console-viewport");
 const chkAutoScroll = document.getElementById("chk-auto-scroll");
@@ -96,19 +117,7 @@ const slots = ["slot1", "slot2", "slot3", "slot4"];
             });
         }
 
-        // Password visibility toggle
-        document.querySelectorAll(".btn-toggle-password").forEach(btn => {
-            btn.addEventListener("click", () => {
-                const input = btn.previousElementSibling;
-                if (input.type === "password") {
-                    input.type = "text";
-                    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
-                } else {
-                    input.type = "password";
-                    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-                }
-            });
-        });
+        // Password visibility toggle is self-contained in <item-slot-card> component
 
         const btnToggleCensor = document.getElementById("btn-toggle-censor");
         if (btnToggleCensor) {
@@ -133,6 +142,40 @@ const slots = ["slot1", "slot2", "slot3", "slot4"];
 
         btnStartParty.addEventListener("click", startParty);
         btnStopParty.addEventListener("click", stopParty);
+        if (btnPauseParty) {
+            btnPauseParty.addEventListener('click', () => {
+                isPausedState = !isPausedState;
+                btnPauseParty.disabled = true;
+                btnPauseParty.textContent = isPausedState ? 'Pausing...' : 'Resuming...';
+                
+                window.pywebview.api.toggle_pause(isPausedState).then(res => {
+                    btnPauseParty.disabled = false;
+                    if (res && res.success) {
+                        if (isPausedState) {
+                            btnPauseParty.classList.remove('btn-warning');
+                            btnPauseParty.classList.add('btn-success');
+                            btnPauseParty.innerHTML = `
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" id="pause-btn-icon">
+                                    <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                                </svg>
+                                <span id="pause-btn-text">Resume</span>
+                            `;
+                        } else {
+                            resetPauseBtnUI();
+                        }
+                    } else {
+                        isPausedState = !isPausedState;
+                        alert(`Error toggling pause: ${res ? res.error : "Unknown error"}`);
+                        resetPauseBtnUI();
+                    }
+                }).catch(err => {
+                    btnPauseParty.disabled = false;
+                    isPausedState = !isPausedState;
+                    alert(`Error toggling pause: ${err}`);
+                    resetPauseBtnUI();
+                });
+            });
+        }
         btnClearLogs.addEventListener("click", clearLogs);
 
         const btnResetConfig = document.getElementById("btn-reset-config");
@@ -303,6 +346,7 @@ function updateConsoleTabs() {
 function startParty(isAuto = false) {
     saveConfiguration();
     
+    isManualStop = false;
     if (isAuto !== true) {
         restartAttempts = 0;
         partyStartTime = Date.now();
@@ -312,9 +356,14 @@ function startParty(isAuto = false) {
     window.pywebview.api.start_party(config).then(res => {
         if (res.success) {
             isPartyRunning = true;
+            isManualStop = false;
             lastStartTimestamp = Date.now();
             btnStartParty.classList.add("hidden");
             btnStopParty.classList.remove("hidden");
+            if (btnPauseParty) {
+                btnPauseParty.classList.remove("hidden");
+                resetPauseBtnUI();
+            }
             btnStartParty.disabled = false;
             
 
@@ -357,6 +406,8 @@ function startParty(isAuto = false) {
 
 // Stop Party
 function stopParty() {
+    isManualStop = true;
+    isPartyRunning = false;
     btnStopParty.disabled = true;
     
     // Clear any active auto-restart timers
@@ -365,48 +416,54 @@ function stopParty() {
     isStoppingForRestart = false;
     updateRestartStatusText("");
     
-    window.pywebview.api.stop_party().then(() => {
-        isPartyRunning = false;
-        
+    // Stop Polling Status immediately to prevent disconnect detection during shutdown
+    stopTelemetryPolling();
 
-        btnStopParty.classList.add("hidden");
-        btnStartParty.removeAttribute("disabled");
-        btnStartParty.classList.remove("hidden");
-        btnStopParty.disabled = false;
-        
-        // Stop and reset duration counter
-        if (durationInterval) {
-            clearInterval(durationInterval);
-            durationInterval = null;
-        }
-        const durationCounter = document.getElementById("duration-counter");
-        const durationVal = document.getElementById("duration-val");
-        if (durationCounter) durationCounter.classList.add("hidden");
-        if (durationVal) durationVal.innerText = "00:00:00";
-        const clearedCounter = document.getElementById("cleared-counter");
-        const clearedVal = document.getElementById("cleared-val");
-        if (clearedCounter) clearedCounter.classList.add("hidden");
-        if (clearedVal) clearedVal.innerText = "0";
-        
-        // Show reset button
-        const btnReset = document.getElementById("btn-reset-config");
-        if (btnReset) btnReset.classList.remove("hidden");
-        
-        // Unlock fields
-        toggleFormFieldsLock(false);
-        
-        // Show credentials and hide summary
-        toggleCredentialsVisibility(false);
-        
-        // Stop Polling Status
-        stopTelemetryPolling();
-        
-        // Clean layouts
-        slots.forEach(slot => {
-            document.getElementById(`badge-${slot}`).className = "status-badge";
-            document.getElementById(`badge-${slot}`).innerText = "Offline";
-            document.getElementById(`telemetry-${slot}`).classList.add("hidden");
-        });
+    // Immediately update control buttons and hide pause
+    btnStopParty.classList.add("hidden");
+    btnStartParty.removeAttribute("disabled");
+    btnStartParty.classList.remove("hidden");
+    btnStopParty.disabled = false;
+    if (btnPauseParty) {
+        btnPauseParty.classList.add("hidden");
+        resetPauseBtnUI();
+    }
+    
+    // Stop and reset duration counter
+    if (durationInterval) {
+        clearInterval(durationInterval);
+        durationInterval = null;
+    }
+    const durationCounter = document.getElementById("duration-counter");
+    const durationVal = document.getElementById("duration-val");
+    if (durationCounter) durationCounter.classList.add("hidden");
+    if (durationVal) durationVal.innerText = "00:00:00";
+    const clearedCounter = document.getElementById("cleared-counter");
+    const clearedVal = document.getElementById("cleared-val");
+    if (clearedCounter) clearedCounter.classList.add("hidden");
+    if (clearedVal) clearedVal.innerText = "0";
+    
+    // Show reset button
+    const btnReset = document.getElementById("btn-reset-config");
+    if (btnReset) btnReset.classList.remove("hidden");
+    
+    // Unlock fields
+    toggleFormFieldsLock(false);
+    
+    // Show credentials and hide summary
+    toggleCredentialsVisibility(false);
+    
+    // Clean layouts
+    slots.forEach(slot => {
+        document.getElementById(`badge-${slot}`).className = "status-badge";
+        document.getElementById(`badge-${slot}`).innerText = "Offline";
+        document.getElementById(`telemetry-${slot}`).classList.add("hidden");
+    });
+    
+    window.pywebview.api.stop_party().then(() => {
+        // Confirmed stopped on backend
+    }).catch(err => {
+        console.error("Error stopping party:", err);
     });
 }
 
@@ -469,11 +526,12 @@ function checkActiveBotStatuses() {
         
         const timeRunningSecs = data._time_running !== undefined ? data._time_running : statuses._time_running;
 
-        if (anySlotRunning && !isPartyRunning) {
+        if (anySlotRunning && !isPartyRunning && !isManualStop) {
             isPartyRunning = true;
             lastStartTimestamp = timeRunningSecs ? (Date.now() - (timeRunningSecs * 1000)) : Date.now();
             btnStartParty.classList.add("hidden");
             btnStopParty.classList.remove("hidden");
+            if (btnPauseParty) btnPauseParty.classList.remove("hidden");
             toggleFormFieldsLock(true);
             toggleCredentialsVisibility(true, statuses);
             
@@ -491,11 +549,14 @@ function checkActiveBotStatuses() {
             lastStartTimestamp = null;
             btnStartParty.classList.remove("hidden");
             btnStopParty.classList.add("hidden");
+            if (btnPauseParty) {
+                btnPauseParty.classList.add("hidden");
+                resetPauseBtnUI();
+            }
             btnStartParty.disabled = false;
             btnStopParty.disabled = false;
             toggleFormFieldsLock(false);
             toggleCredentialsVisibility(false);
-            stopTelemetryPolling();
             const durationCounter = document.getElementById("duration-counter");
             if (durationCounter) durationCounter.classList.add("hidden");
             const clearedCounter = document.getElementById("cleared-counter");
@@ -504,6 +565,24 @@ function checkActiveBotStatuses() {
                 clearInterval(durationInterval);
                 durationInterval = null;
             }
+
+            // Auto-restart only if stopped unexpectedly (not manually)
+            if (!isManualStop && config.auto_restart_enabled) {
+                const maxAttempts = parseInt(config.auto_restart_max_attempts) || 3;
+                if (restartAttempts < maxAttempts) {
+                    const delaySecs = parseInt(config.auto_restart_delay) || 30;
+                    restartTimerActive = true;
+                    restartTimerTarget = Date.now() + (delaySecs * 1000);
+                    addSlaveLog("System", `<span class="log-yellow log-bold">[System] Bots stopped unexpectedly. Auto-restarting in ${delaySecs}s...</span>`);
+                    updateRestartStatusText(`Auto-Restarting in ${delaySecs}s...`);
+                    return;
+                } else {
+                    updateRestartStatusText("Auto-restart limit reached!");
+                    addSlaveLog("System", `<span class="log-red log-bold">[System] Error: Auto-restart limit reached. Bots stopped completely.</span>`);
+                }
+            }
+
+            stopTelemetryPolling();
         }
         
         if (isPartyRunning) {
@@ -600,6 +679,9 @@ function checkActiveBotStatuses() {
                 if (status.is_dead) {
                     badge.innerText = "DEAD";
                     badge.className = "status-badge dead";
+                } else if (status.is_paused) {
+                    badge.innerText = "PAUSED";
+                    badge.className = "status-badge paused";
                 }
                 
                 // SoE indicator in running info display
@@ -661,8 +743,34 @@ function checkActiveBotStatuses() {
             }
         });
 
+        // Sync Pause button state
+        let anySlotPaused = false;
+        slots.forEach(slot => {
+            const status = statuses[slot];
+            if (status && status.running && status.is_paused) {
+                anySlotPaused = true;
+            }
+        });
+        if (anySlotRunning && isPartyRunning && !isManualStop && btnPauseParty && !btnPauseParty.disabled) {
+            if (anySlotPaused && !isPausedState) {
+                isPausedState = true;
+                btnPauseParty.classList.remove('btn-warning');
+                btnPauseParty.classList.add('btn-success');
+                btnPauseParty.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" id="pause-btn-icon">
+                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
+                    </svg>
+                    <span id="pause-btn-text">Resume</span>
+                `;
+            } else if (!anySlotPaused && isPausedState) {
+                resetPauseBtnUI();
+            }
+        }
+
         // Monitor client connections and auto-restart if dc is detected
-        handleDisconnectMonitoring(statuses);
+        if (!isManualStop && (isPartyRunning || restartTimerActive)) {
+            handleDisconnectMonitoring(statuses);
+        }
     }).catch(err => {
         console.error("Error fetching eclipse bot statuses:", err);
     });
@@ -799,7 +907,7 @@ function updateRestartStatusText(text) {
 }
 
 function handleDisconnectMonitoring(statuses) {
-    if (!config.auto_restart_enabled) {
+    if (isManualStop || !config.auto_restart_enabled) {
         isStoppingForRestart = false;
         restartTimerActive = false;
         restartTimerTarget = null;
@@ -872,6 +980,10 @@ function handleDisconnectMonitoring(statuses) {
                 btnStartParty.removeAttribute("disabled");
                 btnStartParty.classList.remove("hidden");
                 btnStopParty.disabled = false;
+                if (btnPauseParty) {
+                    btnPauseParty.classList.add("hidden");
+                    resetPauseBtnUI();
+                }
                 
                 const btnReset = document.getElementById("btn-reset-config");
                 if (btnReset) btnReset.classList.remove("hidden");
@@ -895,6 +1007,10 @@ function handleDisconnectMonitoring(statuses) {
             btnStartParty.removeAttribute("disabled");
             btnStartParty.classList.remove("hidden");
             btnStopParty.disabled = false;
+            if (btnPauseParty) {
+                btnPauseParty.classList.add("hidden");
+                resetPauseBtnUI();
+            }
             
             const btnReset = document.getElementById("btn-reset-config");
             if (btnReset) btnReset.classList.remove("hidden");

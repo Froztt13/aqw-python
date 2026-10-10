@@ -1314,7 +1314,6 @@ class EclipseApi:
             "converge_type": "sun",
             "slot_number": 2,
             "light_gather_taunter": bool(s2.get("light_gather_taunter", True)),
-            "debug_mon": True
         }
         t2 = EclipseBotThread("slot2", s2["username"], s2["password"], s2["char_class"], EclipseSlaveBot, s2_kwargs, execution_config, self.handle_slave_log)
         self.active_threads["slot2"] = t2
@@ -1368,6 +1367,16 @@ class EclipseApi:
         self.active_threads.clear()
         return {"success": True}
 
+    def toggle_pause(self, pause_state):
+        state = bool(pause_state)
+        for slot_id, thread in self.active_threads.items():
+            if thread.bot_instance:
+                thread.bot_instance.is_paused = state
+                thread.bot_instance.is_script_paused = state
+            if thread.bot_core:
+                thread.bot_core.is_paused = state
+        return {"success": True}
+
     def get_status(self):
         from datetime import datetime
         statuses = {}
@@ -1402,6 +1411,8 @@ class EclipseApi:
                     except Exception:
                         scroll_qty = 0
 
+                is_paused = getattr(bot, "is_paused", False) or (getattr(thread.bot_core, "is_paused", False) if thread.bot_core else False)
+
                 try:
                     statuses[slot_id] = {
                         "running": running,
@@ -1414,6 +1425,7 @@ class EclipseApi:
                         "map": getattr(bot, "strMapName", "-"),
                         "is_connected": bot.is_client_connected,
                         "is_dead": player.ISDEAD if player else False,
+                        "is_paused": is_paused,
                         "username": thread.username,
                         "cooldowns": cooldowns,
                         "scroll_enrage_qty": scroll_qty,
@@ -1632,6 +1644,9 @@ class CombinedApi:
     def eclipse_stop_party(self):
         return self.eclipse_api.stop_party()
 
+    def eclipse_toggle_pause(self, pause_state):
+        return self.eclipse_api.toggle_pause(pause_state)
+
     def validate_password(self, password):
         return self.eclipse_api.validate_password(password)
 
@@ -1812,6 +1827,7 @@ def serve_injected_html(filepath, bot_type):
                             reset_config: () => topApi.eclipse_reset_config(),
                             start_party: (cfg) => topApi.eclipse_start_party(cfg),
                             stop_party: () => topApi.eclipse_stop_party(),
+                            toggle_pause: (p) => topApi.eclipse_toggle_pause(p),
                             validate_password: (pwd) => topApi.validate_password(pwd)
                         }
                     };

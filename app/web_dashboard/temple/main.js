@@ -1,6 +1,7 @@
 // Real-time variables
 let config = {};
 let isPartyRunning = false;
+let isManualStop = false;
 let statusInterval = null;
 let isCensorActive = false;
 let durationInterval = null;
@@ -86,19 +87,7 @@ const slots = ["slot1", "slot2", "slot3", "slot4"];
             });
         }
 
-        // Password visibility toggle
-        document.querySelectorAll(".btn-toggle-password").forEach(btn => {
-            btn.addEventListener("click", () => {
-                const input = btn.previousElementSibling;
-                if (input.type === "password") {
-                    input.type = "text";
-                    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19m-6.72-1.07a3 3 0 1 1-4.24-4.24"></path><line x1="1" y1="1" x2="23" y2="23"></line></svg>`;
-                } else {
-                    input.type = "password";
-                    btn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 16px; height: 16px; pointer-events: none;"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"></path><circle cx="12" cy="12" r="3"></circle></svg>`;
-                }
-            });
-        });
+        // Password visibility toggle is self-contained in <item-slot-card> component
 
         const btnToggleCensor = document.getElementById("btn-toggle-censor");
         if (btnToggleCensor) {
@@ -270,6 +259,7 @@ function updateConsoleTabs() {
 function startParty(isAuto = false) {
     saveConfiguration();
     
+    isManualStop = false;
     if (isAuto !== true) {
         restartAttempts = 0;
         partyStartTime = Date.now();
@@ -323,6 +313,8 @@ function startParty(isAuto = false) {
 
 // Stop Party
 function stopParty() {
+    isManualStop = true;
+    isPartyRunning = false;
     btnStopParty.disabled = true;
     
     // Clear any active auto-restart timers
@@ -331,60 +323,61 @@ function stopParty() {
     isStoppingForRestart = false;
     updateRestartStatusText("");
     
-    window.pywebview.api.stop_party().then(() => {
-        isPartyRunning = false;
-        
+    // Stop Polling Status immediately to prevent disconnect detection during shutdown
+    stopTelemetryPolling();
 
-        btnStopParty.classList.add("hidden");
-        btnStartParty.removeAttribute("disabled");
-        btnStartParty.classList.remove("hidden");
-        btnStopParty.disabled = false;
-        
-        // Stop and reset duration counter
-        if (durationInterval) {
-            clearInterval(durationInterval);
-            durationInterval = null;
+    btnStopParty.classList.add("hidden");
+    btnStartParty.removeAttribute("disabled");
+    btnStartParty.classList.remove("hidden");
+    btnStopParty.disabled = false;
+    
+    // Stop and reset duration counter
+    if (durationInterval) {
+        clearInterval(durationInterval);
+        durationInterval = null;
+    }
+    const durationCounter = document.getElementById("duration-counter");
+    const durationVal = document.getElementById("duration-val");
+    if (durationCounter) durationCounter.classList.add("hidden");
+    if (durationVal) durationVal.innerText = "00:00:00";
+    const clearedCounter = document.getElementById("cleared-counter");
+    const clearedVal = document.getElementById("cleared-val");
+    if (clearedCounter) clearedCounter.classList.add("hidden");
+    if (clearedVal) clearedVal.innerText = "0";
+    
+    // Show reset config button inside popover
+    const btnReset = document.getElementById("btn-reset-config");
+    if (btnReset) btnReset.classList.remove("hidden");
+    
+    // Unlock fields
+    toggleFormFieldsLock(false);
+    
+    // Show credentials input again
+    toggleCredentialsVisibility(false);
+    
+    // Clean layouts back to offline defaults
+    slots.forEach(slot => {
+        const badge = document.getElementById(`badge-${slot}`);
+        if (badge) {
+            badge.className = "status-badge";
+            badge.innerText = "Offline";
         }
-        const durationCounter = document.getElementById("duration-counter");
-        const durationVal = document.getElementById("duration-val");
-        if (durationCounter) durationCounter.classList.add("hidden");
-        if (durationVal) durationVal.innerText = "00:00:00";
-        const clearedCounter = document.getElementById("cleared-counter");
-        const clearedVal = document.getElementById("cleared-val");
-        if (clearedCounter) clearedCounter.classList.add("hidden");
-        if (clearedVal) clearedVal.innerText = "0";
-        
-        // Show reset config button inside popover
-        const btnReset = document.getElementById("btn-reset-config");
-        if (btnReset) btnReset.classList.remove("hidden");
-        
-        // Unlock fields
-        toggleFormFieldsLock(false);
-        
-        // Show credentials input again
-        toggleCredentialsVisibility(false);
-        
-        // Stop Polling Status
-        stopTelemetryPolling();
-        
-        // Clean layouts back to offline defaults
-        slots.forEach(slot => {
-            const badge = document.getElementById(`badge-${slot}`);
-            if (badge) {
-                badge.className = "status-badge";
-                badge.innerText = "Offline";
-            }
-            const tel = document.getElementById(`telemetry-${slot}`);
-            if (tel) {
-                tel.classList.add("hidden");
-            }
-        });
+        const tel = document.getElementById(`telemetry-${slot}`);
+        if (tel) {
+            tel.classList.add("hidden");
+        }
+    });
 
-        // Hide monsters panel
-        const monstersPanel = document.getElementById("monsters-panel");
-        const monstersList = document.getElementById("monsters-list");
-        if (monstersPanel) monstersPanel.classList.add("hidden");
-        if (monstersList) monstersList.innerHTML = "";
+    // Hide monsters panel
+    const monstersPanel = document.getElementById("monsters-panel");
+    const monstersList = document.getElementById("monsters-list");
+    if (monstersPanel) monstersPanel.classList.add("hidden");
+    if (monstersList) monstersList.innerHTML = "";
+
+    window.pywebview.api.stop_party().then(() => {
+        // Confirmed stopped
+    }).catch(err => {
+        console.error("Error stopping party:", err);
     });
 }
 
@@ -468,7 +461,7 @@ function checkActiveBotStatuses() {
             }
         });
         
-        if (anySlotRunning && !isPartyRunning) {
+        if (anySlotRunning && !isPartyRunning && !isManualStop) {
             isPartyRunning = true;
             btnStartParty.classList.add("hidden");
             btnStopParty.classList.remove("hidden");
@@ -492,7 +485,6 @@ function checkActiveBotStatuses() {
             btnStopParty.disabled = false;
             toggleFormFieldsLock(false);
             toggleCredentialsVisibility(false);
-            stopTelemetryPolling();
             const durationCounter = document.getElementById("duration-counter");
             if (durationCounter) durationCounter.classList.add("hidden");
             const clearedCounter = document.getElementById("cleared-counter");
@@ -501,6 +493,24 @@ function checkActiveBotStatuses() {
                 clearInterval(durationInterval);
                 durationInterval = null;
             }
+
+            // Auto-restart only if stopped unexpectedly (not manually)
+            if (!isManualStop && config.auto_restart_enabled) {
+                const maxAttempts = parseInt(config.auto_restart_max_attempts) || 3;
+                if (restartAttempts < maxAttempts) {
+                    const delaySecs = parseInt(config.auto_restart_delay) || 30;
+                    restartTimerActive = true;
+                    restartTimerTarget = Date.now() + (delaySecs * 1000);
+                    addSlaveLog("System", `<span class="log-yellow log-bold">[System] Bots stopped unexpectedly. Auto-restarting in ${delaySecs}s...</span>`);
+                    updateRestartStatusText(`Auto-Restarting in ${delaySecs}s...`);
+                    return;
+                } else {
+                    updateRestartStatusText("Auto-restart limit reached!");
+                    addSlaveLog("System", `<span class="log-red log-bold">[System] Error: Auto-restart limit reached. Bots stopped completely.</span>`);
+                }
+            }
+
+            stopTelemetryPolling();
         }
         
         if (isPartyRunning && statuses["_time_running"] !== undefined) {
@@ -586,7 +596,7 @@ function checkActiveBotStatuses() {
                 // Skill Cooldowns Grid rendering
                 if (cooldownsEl) {
                     const cooldowns = status.cooldowns || { 0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
-                    let htmlStr = '<div class="cooldowns-grid">';
+                    let htmlStr = '';
                     for (let i = 0; i <= 5; i++) {
                         const cd = cooldowns[i] || 0;
                         const isSkill5 = i === 5;
@@ -595,23 +605,22 @@ function checkActiveBotStatuses() {
                         const label = isSkill0 ? 'AA' : i;
                         if (cd > 0) {
                             htmlStr += `
-                                <span class="skill-cd-badge on-cooldown${extraClass}" title="Skill ${label} on cooldown">
+                                <div class="skill-cd-badge on-cooldown${extraClass}" title="Skill ${label} on cooldown">
                                     <span class="skill-idx">${label}</span>
                                     <span class="skill-cd-val">${cd.toFixed(1)}s</span>
-                                </span>
+                                </div>
                             `;
                         } else {
                             htmlStr += `
-                                <span class="skill-cd-badge ready${extraClass}" title="Skill ${label} ready">
+                                <div class="skill-cd-badge ready${extraClass}" title="Skill ${label} ready">
                                     <span class="skill-idx">${label}</span>
                                     <span class="skill-cd-val">
                                         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="4" stroke-linecap="round" stroke-linejoin="round" style="width: 8px; height: 8px; display: block; margin: 0 auto;"><polyline points="20 6 9 17 4 12"></polyline></svg>
                                     </span>
-                                </span>
+                                </div>
                             `;
                         }
                     }
-                    htmlStr += '</div>';
                     cooldownsEl.innerHTML = htmlStr;
                 }
             } else {
@@ -624,7 +633,9 @@ function checkActiveBotStatuses() {
         });
 
         // Monitor client connections and auto-restart if dc is detected
-        handleDisconnectMonitoring(statuses);
+        if (!isManualStop && (isPartyRunning || restartTimerActive)) {
+            handleDisconnectMonitoring(statuses);
+        }
     }).catch(err => {
         console.error("Error fetching bot statuses:", err);
     });
@@ -764,7 +775,7 @@ function updateRestartStatusText(text) {
 }
 
 function handleDisconnectMonitoring(statuses) {
-    if (!config.auto_restart_enabled) {
+    if (isManualStop || !config.auto_restart_enabled) {
         isStoppingForRestart = false;
         restartTimerActive = false;
         restartTimerTarget = null;
