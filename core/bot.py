@@ -3,6 +3,8 @@ from core.command import Command
 from core.player import Player
 from core.utils import normalize
 import json
+import zlib
+import base64
 import time
 from typing import Awaitable, Callable, List, Optional
 from xml.etree import ElementTree
@@ -235,6 +237,8 @@ class Bot:
                 if messages:
                     for msg in messages:
                         try:
+                            if msg.startswith("Z"):
+                                msg = self.decompress_message(msg)
                             await self.handle_server_response(msg)
                         except Exception as e:
                             print(f"Handle Response Error: {e}")
@@ -313,6 +317,9 @@ class Bot:
             self.stop_bot()
 
     async def handle_server_response(self, msg):
+        if msg.startswith("Z"):
+            msg = self.decompress_message(msg)
+
         if self.auto_adjust_skill_delay and self.check_spam_time:
             if (time.time() - self.check_spam_time) > 300 and self.skill_delay_ms > 1500:
                 # self.check_spam_time = None
@@ -716,7 +723,7 @@ class Bot:
                 self.player.removeAllAuras()
         elif self.is_valid_xml(msg):
             if ("<cross-domain-policy><allow-access-from domain='*'" in msg):
-                self.write_message(f"<msg t='sys'><body action='login' r='0'><login z='zone_master'><nick><![CDATA[SPIDER#0001~{self.player.USER}~3.0141]]></nick><pword><![CDATA[{self.player.TOKEN}]]></pword></login></body></msg>")
+                self.write_message(f"<msg t='sys'><body action='login' r='0'><login z='zone_master'><nick><![CDATA[SPIDER#0001~{self.player.USER}~5.01]]></nick><pword><![CDATA[{self.player.TOKEN}]]></pword></login></body></msg>")
             elif "joinOK" in msg:
                 self.extract_user_ids(msg)
             elif "userGone" in msg:
@@ -822,6 +829,8 @@ class Bot:
                 messages = await self.read_batch_async(self.client_socket)
                 if messages:
                     for msg in messages:
+                        if msg.startswith("Z"):
+                            msg = self.decompress_message(msg)
                         await self.handle_server_response(msg)
                 if messages is None:
                     if self.isScriptable and self.auto_relogin:
@@ -879,6 +888,7 @@ class Bot:
                         self.is_valid_json(msg)
                         or self.is_valid_xml(msg)
                         or (msg.startswith("%") and msg.endswith("%"))
+                        or msg.startswith("Z")
                     ):
                         complete_messages.append(msg)
 
@@ -908,6 +918,25 @@ class Bot:
         except socket.error as e:
             return f"Error writing to the connection: {e}"
         return None
+
+    def decompress_message(self, msg: str) -> str:
+        """Decompress a message if it starts with 'Z' using Base64 and Zlib."""
+        if msg.startswith("Z"):
+            try:
+                b64_data = msg[1:]
+                decompressed = zlib.decompress(base64.b64decode(b64_data))
+                return decompressed.decode("utf-8")
+            except zlib.error:
+                try:
+                    decompressed = zlib.decompress(base64.b64decode(b64_data), -zlib.MAX_WBITS)
+                    return decompressed.decode("utf-8")
+                except Exception as e:
+                    print(f"Error decompressing Z packet: {e}")
+                    return msg
+            except Exception as e:
+                print(f"Error decompressing Z packet: {e}")
+                return msg
+        return msg
 
     def is_valid_json(self, s):
         try:
