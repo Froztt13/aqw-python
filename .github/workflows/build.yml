@@ -1,0 +1,99 @@
+name: Build App Bundles (macOS & Windows)
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    name: Build macOS (.app)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build macOS App Bundle
+        run: |
+          python app/build_hub_app.py build
+
+      - name: Compress macOS .app Bundle
+        run: |
+          cd dist
+          zip -r -y AQW_Bot_Hub-macOS.zip AQW_Bot_Hub.app
+
+      - name: Upload macOS Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AQW_Bot_Hub-macOS
+          path: dist/AQW_Bot_Hub-macOS.zip
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build Windows Executable
+        run: |
+          python app/build_hub_app_win.py
+
+      - name: Upload Windows Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: AQW_Bot_Hub-Windows
+          path: dist/AQW_Bot_Hub.exe
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: [build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AQW_Bot_Hub-macOS
+          path: release_assets
+
+      - name: Download Windows Artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: AQW_Bot_Hub-Windows
+          path: release_assets
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            release_assets/AQW_Bot_Hub-macOS.zip
+            release_assets/AQW_Bot_Hub.exe
+          generate_release_notes: true

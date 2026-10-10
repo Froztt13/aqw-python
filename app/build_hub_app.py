@@ -2002,28 +2002,19 @@ def generate_icons():
         except Exception as e:
             print(f"Failed to generate Windows app.ico: {e}")
 
-# --- Packager (Build) ---
+# --- Packager (Build macOS App Bundle) ---
 def build_app():
-    system = platform.system()
     app_name = "AQW_Bot_Hub"
     entrypoint = os.path.join("app", "build_hub_app.py")
     
     generate_icons()
-    print(f"Building AQW Bot Hub for {system}...")
+    print("Building AQW Bot Hub macOS app bundle (.app)...")
     
-    # Define outputs to clean depending on the OS
-    if system == "Windows":
-        outputs_to_clean = [
-            os.path.join("build", app_name),
-            os.path.join("dist", app_name),
-            os.path.join("dist", f"{app_name}.exe")
-        ]
-    else:  # macOS / Linux
-        outputs_to_clean = [
-            os.path.join("build", app_name),
-            os.path.join("dist", f"{app_name}.app"),
-            os.path.join("dist", app_name)
-        ]
+    outputs_to_clean = [
+        os.path.join("build", app_name),
+        os.path.join("dist", f"{app_name}.app"),
+        os.path.join("dist", app_name)
+    ]
         
     for path in outputs_to_clean:
         if os.path.exists(path):
@@ -2041,13 +2032,10 @@ def build_app():
         ("bot", "bot")
     ]
     
-    icon_file = "app.icns" if system == "Darwin" else "app.ico"
-    separator = ";" if system == "Windows" else ":"
+    icon_file = "app.icns"
     
     pyinstaller_bin = "pyinstaller"
     venv_pyinstaller = os.path.join("venv", "bin", "pyinstaller")
-    if system == "Windows":
-        venv_pyinstaller = os.path.join("venv", "Scripts", "pyinstaller.exe")
     if os.path.exists(venv_pyinstaller):
         pyinstaller_bin = venv_pyinstaller
 
@@ -2062,7 +2050,7 @@ def build_app():
     ]
     
     for src, dest in data_folders:
-        cmd.append(f"--add-data={src}{separator}{dest}")
+        cmd.append(f"--add-data={src}:{dest}")
         
     if os.path.exists(icon_file):
         cmd.append(f"--icon={icon_file}")
@@ -2076,8 +2064,8 @@ def build_app():
     
     if result.returncode == 0:
         print("\n" + "="*60)
-        output_file_desc = os.path.join("dist", f"{app_name}.app" if system == "Darwin" else f"{app_name}.exe")
-        print("SUCCESS! Standing app bundle built successfully.")
+        output_file_desc = os.path.join("dist", f"{app_name}.app")
+        print("SUCCESS! macOS App bundle built successfully.")
         print(f"You can find the standalone client at: {os.path.abspath(output_file_desc)}")
         print("="*60 + "\n")
     else:
