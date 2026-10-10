@@ -39,7 +39,8 @@ document.addEventListener('DOMContentLoaded', () => {
     // Config Inputs
     const followPlayerInput = document.getElementById('input-follow-player');
     const copyWalkInput = document.getElementById('input-copy-walk');
-    const serverSelect = document.getElementById('select-server');
+    const serverSelectEl = document.getElementById('select-server');
+    const serverSelect = serverSelectEl ? (serverSelectEl.querySelector('select') || serverSelectEl) : null;
     const roomNumberInput = document.getElementById('input-room-number');
     const targetsInput = document.getElementById('input-targets-priority');
     const autoZoneSelect = document.getElementById('select-auto-zone');
@@ -132,18 +133,67 @@ document.addEventListener('DOMContentLoaded', () => {
 
 
 
+    // Toast notification helper
+    function showToast(message) {
+        const toast = document.getElementById('toast-notification');
+        if (!toast) return;
+        toast.textContent = message;
+        toast.classList.remove('hidden');
+        setTimeout(() => {
+            toast.classList.add('hidden');
+        }, 2500);
+    }
+
+    // Global Settings Modal Dialog
+    const modalGlobalSettings = document.getElementById('modal-global-settings');
     const btnToggleSettings = document.getElementById('btn-toggle-settings');
-    const appBody = document.getElementById('app-body');
-    if (btnToggleSettings && appBody) {
-        btnToggleSettings.addEventListener('click', () => {
-            const active = appBody.classList.toggle('settings-hidden');
-            btnToggleSettings.classList.toggle('active', active);
-            if (globalConfig) {
-                globalConfig.settings_hidden = active;
-                window.pywebview.api.save_config(globalConfig);
+    const btnCloseSettingsModal = document.getElementById('btn-close-settings-modal');
+    const btnCancelSettings = document.getElementById('btn-cancel-settings');
+
+    function openGlobalSettingsModal() {
+        if (modalGlobalSettings) {
+            modalGlobalSettings.classList.remove('hidden');
+        }
+    }
+
+    function closeGlobalSettingsModal() {
+        if (modalGlobalSettings) {
+            modalGlobalSettings.classList.add('hidden');
+        }
+    }
+
+    if (btnToggleSettings) {
+        btnToggleSettings.addEventListener('click', openGlobalSettingsModal);
+    }
+    if (btnCloseSettingsModal) {
+        btnCloseSettingsModal.addEventListener('click', closeGlobalSettingsModal);
+    }
+    if (btnCancelSettings) {
+        btnCancelSettings.addEventListener('click', closeGlobalSettingsModal);
+    }
+    if (modalGlobalSettings) {
+        modalGlobalSettings.addEventListener('click', (e) => {
+            if (e.target === modalGlobalSettings) {
+                closeGlobalSettingsModal();
             }
         });
     }
+
+    // Modal Tabs Navigation
+    const modalSettingsTabs = document.querySelectorAll('#modal-global-settings .modal-tab');
+    const modalSettingsContents = document.querySelectorAll('#modal-global-settings .modal-tab-content');
+    modalSettingsTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            const targetTab = tab.getAttribute('data-tab');
+            modalSettingsTabs.forEach(t => t.classList.remove('active'));
+            modalSettingsContents.forEach(c => c.classList.remove('active'));
+            tab.classList.add('active');
+            const targetContent = document.getElementById(targetTab);
+            if (targetContent) {
+                targetContent.classList.add('active');
+            }
+        });
+    });
 
     // Console Tab Switch handler
     tabsList.addEventListener('click', (e) => {
@@ -417,16 +467,6 @@ document.addEventListener('DOMContentLoaded', () => {
         window.pywebview.api.load_config().then(config => {
             globalConfig = config;
 
-            // Apply saved settings panel state
-            const isSettingsHidden = config.settings_hidden || false;
-            if (isSettingsHidden) {
-                appBody.classList.add('settings-hidden');
-                btnToggleSettings.classList.add('active');
-            } else {
-                appBody.classList.remove('settings-hidden');
-                btnToggleSettings.classList.remove('active');
-            }
-
 
 
             if (!isEmbedded) {
@@ -471,6 +511,10 @@ document.addEventListener('DOMContentLoaded', () => {
     function renderSlavesTable() {
         slaveTableBody.innerHTML = '';
         const slaves = globalConfig.slaves || [];
+        const badgeCount = document.getElementById('badge-slave-count');
+        if (badgeCount) {
+            badgeCount.textContent = `${slaves.length} Accounts`;
+        }
 
         if (slaves.length === 0) {
             slaveTableBody.innerHTML = `<tr><td colspan="9" class="text-muted" style="text-align: center; padding: 20px;">No registered slave accounts. Click "+ Add Account" to start.</td></tr>`;
@@ -480,49 +524,92 @@ document.addEventListener('DOMContentLoaded', () => {
         slaves.forEach(s => {
             const tr = document.createElement('tr');
             tr.setAttribute('data-username', s.username);
-            tr.id = `slave-row-${s.id}`;
             tr.innerHTML = `
-                <td><input type="checkbox" class="chk-slave" value="${s.id}"></td>
-                <td><strong>${s.username}</strong></td>
-                <td><span class="text-muted">${s.char_class}</span></td>
-                <td style="text-align: center; vertical-align: middle;">
-                    <div style="display: flex; flex-direction: column; align-items: center; gap: 4px;">
-                        <input type="checkbox" class="chk-taunt-toggle" data-id="${s.id}" ${s.taunter ? 'checked' : ''} style="cursor: pointer; accent-color: var(--primary-color); width: 15px; height: 15px;">
-                        <span id="scroll-qty-${s.id}" class="scroll-qty-badge" style="font-size: 0.65rem; color: var(--text-muted); display: none; line-height: 1.1; text-align: center;">0<br>SoE</span>
+                <td class="col-chk" style="text-align: center;">
+                    <input type="checkbox" class="chk-slave" value="${s.id}">
+                </td>
+                <td class="col-account">
+                    <div class="account-cell">
+                        <div class="account-meta">
+                            <span class="account-name">${s.username}</span>
+                            <span class="account-sub">Skills: ${s.skills || '1,2,3,4'}</span>
+                        </div>
                     </div>
                 </td>
-                <td class="col-map">-</td>
+                <td class="col-class">
+                    <div class="class-badge" title="${s.char_class || 'Default'}">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="class-badge-icon">
+                            <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path>
+                        </svg>
+                        <span class="class-badge-text">${s.char_class || 'Default'}</span>
+                    </div>
+                </td>
+                <td class="col-taunt" style="text-align: center;">
+                    <div class="taunt-cell-wrapper">
+                        <label class="mini-switch" title="Auto Loop Taunt (Scroll of Enrage)">
+                            <input type="checkbox" class="chk-taunt-toggle" data-id="${s.id}" ${s.taunter ? 'checked' : ''}>
+                            <span class="mini-switch-slider"></span>
+                        </label>
+                        <span id="scroll-qty-${s.id}" class="scroll-qty-badge" style="display: none;">0 SoE</span>
+                    </div>
+                </td>
+                <td class="col-map">
+                    <div class="location-chip" id="location-chip-${s.id}">
+                        <span class="text-muted">-</span>
+                    </div>
+                </td>
                 <td class="col-vitals">
                     <div class="vitals-progress-wrapper">
-                        <div class="mini-vital-bar">
-                            <div class="mini-hp-fill" id="hp-bar-${s.id}"></div>
+                        <div class="vital-row">
+                            <span class="vital-tag tag-hp">HP</span>
+                            <div class="mini-vital-bar">
+                                <div class="mini-hp-fill" id="hp-bar-${s.id}"></div>
+                            </div>
+                            <span class="vital-val" id="hp-txt-${s.id}">0/0</span>
                         </div>
-                        <div class="mini-vital-bar">
-                            <div class="mini-mp-fill" id="mp-bar-${s.id}"></div>
-                        </div>
-                        <div class="vital-labels-sm">
-                            <span id="hp-txt-${s.id}">0/0</span>
-                            <span id="mp-txt-${s.id}">0/0</span>
+                        <div class="vital-row">
+                            <span class="vital-tag tag-mp">MP</span>
+                            <div class="mini-vital-bar">
+                                <div class="mini-mp-fill" id="mp-bar-${s.id}"></div>
+                            </div>
+                            <span class="vital-val" id="mp-txt-${s.id}">0/0</span>
                         </div>
                     </div>
                 </td>
                 <td class="col-recent-skills">
                     <div class="recent-skills-container" id="recent-skills-${s.id}">
-                        <span class="text-muted">-</span>
+                        <span class="text-muted cd-placeholder">-</span>
                     </div>
                 </td>
-                <td class="col-status"><span class="status-pill offline">Offline</span></td>
-                <td style="position: relative; text-align: center;">
+                <td class="col-status">
+                    <span class="status-pill offline">
+                        <span class="status-pill-dot"></span>
+                        <span class="status-pill-text">Offline</span>
+                    </span>
+                </td>
+                <td class="col-action" style="position: relative; text-align: center;">
                     <button class="btn-action-trigger" data-id="${s.id}" title="Actions">
-                        <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor" style="pointer-events: none; display: block; margin: 0 auto;">
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
                             <circle cx="12" cy="5" r="2.2"></circle>
                             <circle cx="12" cy="12" r="2.2"></circle>
                             <circle cx="12" cy="19" r="2.2"></circle>
                         </svg>
                     </button>
                     <div class="action-dropdown hidden" id="action-dropdown-${s.id}">
-                        <button class="action-item edit" data-action="edit" data-id="${s.id}">Edit</button>
-                        <button class="action-item delete" data-action="delete" data-id="${s.id}">Delete</button>
+                        <button class="action-item edit" data-action="edit" data-id="${s.id}">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                            </svg>
+                            <span>Edit</span>
+                        </button>
+                        <button class="action-item delete" data-action="delete" data-id="${s.id}">
+                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="3 6 5 6 21 6"></polyline>
+                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                            </svg>
+                            <span>Delete</span>
+                        </button>
                     </div>
                 </td>
             `;
@@ -626,7 +713,8 @@ document.addEventListener('DOMContentLoaded', () => {
 
     btnSaveSettings.addEventListener('click', () => {
         saveConfigurationLocal();
-        alert('Configuration settings saved successfully.');
+        closeGlobalSettingsModal();
+        showToast('Global settings saved successfully.');
     });
 
     // 6. Form Locking when active
@@ -659,6 +747,15 @@ document.addEventListener('DOMContentLoaded', () => {
 
         const actionSelects = slaveTableBody.querySelectorAll('.select-action');
         actionSelects.forEach(sel => sel.disabled = isRunning);
+
+        const slaveTable = document.getElementById('slave-table');
+        if (slaveTable) {
+            if (isRunning) {
+                slaveTable.classList.add('running');
+            } else {
+                slaveTable.classList.remove('running');
+            }
+        }
 
         if (isRunning && !isPaused) {
             addSlaveForm.classList.add('hidden');
@@ -695,7 +792,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnStart.innerHTML = `
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                     <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                </svg>Start
+                </svg><span>START</span>
             `;
             if (res.success) {
                 btnStart.classList.add('hidden');
@@ -723,7 +820,7 @@ document.addEventListener('DOMContentLoaded', () => {
             btnStop.innerHTML = `
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
                     <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                </svg> Stop All Slaves
+                </svg><span>STOP</span>
             `;
             if (res.success) {
                 btnStop.classList.add('hidden');
@@ -794,7 +891,11 @@ document.addEventListener('DOMContentLoaded', () => {
                 let activeCount = 0;
 
                 globalConfig.slaves.forEach(s => {
-                    const status = statuses[s.username];
+                    let status = statuses ? statuses[s.username] : null;
+                    if (!status && statuses) {
+                        const matchKey = Object.keys(statuses).find(k => k.toLowerCase() === s.username.toLowerCase());
+                        if (matchKey) status = statuses[matchKey];
+                    }
                     if (status) {
                         updateRowStatus(s.username, status);
                         if (status.running) {
@@ -843,21 +944,30 @@ document.addEventListener('DOMContentLoaded', () => {
         const mpTxt = document.getElementById(`mp-txt-${id}`);
         const recentSkillsEl = document.getElementById(`recent-skills-${id}`);
         const tauntChk = row.querySelector('.chk-taunt-toggle');
+        const tauntSwitch = tauntChk ? tauntChk.closest('.mini-switch') : null;
 
         if (!status || !status.running) {
-            colMap.textContent = '-';
-            colStatus.innerHTML = `<span class="status-pill offline">Offline</span>`;
+            if (colMap) colMap.innerHTML = `<span class="text-muted">-</span>`;
+            if (colStatus) {
+                colStatus.innerHTML = `
+                    <span class="status-pill offline">
+                        <span class="status-pill-dot"></span>
+                        <span class="status-pill-text">Offline</span>
+                    </span>
+                `;
+            }
             if (hpBar) hpBar.style.width = '0%';
             if (mpBar) mpBar.style.width = '0%';
             if (hpTxt) hpTxt.textContent = '0/0';
             if (mpTxt) mpTxt.textContent = '0/0';
             if (recentSkillsEl) {
-                recentSkillsEl.innerHTML = '<span class="text-muted">-</span>';
+                recentSkillsEl.innerHTML = '<span class="text-muted cd-placeholder">-</span>';
+            }
+            if (tauntSwitch) {
+                tauntSwitch.classList.remove('taunt-error-highlight', 'taunt-active-highlight');
+                tauntSwitch.removeAttribute('title');
             }
             if (tauntChk) {
-                tauntChk.classList.remove('taunt-error-highlight');
-                tauntChk.classList.remove('taunt-active-highlight');
-                tauntChk.removeAttribute('title');
                 tauntChk.disabled = false;
             }
             const scrollQtyEl = document.getElementById(`scroll-qty-${id}`);
@@ -867,16 +977,38 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        colMap.textContent = `${status.map} (${status.cell})`;
+        if (colMap) {
+            colMap.innerHTML = `
+                <div class="location-chip" title="Map: ${status.map || 'Unknown'}, Cell: ${status.cell || ''}">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="loc-icon">
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"></path>
+                        <circle cx="12" cy="10" r="3"></circle>
+                    </svg>
+                    <span class="loc-map">${status.map || '-'}</span>
+                    <span class="loc-cell">${status.cell ? '(' + status.cell + ')' : ''}</span>
+                </div>
+            `;
+        }
 
-        if (status.is_dead) {
-            colStatus.innerHTML = `<span class="status-pill dead">Dead</span>`;
-        } else if (status.is_paused) {
-            colStatus.innerHTML = `<span class="status-pill paused">Paused</span>`;
-        } else if (status.is_connected) {
-            colStatus.innerHTML = `<span class="status-pill online">Serving</span>`;
-        } else {
-            colStatus.innerHTML = `<span class="status-pill connecting">Connecting</span>`;
+        if (colStatus) {
+            let statusClass = 'connecting';
+            let statusText = 'Connecting';
+            if (status.is_dead) {
+                statusClass = 'dead';
+                statusText = 'Dead';
+            } else if (status.is_paused) {
+                statusClass = 'paused';
+                statusText = 'Paused';
+            } else if (status.is_connected) {
+                statusClass = 'online';
+                statusText = 'Serving';
+            }
+            colStatus.innerHTML = `
+                <span class="status-pill ${statusClass}">
+                    <span class="status-pill-dot"></span>
+                    <span class="status-pill-text">${statusText}</span>
+                </span>
+            `;
         }
 
         if (recentSkillsEl) {
@@ -911,38 +1043,33 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         if (tauntChk) {
-            tauntChk.classList.remove('taunt-error-highlight');
-            tauntChk.classList.remove('taunt-active-highlight');
-            tauntChk.removeAttribute('title');
             tauntChk.disabled = status.running && !status.is_paused;
+        }
+
+        if (tauntSwitch) {
+            tauntSwitch.classList.remove('taunt-error-highlight', 'taunt-active-highlight');
+            if (status.taunt_error) {
+                tauntSwitch.classList.add('taunt-error-highlight');
+                tauntSwitch.title = "Scroll of Enrage not found in inventory!";
+            } else if (status.is_active_taunter) {
+                tauntSwitch.classList.add('taunt-active-highlight');
+                tauntSwitch.title = "Currently active taunter (casting Scroll of Enrage)";
+            } else {
+                tauntSwitch.title = "Auto Loop Taunt (Scroll of Enrage)";
+            }
         }
 
         const scrollQtyEl = document.getElementById(`scroll-qty-${id}`);
         if (scrollQtyEl) {
             if (status.running && status.scroll_enrage_qty !== undefined) {
-                scrollQtyEl.innerHTML = `${status.scroll_enrage_qty}<br>SoE`;
+                scrollQtyEl.textContent = `${status.scroll_enrage_qty} SoE`;
                 scrollQtyEl.style.display = 'inline-block';
-                if (status.scroll_enrage_qty === 0) {
-                    scrollQtyEl.style.color = 'var(--danger-color)';
-                } else if (status.scroll_enrage_qty < 10) {
-                    scrollQtyEl.style.color = 'var(--warning-color)';
-                } else {
-                    scrollQtyEl.style.color = 'var(--success-color)';
-                }
+                scrollQtyEl.className = 'scroll-qty-badge ' + (
+                    status.scroll_enrage_qty === 0 ? 'qty-empty' :
+                    status.scroll_enrage_qty < 10 ? 'qty-low' : 'qty-ok'
+                );
             } else {
                 scrollQtyEl.style.display = 'none';
-            }
-        }
-
-        if (status.taunt_error) {
-            if (tauntChk) {
-                tauntChk.classList.add('taunt-error-highlight');
-                tauntChk.title = "Scroll of Enrage not found in inventory!";
-            }
-        } else if (status.is_active_taunter) {
-            if (tauntChk) {
-                tauntChk.classList.add('taunt-active-highlight');
-                tauntChk.title = "Currently active taunter (casting Scroll of Enrage)";
             }
         }
 

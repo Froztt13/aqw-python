@@ -314,11 +314,19 @@ document.addEventListener('DOMContentLoaded', () => {
             }
 
             // Update Summary Banner
+            const bannerStatusBadge = document.getElementById('banner-status-badge');
+            const bannerActiveCount = document.getElementById('banner-active-count');
+            if (bannerActiveCount) {
+                bannerActiveCount.textContent = `${activeBots.length} / 4`;
+            }
+
             if (activeBots.length > 0) {
                 bannerDot.classList.add('active');
+                if (bannerStatusBadge) bannerStatusBadge.textContent = 'ACTIVE';
                 bannerDescription.textContent = `Running: ${activeBots.join(', ')}`;
             } else {
                 bannerDot.classList.remove('active');
+                if (bannerStatusBadge) bannerStatusBadge.textContent = 'STANDBY';
                 bannerDescription.textContent = 'All bots are currently inactive.';
             }
         }).catch(err => {
@@ -331,17 +339,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const badge = badges[botId];
         const cardDetails = details[botId];
         const card = cards[botId];
+        const navDot = document.getElementById(`nav-dot-${botId}`);
 
         if (isActive) {
             badge.classList.add('active');
             badge.textContent = 'Active';
             cardDetails.classList.remove('hidden');
             card.classList.add('active-card');
+            if (navDot) navDot.classList.add('active');
         } else {
             badge.classList.remove('active');
             badge.textContent = 'Offline';
             cardDetails.classList.add('hidden');
             card.classList.remove('active-card');
+            if (navDot) navDot.classList.remove('active');
         }
     }
 

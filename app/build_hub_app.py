@@ -233,7 +233,11 @@ class SlaveBotThread(threading.Thread):
                 muteSpamWarning=True,
                 antiMod=True
             )
-            self.bot_instance.set_login_info(self.username, self.password, self.config.get("server", "Artix"))
+            self.bot_instance.set_login_info(self.username, self.password, self.config.get("server", "Alteon"))
+            self.bot_instance.is_script_paused = False
+            self.bot_instance.is_paused = False
+            self.bot_instance.was_paused = False
+            self.bot_instance.taunt_error = False
             
             # Inject properties into bot instance for thread safety
             self.bot_instance.default_room_number = int(self.config.get("room_number", 9099))
@@ -740,9 +744,11 @@ class SlaveryApi:
         return {"success": True}
 
     def toggle_pause_slaves(self, pause_state):
+        state = bool(pause_state)
         for username, thread in self.active_threads.items():
             if thread.bot_instance:
-                thread.bot_instance.is_script_paused = bool(pause_state)
+                thread.bot_instance.is_paused = state
+                thread.bot_instance.is_script_paused = state
         return {"success": True}
 
     def update_slave_taunter(self, username, taunter_state):
@@ -759,42 +765,66 @@ class SlaveryApi:
     def get_status(self):
         from datetime import datetime
         statuses = {}
+        now = datetime.now()
         for username, thread in list(self.active_threads.items()):
             running = thread.is_alive()
             if running and thread.bot_instance:
                 bot = thread.bot_instance
-                player = bot.player
+                player = getattr(bot, "player", None)
                 
-                cooldowns = {}
-                now = datetime.now()
+                cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
                 if player and hasattr(player, "SKILLS"):
-                    for i in range(0, 6):
-                        if i < len(player.SKILLS):
-                            skill_data = player.SKILLS[i]
-                            next_use = skill_data.get("nextUse")
-                            if next_use and next_use > now:
-                                cooldowns[i] = round((next_use - now).total_seconds(), 1)
-                            else:
-                                cooldowns[i] = 0.0
-                        else:
-                            cooldowns[i] = 0.0
-                else:
-                    cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+                    try:
+                        skills = player.SKILLS
+                        if isinstance(skills, (list, tuple)):
+                            for i in range(0, 6):
+                                if i < len(skills):
+                                    skill_data = skills[i]
+                                    if isinstance(skill_data, dict):
+                                        next_use = skill_data.get("nextUse")
+                                        if isinstance(next_use, datetime) and next_use > now:
+                                            cooldowns[i] = round((next_use - now).total_seconds(), 1)
+                    except Exception:
+                        pass
+
+                scroll_qty = 0
+                if player and hasattr(player, "get_item_inventory"):
+                    try:
+                        item_enrage = player.get_item_inventory("Scroll of Enrage")
+                        if item_enrage and hasattr(item_enrage, "qty"):
+                            scroll_qty = int(item_enrage.qty)
+                    except Exception:
+                        scroll_qty = 0
+
+                is_active_taunter = False
+                if self.taunt_coordinator:
+                    try:
+                        is_active_taunter = (self.taunt_coordinator.get_active_taunter() == username)
+                    except Exception:
+                        pass
 
                 try:
+                    hp_val = int(player.CURRENT_HP) if player and player.CURRENT_HP is not None else 0
+                    max_hp_val = int(player.MAX_HP) if player and player.MAX_HP is not None else 0
+                    mp_val = int(player.MANA) if player and player.MANA is not None else 0
+                    max_mp_val = int(player.MAX_MP) if player and player.MAX_MP is not None else 0
+                    
                     statuses[username] = {
-                        "running": running,
-                        "is_connected": bot.is_client_connected,
-                        "hp": player.CURRENT_HP if player else 0,
-                        "max_hp": player.MAX_HP if player else 0,
-                        "mp": player.MANA if player else 0,
-                        "max_mp": player.MAX_MP if player else 0,
-                        "is_dead": player.ISDEAD if player else False,
-                        "map": bot.strMapName or "-",
-                        "cell": player.CELL if player else "-",
-                        "pad": player.PAD if player else "-",
-                        "is_paused": bot.is_script_paused,
-                        "cooldowns": cooldowns
+                        "running": True,
+                        "is_connected": bool(getattr(bot, "is_client_connected", False)),
+                        "hp": hp_val,
+                        "max_hp": max_hp_val,
+                        "mp": mp_val,
+                        "max_mp": max_mp_val,
+                        "is_dead": bool(player.ISDEAD) if player else False,
+                        "map": str(getattr(bot, "strMapName", "-") or "-"),
+                        "cell": str(player.CELL if player and player.CELL else "-"),
+                        "pad": str(player.PAD if player and player.PAD else "-"),
+                        "is_paused": bool(getattr(bot, "is_paused", False) or getattr(bot, "is_script_paused", False)),
+                        "cooldowns": cooldowns,
+                        "scroll_enrage_qty": scroll_qty,
+                        "taunt_error": bool(getattr(bot, "taunt_error", False)),
+                        "is_active_taunter": is_active_taunter
                     }
                 except Exception as e:
                     statuses[username] = {
@@ -1922,11 +1952,11 @@ def run_gui():
 # --- Icon Generator ---
 def generate_icons():
     system = platform.system()
-    png_path = os.path.join(project_root, "app", "web_dashboard", "aqw_icon.png")
+    png_path = os.path.join(project_root, "app", "web_dashboard", "temple_icon.png")
     if not os.path.exists(png_path):
         return
         
-    print("Generating application icons from aqw_icon.png...")
+    print("Generating application icons from temple_icon.png...")
     if system == "Darwin":
         try:
             iconset_dir = "app.iconset"

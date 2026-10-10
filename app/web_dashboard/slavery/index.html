@@ -7,9 +7,7 @@
     <title>AQW Maid Slavery</title>
     <link rel="icon" href="favicon.ico" type="image/x-icon">
     <link rel="stylesheet" href="style.css">
-    <link
-        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap"
-        rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
 </head>
 
 <body>
@@ -27,7 +25,7 @@
                         <h1 id="app-title-click">Maid Slavery</h1>
                         <span class="version-badge" id="app-version">v1.1.0</span>
                     </div>
-                    <p>Auto battle, follow, and sucking.</p>
+                    <p>Auto battle, follow, and team coordination.</p>
                     <div class="info-tooltip-bubble" id="info-bubble">
                         Based on <strong>AQW Python</strong><br>
                         <a href="https://github.com/Froztt13/aqw-python" target="_blank"
@@ -35,142 +33,50 @@
                     </div>
                 </div>
             </div>
-            <div class="header-controls" style="display: flex; align-items: center;">
-                <div class="theme-selector-group" id="theme-selector-group" style="padding: 4px 10px; height: 42px; border-radius: 10px; margin-right: 8px; display: inline-flex; align-items: center; gap: 8px;">
+            <div class="header-controls">
+                <div class="theme-selector-group" id="theme-selector-group">
                     <button type="button" class="theme-dot default" data-theme="default" title="Default Theme"></button>
                     <button type="button" class="theme-dot red" data-theme="red" title="Red Theme"></button>
                     <button type="button" class="theme-dot pink" data-theme="pink" title="Pink Theme"></button>
                     <button type="button" class="theme-dot blue" data-theme="blue" title="Blue Theme"></button>
                     <button type="button" class="theme-dot green" data-theme="green" title="Green Theme"></button>
                 </div>
-                <settings-button id="btn-toggle-settings" title="Toggle Global Settings"></settings-button>
-                <button class="btn btn-warning hidden" id="btn-pause-slaves" style="margin-right: 8px;">
+                <button type="button" class="btn btn-secondary btn-icon-with-text" id="btn-toggle-settings" title="Configure Global Settings">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
+                        <circle cx="12" cy="12" r="3"></circle>
+                        <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path>
+                    </svg>
+                    <span>Settings</span>
+                </button>
+                <button class="btn btn-warning hidden" id="btn-pause-slaves">
                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon" id="pause-btn-icon">
                         <rect x="6" y="4" width="4" height="16"></rect>
                         <rect x="14" y="4" width="4" height="16"></rect>
                     </svg>
                     <span id="pause-btn-text">Pause</span>
                 </button>
-                <bot-control-buttons start-id="btn-start-slaves" stop-id="btn-stop-slaves" start-label="Start" stop-label="Stop"></bot-control-buttons>
+                <bot-control-buttons start-id="btn-start-slaves" stop-id="btn-stop-slaves" start-label="START" stop-label="STOP"></bot-control-buttons>
             </div>
         </header>
 
-        <!-- Main Body -->
+        <!-- Main Body (Full Width Slave Registry Panel) -->
         <main class="app-body" id="app-body">
-
-            <!-- Left Side: Global Configuration -->
-            <section class="panel-column span-2" id="panel-global-settings">
-                <div class="card glass-card fill-height scrollable-panel">
-                    <div class="settings-header-wrapper"
-                        style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px; border-bottom: 1px dashed rgba(255, 255, 255, 0.08); padding-bottom: 12px;">
-                        <h2 style="margin: 0; font-size: 1.2rem;">Global Slavery Settings</h2>
-                        <button class="btn btn-small btn-success" id="btn-save-settings">Save Settings</button>
-                    </div>
-
-                    <!-- Section 1: Connection & Server -->
-                    <div class="settings-section">
-                        <h3 class="settings-section-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon"><rect x="2" y="2" width="20" height="8" rx="2" ry="2"></rect><rect x="2" y="14" width="20" height="8" rx="2" ry="2"></rect><line x1="6" y1="6" x2="6.01" y2="6"></line><line x1="6" y1="18" x2="6.01" y2="18"></line></svg>
-                            Connection & Server
-                        </h3>
-                        <div class="form-row">
-                            <div class="form-group flex-2">
-                                <label for="input-follow-player">Master Player Name</label>
-                                <input type="text" id="input-follow-player" placeholder="e.g. MasterAccount">
-                            </div>
-                            <div class="form-group flex-1">
-                                <label for="select-server">Server</label>
-                                <server-select id="select-server" value="Artix"></server-select>
-                            </div>
-                        </div>
-                        <span class="help-text" style="display: block; margin-top: -6px; margin-bottom: 12px;">The username of the player that all slaves will follow.</span>
-
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label class="custom-switch">
-                                <input type="checkbox" id="input-copy-walk">
-                                <span class="switch-slider"></span>
-                                <span class="switch-text">Enable Copy Walk</span>
-                            </label>
-                            <span class="help-text" style="margin-top: 4px;">Directly mirror the master's cell jumps and cell movements.</span>
-                        </div>
-                    </div>
-
-                    <!-- Section 2: Combat & Automation -->
-                    <div class="settings-section">
-                        <h3 class="settings-section-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon"><polygon points="6 2 18 2 18 6 6 6 6 2"></polygon><rect x="3" y="6" width="18" height="16" rx="2"></rect><line x1="10" y1="12" x2="14" y2="12"></line></svg>
-                            Combat & Automation
-                        </h3>
-                        
-                        <div class="form-group">
-                            <label for="select-auto-zone">Auto Zone Boss Mechanic</label>
-                            <select id="select-auto-zone">
-                                <option value="none">None</option>
-                                <option value="Astral Empyrean">Astral Empyrean</option>
-                                <option value="Dark Carnax">Dark Carnax</option>
-                                <option value="Ultra Dage">Ultra Dage</option>
-                                <option value="Queen Iona">Queen Iona</option>
-                                <option value="Vordred">Vordred</option>
-                            </select>
-                            <span class="help-text">Automatically reposition the player to safe zones during the selected boss fight.</span>
-                        </div>
-
-                        <div class="form-group" style="margin-bottom: 0;">
-                            <label for="input-targets-priority">Combat Priority List</label>
-                            <input type="text" id="input-targets-priority" placeholder="Comma-separated monster names">
-                            <span class="help-text">Target priority, e.g. Staff of Inversion, Defense Drone.</span>
-                        </div>
-                    </div>
-
-                    <!-- Section 3: Loot & Patrol -->
-                    <div class="settings-section" style="margin-bottom: 0;">
-                        <h3 class="settings-section-title">
-                            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="section-icon"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"></path></svg>
-                            Loot & Map Patrol
-                        </h3>
-                        
-                        <!-- Whitelist Section -->
-                        <div class="form-group">
-                            <label>Item Drop Whitelist</label>
-                            <div class="tag-input-container">
-                                <input type="text" id="input-new-tag" placeholder="Add drop item...">
-                                <button class="btn btn-primary" id="btn-add-tag">Add</button>
-                            </div>
-                            <div class="tags-container" id="whitelist-tags">
-                                <!-- Populated dynamically -->
-                            </div>
-                        </div>
-
-                        <!-- Locked Zones Checklist -->
-                        <div class="form-group">
-                            <label>Locked Zones Map Patrol</label>
-                            <span class="help-text" style="margin-bottom: 6px;">Maps check path if master is in locked zone:</span>
-                            <div class="checklist-container" id="locked-zones-list">
-                                <!-- Populated dynamically with checklist items -->
-                            </div>
-                            <div class="tag-input-container margin-top-sm">
-                                <input type="text" id="input-new-map" placeholder="Add custom map...">
-                                <button class="btn btn-primary" id="btn-add-map">Add</button>
-                            </div>
-
-                        <!-- Room Number under Locked Zones -->
-                        <div class="form-group margin-top-md" style="margin-bottom: 0;">
-                            <label for="input-room-number">Room Number</label>
-                            <input type="number" id="input-room-number" value="9099">
-                            <span class="help-text">Default room number used to join patrol map instances.</span>
-                        </div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Right Side: Slaves Accounts Manager -->
-            <section class="panel-column span-3" id="panel-slave-registry">
+            <section class="panel-column span-full" id="panel-slave-registry">
                 <div class="card glass-card fill-height">
                     <div class="card-header">
-                        <h2>Slave Bots Registry</h2>
-                        <button class="btn btn-small btn-primary" id="btn-toggle-add-form">
-                            + Add Account
-                        </button>
+                        <div class="card-header-left">
+                            <h2>Slave Bots Registry</h2>
+                            <span class="count-badge" id="badge-slave-count">0 Accounts</span>
+                        </div>
+                        <div class="card-header-actions">
+                            <button class="btn btn-small btn-primary" id="btn-toggle-add-form">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" class="btn-icon">
+                                    <line x1="12" y1="5" x2="12" y2="19"></line>
+                                    <line x1="5" y1="12" x2="19" y2="12"></line>
+                                </svg>
+                                <span>Add Account</span>
+                            </button>
+                        </div>
                     </div>
 
                     <!-- Slave Accounts Table -->
@@ -178,10 +84,10 @@
                         <table class="slave-table" id="slave-table">
                             <thead>
                                 <tr>
-                                    <th width="40"><input type="checkbox" id="chk-select-all"></th>
-                                    <th>Username</th>
-                                    <th>Class</th>
-                                    <th width="60" style="text-align: center; position: relative;">
+                                    <th width="44" style="text-align: center;"><input type="checkbox" id="chk-select-all" title="Select All"></th>
+                                    <th style="min-width: 170px;">Account</th>
+                                    <th width="125">Class</th>
+                                    <th width="85" style="text-align: center; position: relative;">
                                         <div style="display: inline-flex; align-items: center; gap: 4px; justify-content: center; cursor: pointer;" id="th-taunt-click">
                                             <span>Taunt</span>
                                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 12px; height: 12px; opacity: 0.7;">
@@ -195,11 +101,11 @@
                                             Automatic rotation mechanism for using <em>Scroll of Enrage</em> between active accounts sequentially every <strong>6 seconds</strong> to keep the boss taunted 100% of the time without overlapping.
                                         </div>
                                     </th>
-                                    <th>Location</th>
-                                    <th>Vitals (HP/MP)</th>
-                                    <th>Skill Cooldowns</th>
-                                    <th>Status</th>
-                                    <th width="60">Action</th>
+                                    <th width="145">Location</th>
+                                    <th width="180">Vitals (HP / MP)</th>
+                                    <th width="150">Cooldowns</th>
+                                    <th width="105">Status</th>
+                                    <th width="55" style="text-align: center;" class="col-action-th">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="slave-table-body">
@@ -211,7 +117,7 @@
             </section>
         </main>
 
-        <!-- Bottom Console Console -->
+        <!-- Bottom Console Viewport -->
         <footer class="app-console">
             <div class="console-tabs-bar">
                 <div class="tabs-list" id="console-tabs-list">
@@ -231,15 +137,122 @@
         </footer>
     </div>
 
-    <!-- Add/Edit Slave Account Modal -->
+    <!-- ==================== GLOBAL SETTINGS MODAL DIALOG ==================== -->
+    <div id="modal-global-settings" class="modal-overlay hidden">
+        <div class="modal-card modal-card-lg">
+            <button type="button" class="btn-close-modal" id="btn-close-settings-modal">&times;</button>
+            <div class="modal-header-section">
+                <span class="modal-badge-tag">SETTINGS</span>
+                <h3 class="modal-title">Global Slavery Configuration</h3>
+                <p class="modal-subtitle">Configure master follower settings, patrol routes, and boss mechanics</p>
+            </div>
+
+            <!-- Tabbed Navigation Inside Modal -->
+            <div class="modal-tabs">
+                <button type="button" class="modal-tab active" data-tab="tab-settings-connection">Connection & Master</button>
+                <button type="button" class="modal-tab" data-tab="tab-settings-combat">Combat & Bosses</button>
+                <button type="button" class="modal-tab" data-tab="tab-settings-patrol">Loot & Patrol</button>
+            </div>
+
+            <!-- Tab 1: Connection & Master -->
+            <div class="modal-tab-content active" id="tab-settings-connection">
+                <div class="form-row">
+                    <div class="form-group flex-2">
+                        <label for="input-follow-player">Master Player Username</label>
+                        <input type="text" id="input-follow-player" placeholder="e.g. MasterAccount">
+                        <span class="help-text">Username of the character that all slaves will follow.</span>
+                    </div>
+                    <div class="form-group flex-1">
+                        <label for="select-server">Target Server</label>
+                        <server-select id="select-server" value="Artix"></server-select>
+                    </div>
+                </div>
+
+                <div class="form-row margin-top-md">
+                    <div class="form-group flex-1">
+                        <label for="input-room-number">Default Room Number</label>
+                        <input type="number" id="input-room-number" value="9099">
+                        <span class="help-text">Room instance joined when moving to map areas.</span>
+                    </div>
+                    <div class="form-group flex-1" style="display: flex; flex-direction: column; justify-content: center;">
+                        <label class="custom-switch" style="margin-top: 10px;">
+                            <input type="checkbox" id="input-copy-walk">
+                            <span class="switch-slider"></span>
+                            <span class="switch-text">Enable Copy Walk</span>
+                        </label>
+                        <span class="help-text" style="margin-top: 6px;">Directly mirror master's cell jumps and movements.</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Tab 2: Combat & Boss Tactics -->
+            <div class="modal-tab-content" id="tab-settings-combat">
+                <div class="form-group">
+                    <label for="select-auto-zone">Auto Zone Boss Mechanic</label>
+                    <select id="select-auto-zone">
+                        <option value="none">None (Disabled)</option>
+                        <option value="Astral Empyrean">Astral Empyrean</option>
+                        <option value="Dark Carnax">Dark Carnax</option>
+                        <option value="Ultra Dage">Ultra Dage</option>
+                        <option value="Queen Iona">Queen Iona</option>
+                        <option value="Vordred">Vordred</option>
+                    </select>
+                    <span class="help-text">Automatically reposition slaves to safe zones during special boss mechanics.</span>
+                </div>
+
+                <div class="form-group margin-top-md">
+                    <label for="input-targets-priority">Combat Priority List</label>
+                    <input type="text" id="input-targets-priority" placeholder="e.g. Staff of Inversion, Defense Drone">
+                    <span class="help-text">Comma-separated target list (evaluated from highest to lowest priority).</span>
+                </div>
+            </div>
+
+            <!-- Tab 3: Loot & Map Patrol -->
+            <div class="modal-tab-content" id="tab-settings-patrol">
+                <!-- Whitelist Section -->
+                <div class="form-group">
+                    <label>Item Drop Whitelist</label>
+                    <div class="tag-input-container">
+                        <input type="text" id="input-new-tag" placeholder="Add drop item name...">
+                        <button type="button" class="btn btn-primary" id="btn-add-tag">Add</button>
+                    </div>
+                    <div class="tags-container" id="whitelist-tags">
+                        <!-- Populated dynamically -->
+                    </div>
+                </div>
+
+                <!-- Locked Zones Checklist -->
+                <div class="form-group margin-top-md">
+                    <label>Locked Zones Map Patrol</label>
+                    <span class="help-text" style="margin-bottom: 6px;">Maps check path if master enters a locked zone:</span>
+                    <div class="checklist-container" id="locked-zones-list">
+                        <!-- Populated dynamically -->
+                    </div>
+                    <div class="tag-input-container margin-top-sm">
+                        <input type="text" id="input-new-map" placeholder="Add custom patrol map...">
+                        <button type="button" class="btn btn-primary" id="btn-add-map">Add</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal Footer Actions -->
+            <div class="modal-actions-footer">
+                <button type="button" class="btn btn-secondary" id="btn-cancel-settings">Cancel</button>
+                <button type="button" class="btn btn-success" id="btn-save-settings">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== ADD / EDIT SLAVE ACCOUNT MODAL ==================== -->
     <div id="add-slave-form" class="modal-overlay hidden">
         <div class="modal-card">
-            <button class="btn-close-modal" id="btn-close-slave-modal">&times;</button>
-            <h3 id="add-slave-title"
-                style="margin-top: 0; margin-bottom: 20px; font-size: 1.15rem; font-weight: 600; color: var(--primary-color);">
-                Add New Slave Account</h3>
+            <button type="button" class="btn-close-modal" id="btn-close-slave-modal">&times;</button>
+            <div class="modal-header-section">
+                <span class="modal-badge-tag">ACCOUNT</span>
+                <h3 class="modal-title" id="add-slave-title">Add New Slave Account</h3>
+            </div>
 
-            <div style="display: flex; flex-direction: column; gap: 14px;">
+            <div style="display: flex; flex-direction: column; gap: 14px; padding: 20px 24px 0 24px;">
                 <!-- Section 1: Account Credentials -->
                 <div style="display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;">
                     <div class="form-group">
@@ -282,7 +295,7 @@
                             <span class="switch-slider"></span>
                             <span class="switch-text">Enable Taunter (Scroll of Enrage)</span>
                         </label>
-                        <span id="form-taunt-info-click" style="cursor: pointer; opacity: 0.6; display: inline-flex; align-items: center; padding: 4px; margin-right: 4px;" title="Info mekanisme Taunt">
+                        <span id="form-taunt-info-click" style="cursor: pointer; opacity: 0.6; display: inline-flex; align-items: center; padding: 4px; margin-right: 4px;" title="Taunt mechanism info">
                             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width: 14px; height: 14px;">
                                 <circle cx="12" cy="12" r="10"></circle>
                                 <line x1="12" y1="16" x2="12" y2="12"></line>
@@ -294,7 +307,7 @@
                         <strong>Auto Loop Taunt (Enrage)</strong><br>
                         If enabled, this account will participate in the sequential taunt rotation every <strong>6 seconds</strong>. Automatically casts <em>Scroll of Enrage</em> when its turn arrives.
                     </div>
-                    <span class="help-text" style="margin-top: 4px; margin-left: 48px;">Automatically coordinates and rotates target taunting between active bots.</span>
+                    <span class="help-text" style="margin-top: 4px; margin-left: 48px;">Coordinates target taunting rotation sequentially between active bots.</span>
                 </div>
 
                 <div class="modal-section-divider"></div>
@@ -331,14 +344,18 @@
                 </div>
             </div>
 
-            <div class="form-actions" style="margin-top: 24px; display: flex; justify-content: flex-end; gap: 10px;">
-                <button class="btn btn-secondary" id="btn-cancel-add-slave" style="padding: 8px 16px;">Cancel</button>
-                <button class="btn btn-success" id="btn-save-new-slave" style="padding: 8px 20px;">Save Account</button>
+            <div class="modal-actions-footer margin-top-md">
+                <button type="button" class="btn btn-secondary" id="btn-cancel-add-slave">Cancel</button>
+                <button type="button" class="btn btn-success" id="btn-save-new-slave">Save Account</button>
             </div>
         </div>
     </div>
 
+    <!-- Notification Toast -->
+    <div id="toast-notification" class="toast-notification hidden"></div>
+
     <script src="../components.js"></script>
     <script src="main.js"></script>
 </body>
+
 </html>

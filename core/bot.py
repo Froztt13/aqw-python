@@ -64,6 +64,10 @@ class Bot:
         self.is_char_load_complete= False
         self.is_joining_map = False
         self.is_client_connected = False
+        self.is_script_paused = False
+        self.is_paused = False
+        self.was_paused = False
+        self.taunt_error = False
         
         self.wait_ms = 0
         self.player = Player()

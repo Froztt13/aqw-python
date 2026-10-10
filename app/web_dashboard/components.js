@@ -1,10 +1,31 @@
 class ServerSelect extends HTMLElement {
+    get value() {
+        const select = this.querySelector('select');
+        return select ? select.value : (this.getAttribute('value') || 'Artix');
+    }
+    set value(val) {
+        this.setAttribute('value', val);
+        const select = this.querySelector('select');
+        if (select) {
+            select.value = val;
+        }
+    }
+    get disabled() {
+        const select = this.querySelector('select');
+        return select ? select.disabled : false;
+    }
+    set disabled(val) {
+        const select = this.querySelector('select');
+        if (select) {
+            select.disabled = val;
+        }
+    }
     connectedCallback() {
         const id = this.getAttribute('id') || 'select-server';
         const defaultValue = this.getAttribute('value') || 'Artix';
         this.innerHTML = `
             <div class="select-wrapper">
-                <select id="${id}">
+                <select id="${id}-inner">
                     <option value="Artix">Artix</option>
                     <option value="Gravelyn">Gravelyn</option>
                     <option value="Cysero">Cysero</option>
@@ -23,7 +44,12 @@ class ServerSelect extends HTMLElement {
             </div>
         `;
         const select = this.querySelector('select');
-        select.value = defaultValue;
+        if (select) {
+            select.value = defaultValue;
+            select.addEventListener('change', () => {
+                this.setAttribute('value', select.value);
+            });
+        }
     }
 }
 customElements.define('server-select', ServerSelect);
@@ -32,8 +58,8 @@ class BotControlButtons extends HTMLElement {
     connectedCallback() {
         const startId = this.getAttribute('start-id') || 'btn-start';
         const stopId = this.getAttribute('stop-id') || 'btn-stop';
-        const startLabel = this.getAttribute('start-label') || 'Start';
-        const stopLabel = this.getAttribute('stop-label') || 'Stop';
+        const startLabel = this.getAttribute('start-label') || 'START';
+        const stopLabel = this.getAttribute('stop-label') || 'STOP';
         
         this.innerHTML = `
             <button class="btn btn-success" id="${startId}">
