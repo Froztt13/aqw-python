@@ -55,6 +55,7 @@ def build_windows():
     if os.path.exists(venv_pyinstaller):
         pyinstaller_bin = [venv_pyinstaller]
 
+    web_dashboard_src = os.path.join("app", "web_dashboard")
     cmd = pyinstaller_bin + [
         f"--name={app_name}",
         "--onefile",
@@ -62,13 +63,10 @@ def build_windows():
         "--noconfirm",
         "--clean",
         f"--paths={project_root}",
-        "app/web_dashboard;web_dashboard",
-        "bot;bot",
+        f"--add-data={web_dashboard_src};web_dashboard",
+        f"--add-data=bot;bot",
         "--hidden-import=psutil"
     ]
-    # Format add-data correctly
-    cmd[6] = f"--add-data={os.path.join('app', 'web_dashboard')};web_dashboard"
-    cmd[7] = f"--add-data=bot;bot"
     
     ico_file = os.path.join(project_root, "app.ico")
     if os.path.exists(ico_file):
