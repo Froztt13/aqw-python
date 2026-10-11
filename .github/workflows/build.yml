@@ -2,6 +2,22 @@ name: Build App Bundles (macOS & Windows)
 
 on:
   workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.1.1). Leave blank for build-only (artifacts).'
+        required: false
+        type: string
+        default: ''
+      draft:
+        description: 'Create as Draft Release?'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Create as Pre-release?'
+        required: false
+        type: boolean
+        default: false
   push:
     tags:
       - 'v*'
@@ -73,14 +89,14 @@ jobs:
         with:
           name: Windows-Binaries
           path: |
-            dist/AQW_Bot_Hub.exe
-            dist/AQW_Maid_Slavery.exe
+            dist/AQW_Bot_Hub-Windows.exe
+            dist/AQW_Maid_Slavery-Windows.exe
           if-no-files-found: error
 
   release:
     name: Create GitHub Release
     needs: [build-macos, build-windows]
-    if: startsWith(github.ref, 'refs/tags/v')
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name != '')
     runs-on: ubuntu-latest
     permissions:
       contents: write
@@ -100,9 +116,12 @@ jobs:
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.inputs.tag_name != '' && github.event.inputs.tag_name || github.ref_name }}
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
           files: |
             release_assets/AQW_Bot_Hub-macOS.zip
             release_assets/AQW_Maid_Slavery-macOS.zip
-            release_assets/AQW_Bot_Hub.exe
-            release_assets/AQW_Maid_Slavery.exe
+            release_assets/AQW_Bot_Hub-Windows.exe
+            release_assets/AQW_Maid_Slavery-Windows.exe
           generate_release_notes: true

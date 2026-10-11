@@ -27,7 +27,7 @@ def generate_windows_icon():
 def build_windows(enable_console=False):
     print("Building AQW Maid Slavery Windows standalone executable (.exe)...")
     
-    app_name = "AQW_Maid_Slavery"
+    app_name = "AQW_Maid_Slavery-Windows"
     entrypoint = os.path.join(project_root, "app", "build_slavery_app.py")
     
     # Try to terminate any running instance of the app to avoid file lock issues on Windows
