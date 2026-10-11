@@ -100,7 +100,7 @@
                                     <th width="180">Vitals (HP / MP)</th>
                                     <th width="150">Cooldowns</th>
                                     <th width="105">Status</th>
-                                    <th width="55" style="text-align: center;" class="col-action-th">Action</th>
+                                    <th width="80" style="text-align: center;" class="col-action-th">Action</th>
                                 </tr>
                             </thead>
                             <tbody id="slave-table-body">
@@ -342,6 +342,221 @@
             <div class="modal-actions-footer margin-top-md">
                 <button type="button" class="btn btn-secondary" id="btn-cancel-add-slave">Cancel</button>
                 <button type="button" class="btn btn-success" id="btn-save-new-slave">Save Account</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ==================== PLAYER TELEMETRY MODAL ==================== -->
+    <div id="modal-player-telemetry" class="modal-overlay hidden">
+        <div class="modal-card modal-card-lg modal-telemetry">
+            <button type="button" class="btn-close-modal" id="btn-close-telemetry-modal">&times;</button>
+            <div class="modal-header-section telemetry-header">
+                <div class="telemetry-header-info">
+                    <span class="modal-badge-tag">LIVE TELEMETRY</span>
+                    <div class="telemetry-title-row">
+                        <h3 class="modal-title" id="tel-modal-username">Slave Account</h3>
+                        <span class="tel-class-badge" id="tel-modal-class">-</span>
+                        <span class="status-pill online" id="tel-modal-status-pill">
+                            <span class="status-pill-dot"></span>
+                            <span class="status-pill-text" id="tel-modal-status-text">Online</span>
+                        </span>
+                        <span class="tel-combat-pill" id="tel-modal-combat-pill">Idle</span>
+                    </div>
+                    <p class="modal-subtitle" id="tel-modal-subtitle">Real-time state, active auras, and dropped loot inspector</p>
+                </div>
+                <div class="telemetry-account-selector">
+                    <label for="tel-select-account">Switch Slave:</label>
+                    <select id="tel-select-account" class="rule-select"></select>
+                </div>
+            </div>
+
+            <!-- Modal Tab Navigation -->
+            <div class="modal-tabs">
+                <button type="button" class="modal-tab active" data-tab="tab-tel-state">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;">
+                        <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path>
+                        <circle cx="12" cy="7" r="4"></circle>
+                    </svg>
+                    Player & Target State
+                </button>
+                <button type="button" class="modal-tab" data-tab="tab-tel-auras">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    Active Auras <span class="tab-badge" id="tel-auras-count">0</span>
+                </button>
+                <button type="button" class="modal-tab" data-tab="tab-tel-drops">
+                    <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" style="margin-right: 4px; vertical-align: -2px;">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                        <polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline>
+                        <line x1="12" y1="22.08" x2="12" y2="12"></line>
+                    </svg>
+                    Dropped Items <span class="tab-badge" id="tel-drops-count">0</span>
+                </button>
+            </div>
+
+            <!-- TAB 1: PLAYER & TARGET STATE -->
+            <div class="modal-tab-content active" id="tab-tel-state">
+                <div class="tel-grid">
+                    <!-- Left: Player Vitals & Stats -->
+                    <div class="tel-card">
+                        <div class="tel-card-title">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <path d="M22 12h-4l-3 9L9 3l-3 9H2"></path>
+                            </svg>
+                            Player Vitals
+                        </div>
+                        <div class="vitals-container margin-bottom-sm">
+                            <div class="vital-row">
+                                <div class="vital-label">
+                                    <span class="vital-title">HP</span>
+                                    <span class="vital-val" id="tel-hp-val">0 / 0</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill hp" id="tel-hp-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                            <div class="vital-row">
+                                <div class="vital-label">
+                                    <span class="vital-title">MP</span>
+                                    <span class="vital-val" id="tel-mp-val">0 / 0</span>
+                                </div>
+                                <div class="progress-bar-bg">
+                                    <div class="progress-bar-fill mp" id="tel-mp-bar" style="width: 0%;"></div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="tel-stats-grid">
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Location</span>
+                                <span class="tel-stat-value" id="tel-loc-val">-</span>
+                            </div>
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Cell / Pad</span>
+                                <span class="tel-stat-value" id="tel-cell-pad-val">-</span>
+                            </div>
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Coordinates (X, Y)</span>
+                                <span class="tel-stat-value" id="tel-coords-val">0, 0</span>
+                            </div>
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Server</span>
+                                <span class="tel-stat-value" id="tel-server-val">-</span>
+                            </div>
+                        </div>
+
+                        <div class="tel-stats-grid margin-top-sm">
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Gold</span>
+                                <span class="tel-stat-value gold-text" id="tel-gold-val">0</span>
+                            </div>
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Farmed Gold</span>
+                                <span class="tel-stat-value gold-text" id="tel-farmed-gold-val">+0</span>
+                            </div>
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Farmed EXP</span>
+                                <span class="tel-stat-value exp-text" id="tel-farmed-exp-val">+0</span>
+                            </div>
+                            <div class="tel-stat-box">
+                                <span class="tel-stat-label">Haste / CD Red.</span>
+                                <span class="tel-stat-value" id="tel-cd-red-val">0%</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Right: Current Combat Target -->
+                    <div class="tel-card">
+                        <div class="tel-card-title">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <circle cx="12" cy="12" r="6"></circle>
+                                <circle cx="12" cy="12" r="2"></circle>
+                            </svg>
+                            Current Combat Target
+                        </div>
+                        <div id="tel-target-container">
+                            <div class="tel-empty-box" id="tel-target-empty">
+                                <svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.4;">
+                                    <circle cx="12" cy="12" r="10"></circle>
+                                    <line x1="12" y1="8" x2="12" y2="12"></line>
+                                    <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                                </svg>
+                                <span>No active monster target</span>
+                            </div>
+                            <div id="tel-target-content" class="hidden">
+                                <div class="target-header-row">
+                                    <span class="target-name" id="tel-target-name">Monster</span>
+                                    <span class="target-map-id" id="tel-target-mapid">ID: -</span>
+                                </div>
+                                <div class="vital-row margin-top-xs">
+                                    <div class="vital-label">
+                                        <span class="vital-title">HP</span>
+                                        <span class="vital-val" id="tel-target-hp-val">0 / 0</span>
+                                    </div>
+                                    <div class="progress-bar-bg">
+                                        <div class="progress-bar-fill enemy-hp" id="tel-target-hp-bar" style="width: 0%;"></div>
+                                    </div>
+                                </div>
+                                <div class="margin-top-sm">
+                                    <span class="tel-stat-label" style="display: block; margin-bottom: 6px;">Target Debuffs / Auras</span>
+                                    <div class="target-auras-list" id="tel-target-auras">
+                                        <!-- Populated dynamically -->
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- TAB 2: ACTIVE AURAS -->
+            <div class="modal-tab-content" id="tab-tel-auras">
+                <div class="tel-auras-container" id="tel-auras-list">
+                    <!-- Populated dynamically -->
+                </div>
+                <div class="tel-empty-box" id="tel-auras-empty">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.4;">
+                        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"></polygon>
+                    </svg>
+                    <span>No active buffs or debuffs on this player</span>
+                </div>
+            </div>
+
+            <!-- TAB 3: DROPPED ITEMS -->
+            <div class="modal-tab-content" id="tab-tel-drops">
+                <div class="drops-header-actions">
+                    <span class="drops-summary-text" id="tel-drops-summary">0 item drop(s) recorded in session</span>
+                </div>
+                <div class="drops-table-wrapper">
+                    <table class="drops-table">
+                        <thead>
+                            <tr>
+                                <th>Item Name</th>
+                                <th width="70">Qty</th>
+                                <th width="100">Category</th>
+                                <th width="85">Time</th>
+                                <th width="105">Status</th>
+                                <th width="85" style="text-align: center;">Action</th>
+                            </tr>
+                        </thead>
+                        <tbody id="tel-drops-tbody">
+                            <!-- Populated dynamically -->
+                        </tbody>
+                    </table>
+                </div>
+                <div class="tel-empty-box" id="tel-drops-empty">
+                    <svg viewBox="0 0 24 24" width="32" height="32" fill="none" stroke="currentColor" stroke-width="1.5" style="opacity: 0.4;">
+                        <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path>
+                    </svg>
+                    <span>No dropped items recorded yet</span>
+                </div>
+            </div>
+
+            <!-- Modal Footer -->
+            <div class="modal-actions-footer">
+                <button type="button" class="btn btn-secondary" id="btn-close-telemetry-modal-ft">Close</button>
             </div>
         </div>
     </div>

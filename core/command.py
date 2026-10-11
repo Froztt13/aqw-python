@@ -981,8 +981,9 @@ class Command:
             priority_monsters_id = []
             if hunt and len(target_monsters.split(",")) == 1 and target_monsters != "*":
                 await self.jump_to_monster(target_monsters, byAliveMonster=True)
-            cell_monsters_id = [mon.mon_map_id for mon in self.bot.monsters if mon.frame == self.bot.player.CELL and mon.is_alive]
-            cell_monsters = [mon for mon in self.bot.monsters if mon.frame == self.bot.player.CELL and mon.is_alive]
+            player_cell = str(self.bot.player.CELL or "").lower()
+            cell_monsters_id = [mon.mon_map_id for mon in self.bot.monsters if str(mon.frame or "").lower() == player_cell and mon.is_alive and mon.current_hp > 0]
+            cell_monsters = [mon for mon in self.bot.monsters if str(mon.frame or "").lower() == player_cell and mon.is_alive and mon.current_hp > 0]
             final_ids = []
             if target_monsters != "*":
                 # Mapping priority_monsters_id
@@ -995,7 +996,7 @@ class Command:
                         target_names.append(target_monster.lower())
 
                 # Step 1: build a map of alive monsters in current cell
-                alive_monsters = {mon.mon_map_id: mon for mon in self.bot.monsters if mon.frame == self.bot.player.CELL and mon.is_alive}
+                alive_monsters = {mon.mon_map_id: mon for mon in self.bot.monsters if str(mon.frame or "").lower() == player_cell and mon.is_alive and mon.current_hp > 0}
 
                 priority_monsters_id = []
 
@@ -1008,7 +1009,7 @@ class Command:
                     else:
                         name = target.lower()
                         for mon in self.bot.monsters:
-                            if mon.frame == self.bot.player.CELL and mon.is_alive and mon.mon_name.lower() == name:
+                            if str(mon.frame or "").lower() == player_cell and mon.is_alive and mon.current_hp > 0 and mon.mon_name.lower() == name:
                                 priority_monsters_id.append(mon.mon_map_id)
 
                 # Step 3: merge into cell_monsters_id (dedup, keep priority first)
@@ -1075,11 +1076,14 @@ class Command:
         """
         if monster.startswith('id.'):
             monster = monster.split('.')[1]
+        player_cell = str(self.bot.player.CELL or "").lower()
         for mon in self.bot.monsters:
-            if mon.is_alive and mon.frame == self.bot.player.CELL:
-                if mon.mon_name.lower() == monster.lower() or mon.mon_map_id == monster:
+            if mon.is_alive and mon.current_hp > 0 and str(mon.frame or "").lower() == player_cell:
+                if monster == "*":
                     return True
-                elif monster == "*":
+                elif mon.mon_name and mon.mon_name.lower() == monster.lower():
+                    return True
+                elif mon.mon_map_id == monster:
                     return True
         return False
 

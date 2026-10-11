@@ -349,7 +349,15 @@ async def main(cmd: Command):
         if not check_master_in_cell and not getattr(cmd.bot, "checking_locked_zone", False):
             await goto_master()
             continue
-        
+
+        # Stop skill loop if there are no alive monsters around (in current cell)
+        if not cmd.is_monster_alive("*"):
+            player = cmd.get_player()
+            if player and player.getLastTarget():
+                player.setLastTarget(None)
+            await cmd.sleep(200)
+            continue
+
         targeted_monster = cmd.get_player().getLastTarget()
         skill_mode = SkillMode.ALL
         if targeted_monster and targeted_monster.getAura('Counter Attack'):

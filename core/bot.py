@@ -48,6 +48,7 @@ class Bot:
         self.showDebug = showDebug
         self.showChat = showChat
         self.items_drop_whitelist: list[str] = itemsDropWhiteList
+        self.dropped_items: list[dict] = []
         self.auto_relogin = autoRelogin
         self.follow_player = followPlayer
         self.slaves_player = slavesPlayer
@@ -623,17 +624,42 @@ class Bot:
                     self.player.addRepToFaction(data.get('FactionID', 0), data.get('iRep', 0))
                 self.debug(Fore.YELLOW + str(debug_data_gold) + Fore.WHITE)
             elif cmd == "dropItem":
-                dropItems = data.get('items')
-                lowered_droplist= [item.lower() for item in self.items_drop_whitelist]
-                for itemDrop in dropItems.values():
-                    itemDrop: ItemInventory = ItemInventory(itemDrop)
-                    if itemDrop.item_name.lower() in lowered_droplist:
+                dropItems = data.get('items', {})
+                lowered_droplist = [item.lower() for item in self.items_drop_whitelist]
+                for itemDropRaw in dropItems.values():
+                    itemDrop: ItemInventory = ItemInventory(itemDropRaw)
+                    is_whitelisted = itemDrop.item_name.lower() in lowered_droplist
+                    drop_info = {
+                        "item_id": str(itemDrop.item_id),
+                        "item_name": str(itemDrop.item_name),
+                        "qty": int(itemDrop.qty),
+                        "is_acs": bool(itemDrop.is_acs),
+                        "is_temp": bool(itemDrop.is_temp),
+                        "s_type": str(itemDrop.s_type),
+                        "time": datetime.now().strftime("%H:%M:%S"),
+                        "picked_up": is_whitelisted
+                    }
+                    if not hasattr(self, "dropped_items"):
+                        self.dropped_items = []
+                    existing = next((d for d in self.dropped_items if d.get("item_id") == drop_info["item_id"]), None)
+                    if existing:
+                        existing.update(drop_info)
+                    else:
+                        self.dropped_items.insert(0, drop_info)
+                        if len(self.dropped_items) > 50:
+                            self.dropped_items.pop()
+
+                    if is_whitelisted:
                         print(f"get drop {itemDrop.item_name}")
                         self.get_drop(self.username_id, itemDrop.item_id)
                         self.player.INVENTORY.append(itemDrop)
-                        break
             elif cmd == "addItems":
-                dropItems = data.get('items')
+                dropItems = data.get('items', {})
+                if hasattr(self, "dropped_items"):
+                    for d_id in dropItems.keys():
+                        for d in self.dropped_items:
+                            if str(d.get("item_id")) == str(d_id):
+                                d["picked_up"] = True
                 for itemId, dropItem in dropItems.items():
                     dropItem: ItemInventory = ItemInventory(dropItem)
                     # Item inventory

@@ -588,28 +588,35 @@ document.addEventListener('DOMContentLoaded', () => {
                     </span>
                 </td>
                 <td class="col-action" style="position: relative; text-align: center;">
-                    <button class="btn-action-trigger" data-id="${s.id}" title="Actions">
-                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
-                            <circle cx="12" cy="5" r="2.2"></circle>
-                            <circle cx="12" cy="12" r="2.2"></circle>
-                            <circle cx="12" cy="19" r="2.2"></circle>
-                        </svg>
-                    </button>
-                    <div class="action-dropdown hidden" id="action-dropdown-${s.id}">
-                        <button class="action-item edit" data-action="edit" data-id="${s.id}">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
-                                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                    <div class="col-action-wrapper">
+                        <button class="btn-action-telemetry" type="button" data-id="${s.id}" data-username="${s.username}" title="Player Telemetry">
+                            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" stroke-width="2">
+                                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"></polyline>
                             </svg>
-                            <span>Edit</span>
                         </button>
-                        <button class="action-item delete" data-action="delete" data-id="${s.id}">
-                            <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                                <polyline points="3 6 5 6 21 6"></polyline>
-                                <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                        <button class="btn-action-trigger" type="button" data-id="${s.id}" title="Actions">
+                            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor">
+                                <circle cx="12" cy="5" r="2.2"></circle>
+                                <circle cx="12" cy="12" r="2.2"></circle>
+                                <circle cx="12" cy="19" r="2.2"></circle>
                             </svg>
-                            <span>Delete</span>
                         </button>
+                        <div class="action-dropdown hidden" id="action-dropdown-${s.id}">
+                            <button class="action-item edit" data-action="edit" data-id="${s.id}">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"></path>
+                                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"></path>
+                                </svg>
+                                <span>Edit</span>
+                            </button>
+                            <button class="action-item delete" data-action="delete" data-id="${s.id}">
+                                <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
+                                    <polyline points="3 6 5 6 21 6"></polyline>
+                                    <path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path>
+                                </svg>
+                                <span>Delete</span>
+                            </button>
+                        </div>
                     </div>
                 </td>
             `;
@@ -625,6 +632,20 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     slaveTableBody.addEventListener('click', (e) => {
+        // Direct telemetry icon click
+        const telBtn = e.target.closest('.btn-action-telemetry');
+        if (telBtn) {
+            e.stopPropagation();
+            let username = telBtn.getAttribute('data-username');
+            if (!username) {
+                const id = telBtn.getAttribute('data-id');
+                const slave = (globalConfig && Array.isArray(globalConfig.slaves)) ? globalConfig.slaves.find(s => String(s.id) === String(id)) : null;
+                if (slave) username = slave.username;
+            }
+            openTelemetryModal(username);
+            return;
+        }
+
         // Toggle dropdown visibility
         if (e.target.closest('.btn-action-trigger')) {
             const btn = e.target.closest('.btn-action-trigger');
@@ -642,12 +663,12 @@ document.addEventListener('DOMContentLoaded', () => {
             return;
         }
 
-        // Handle action item click
+        // Handle action item click (Edit, Delete)
         const actionItem = e.target.closest('.action-item');
         if (actionItem) {
             const action = actionItem.getAttribute('data-action');
             const id = actionItem.getAttribute('data-id');
-            const slave = globalConfig.slaves.find(s => s.id === id);
+            const slave = (globalConfig && Array.isArray(globalConfig.slaves)) ? globalConfig.slaves.find(s => String(s.id) === String(id)) : null;
 
             // Close dropdown
             const dropdown = document.getElementById(`action-dropdown-${id}`);
@@ -657,7 +678,7 @@ document.addEventListener('DOMContentLoaded', () => {
 
             if (action === 'delete') {
                 if (confirm(`Delete account ${slave.username}?`)) {
-                    globalConfig.slaves = globalConfig.slaves.filter(s => s.id !== id);
+                    globalConfig.slaves = globalConfig.slaves.filter(s => String(s.id) !== String(id));
                     saveConfigurationLocal(true);
                 }
             } else if (action === 'edit') {
@@ -988,8 +1009,10 @@ document.addEventListener('DOMContentLoaded', () => {
         const recentSkillsEl = document.getElementById(`recent-skills-${id}`);
         const tauntChk = row.querySelector('.chk-taunt-toggle');
         const tauntSwitch = tauntChk ? tauntChk.closest('.mini-switch') : null;
+        const telBtn = row.querySelector('.btn-action-telemetry');
 
         if (!status || !status.running) {
+            if (telBtn) telBtn.classList.remove('pulse-running');
             if (colMap) colMap.innerHTML = `<span class="text-muted">-</span>`;
             if (colStatus) {
                 colStatus.innerHTML = `
@@ -1018,6 +1041,14 @@ document.addEventListener('DOMContentLoaded', () => {
                 scrollQtyEl.style.display = 'none';
             }
             return;
+        }
+
+        if (telBtn) {
+            if (status.is_connected) {
+                telBtn.classList.add('pulse-running');
+            } else {
+                telBtn.classList.remove('pulse-running');
+            }
         }
 
         if (colMap) {
@@ -1169,10 +1200,8 @@ document.addEventListener('DOMContentLoaded', () => {
             });
         });
     }
-});
 
-// Info bubble click toggle handler
-document.addEventListener("DOMContentLoaded", () => {
+    // Info bubble click toggle handler
     const titleClick = document.getElementById("app-title-click");
     const infoBubble = document.getElementById("info-bubble");
 
@@ -1223,4 +1252,385 @@ document.addEventListener("DOMContentLoaded", () => {
         if (tauntInfoBubble) tauntInfoBubble.classList.remove("show");
         if (formTauntBubble) formTauntBubble.classList.remove("show");
     });
+
+    // ==========================================
+    // 9. PLAYER TELEMETRY MODAL CONTROLLER
+    // ==========================================
+    const modalPlayerTelemetry = document.getElementById('modal-player-telemetry');
+    const btnCloseTelemetryModal = document.getElementById('btn-close-telemetry-modal');
+    const btnCloseTelemetryModalFt = document.getElementById('btn-close-telemetry-modal-ft');
+    const telSelectAccount = document.getElementById('tel-select-account');
+
+    const telModalUsername = document.getElementById('tel-modal-username');
+    const telModalClass = document.getElementById('tel-modal-class');
+    const telModalStatusPill = document.getElementById('tel-modal-status-pill');
+    const telModalStatusText = document.getElementById('tel-modal-status-text');
+    const telModalCombatPill = document.getElementById('tel-modal-combat-pill');
+
+    const telHpBar = document.getElementById('tel-hp-bar');
+    const telHpVal = document.getElementById('tel-hp-val');
+    const telMpBar = document.getElementById('tel-mp-bar');
+    const telMpVal = document.getElementById('tel-mp-val');
+
+    const telLocVal = document.getElementById('tel-loc-val');
+    const telCellPadVal = document.getElementById('tel-cell-pad-val');
+    const telCoordsVal = document.getElementById('tel-coords-val');
+    const telServerVal = document.getElementById('tel-server-val');
+    const telGoldVal = document.getElementById('tel-gold-val');
+    const telFarmedGoldVal = document.getElementById('tel-farmed-gold-val');
+    const telFarmedExpVal = document.getElementById('tel-farmed-exp-val');
+    const telCdRedVal = document.getElementById('tel-cd-red-val');
+
+    const telTargetEmpty = document.getElementById('tel-target-empty');
+    const telTargetContent = document.getElementById('tel-target-content');
+    const telTargetName = document.getElementById('tel-target-name');
+    const telTargetMapId = document.getElementById('tel-target-mapid');
+    const telTargetHpBar = document.getElementById('tel-target-hp-bar');
+    const telTargetHpVal = document.getElementById('tel-target-hp-val');
+    const telTargetAuras = document.getElementById('tel-target-auras');
+
+    const telAurasCount = document.getElementById('tel-auras-count');
+    const telAurasList = document.getElementById('tel-auras-list');
+    const telAurasEmpty = document.getElementById('tel-auras-empty');
+
+    const telDropsCount = document.getElementById('tel-drops-count');
+    const telDropsSummary = document.getElementById('tel-drops-summary');
+    const telDropsTbody = document.getElementById('tel-drops-tbody');
+    const telDropsEmpty = document.getElementById('tel-drops-empty');
+
+    let currentTelemetryUsername = null;
+    let telemetryInterval = null;
+
+    // Telemetry Modal Tabs Navigation
+    const modalTelemetryTabs = document.querySelectorAll('#modal-player-telemetry .modal-tab');
+    const modalTelemetryContents = document.querySelectorAll('#modal-player-telemetry .modal-tab-content');
+
+    modalTelemetryTabs.forEach(tab => {
+        tab.addEventListener('click', () => {
+            modalTelemetryTabs.forEach(t => t.classList.remove('active'));
+            modalTelemetryContents.forEach(c => c.classList.remove('active'));
+
+            tab.classList.add('active');
+            const targetId = tab.getAttribute('data-tab');
+            const targetEl = document.getElementById(targetId);
+            if (targetEl) targetEl.classList.add('active');
+        });
+    });
+
+    function openTelemetryModal(username) {
+        if (modalPlayerTelemetry) {
+            modalPlayerTelemetry.classList.remove('hidden');
+        }
+
+        const slaves = (globalConfig && Array.isArray(globalConfig.slaves)) ? globalConfig.slaves : [];
+        if (!username && slaves.length > 0 && slaves[0].username) {
+            username = slaves[0].username;
+        }
+        currentTelemetryUsername = username || '';
+
+        // Populate accounts selector
+        if (telSelectAccount) {
+            telSelectAccount.innerHTML = '';
+            slaves.forEach(s => {
+                if (!s || !s.username) return;
+                const opt = document.createElement('option');
+                opt.value = s.username;
+                opt.textContent = `${s.username} (${s.char_class || 'Class'})`;
+                if (currentTelemetryUsername && s.username.toLowerCase() === currentTelemetryUsername.toLowerCase()) {
+                    opt.selected = true;
+                }
+                telSelectAccount.appendChild(opt);
+            });
+        }
+
+        // Set initial header info immediately
+        if (telModalUsername) {
+            telModalUsername.textContent = currentTelemetryUsername || 'Slave Account';
+        }
+        const currentSlave = slaves.find(s => s && (s.username || '').toLowerCase() === (currentTelemetryUsername || '').toLowerCase());
+        if (telModalClass) {
+            telModalClass.textContent = currentSlave ? (currentSlave.char_class || '-') : '-';
+        }
+        if (telModalStatusPill && telModalStatusText) {
+            telModalStatusPill.className = 'status-pill offline';
+            telModalStatusText.textContent = 'Offline';
+        }
+
+        startTelemetryModalPolling();
+    }
+    window.openTelemetryModal = openTelemetryModal;
+
+    function closeTelemetryModal() {
+        if (modalPlayerTelemetry) {
+            modalPlayerTelemetry.classList.add('hidden');
+        }
+        stopTelemetryModalPolling();
+    }
+    window.closeTelemetryModal = closeTelemetryModal;
+
+    if (btnCloseTelemetryModal) {
+        btnCloseTelemetryModal.addEventListener('click', closeTelemetryModal);
+    }
+    if (btnCloseTelemetryModalFt) {
+        btnCloseTelemetryModalFt.addEventListener('click', closeTelemetryModal);
+    }
+    if (modalPlayerTelemetry) {
+        modalPlayerTelemetry.addEventListener('click', (e) => {
+            if (e.target === modalPlayerTelemetry) {
+                closeTelemetryModal();
+            }
+        });
+    }
+
+    document.addEventListener('keydown', (e) => {
+        if (e.key === 'Escape' && modalPlayerTelemetry && !modalPlayerTelemetry.classList.contains('hidden')) {
+            closeTelemetryModal();
+        }
+    });
+
+    if (telSelectAccount) {
+        telSelectAccount.addEventListener('change', () => {
+            currentTelemetryUsername = telSelectAccount.value;
+            pollTelemetryDetails();
+        });
+    }
+
+    function startTelemetryModalPolling() {
+        stopTelemetryModalPolling();
+        pollTelemetryDetails();
+        telemetryInterval = setInterval(pollTelemetryDetails, 1000);
+    }
+
+    function stopTelemetryModalPolling() {
+        if (telemetryInterval) {
+            clearInterval(telemetryInterval);
+            telemetryInterval = null;
+        }
+    }
+
+    function pollTelemetryDetails() {
+        if (!currentTelemetryUsername) return;
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.get_telemetry) {
+            window.pywebview.api.get_telemetry(currentTelemetryUsername).then(data => {
+                renderTelemetryData(data);
+            }).catch(err => {
+                console.error("Telemetry fetch error:", err);
+            });
+        } else {
+            const slaves = (globalConfig && Array.isArray(globalConfig.slaves)) ? globalConfig.slaves : [];
+            const currentSlave = slaves.find(s => s && (s.username || '').toLowerCase() === (currentTelemetryUsername || '').toLowerCase());
+            renderTelemetryData({
+                username: currentTelemetryUsername,
+                char_class: currentSlave ? (currentSlave.char_class || '-') : '-',
+                running: false,
+                is_connected: false,
+                hp: 0,
+                max_hp: 0,
+                mp: 0,
+                max_mp: 0,
+                map: '-',
+                cell: '-',
+                pad: '-',
+                x: 0,
+                y: 0,
+                gold: 0,
+                gold_farmed: 0,
+                exp_farmed: 0,
+                cd_reduction: 0,
+                target: null,
+                auras: [],
+                dropped_items: []
+            });
+        }
+    }
+
+    function renderTelemetryData(data) {
+        if (!data) return;
+
+        // 1. Header
+        if (telModalUsername) telModalUsername.textContent = data.username || currentTelemetryUsername;
+        if (telModalClass) telModalClass.textContent = data.char_class || '-';
+
+        if (telModalStatusPill && telModalStatusText) {
+            telModalStatusPill.className = 'status-pill';
+            if (data.running) {
+                if (data.is_dead) {
+                    telModalStatusPill.classList.add('dead');
+                    telModalStatusText.textContent = 'Dead';
+                } else if (data.is_paused) {
+                    telModalStatusPill.classList.add('paused');
+                    telModalStatusText.textContent = 'Paused';
+                } else if (data.is_connected) {
+                    telModalStatusPill.classList.add('online');
+                    telModalStatusText.textContent = 'Serving';
+                } else {
+                    telModalStatusPill.classList.add('connecting');
+                    telModalStatusText.textContent = 'Connecting...';
+                }
+            } else {
+                telModalStatusPill.classList.add('offline');
+                telModalStatusText.textContent = 'Offline';
+            }
+        }
+
+        if (telModalCombatPill) {
+            if (data.is_in_combat) {
+                telModalCombatPill.className = 'tel-combat-pill combat';
+                telModalCombatPill.textContent = 'IN COMBAT';
+            } else {
+                telModalCombatPill.className = 'tel-combat-pill';
+                telModalCombatPill.textContent = 'PEACEFUL / IDLE';
+            }
+        }
+
+        // 2. Vitals & Stats
+        const hp = data.hp || 0;
+        const maxHp = data.max_hp || 0;
+        const hpPct = maxHp > 0 ? Math.min(100, Math.max(0, (hp / maxHp) * 100)) : 0;
+        if (telHpBar) telHpBar.style.width = `${hpPct}%`;
+        if (telHpVal) telHpVal.textContent = `${hp} / ${maxHp} (${Math.round(hpPct)}%)`;
+
+        const mp = data.mp || 0;
+        const maxMp = data.max_mp || 0;
+        const mpPct = maxMp > 0 ? Math.min(100, Math.max(0, (mp / maxMp) * 100)) : 0;
+        if (telMpBar) telMpBar.style.width = `${mpPct}%`;
+        if (telMpVal) telMpVal.textContent = `${mp} / ${maxMp} (${Math.round(mpPct)}%)`;
+
+        if (telLocVal) telLocVal.textContent = data.map || '-';
+        if (telCellPadVal) telCellPadVal.textContent = `${data.cell || '-'} / ${data.pad || '-'}`;
+        if (telCoordsVal) telCoordsVal.textContent = `X: ${data.x || 0}, Y: ${data.y || 0}`;
+        if (telServerVal) telServerVal.textContent = data.server || '-';
+        if (telGoldVal) telGoldVal.textContent = (data.gold || 0).toLocaleString();
+        if (telFarmedGoldVal) telFarmedGoldVal.textContent = `+${(data.gold_farmed || 0).toLocaleString()}`;
+        if (telFarmedExpVal) telFarmedExpVal.textContent = `+${(data.exp_farmed || 0).toLocaleString()}`;
+        if (telCdRedVal) telCdRedVal.textContent = `${Math.round((data.cd_reduction || 0) * 100)}%`;
+
+        // 3. Combat Target
+        if (data.target && data.target.name) {
+            if (telTargetEmpty) telTargetEmpty.classList.add('hidden');
+            if (telTargetContent) telTargetContent.classList.remove('hidden');
+            if (telTargetName) telTargetName.textContent = data.target.name;
+            if (telTargetMapId) telTargetMapId.textContent = `MonMapID: ${data.target.map_id}`;
+
+            const tHp = data.target.hp || 0;
+            const tMaxHp = data.target.max_hp || 0;
+            const tPct = tMaxHp > 0 ? Math.min(100, Math.max(0, (tHp / tMaxHp) * 100)) : 0;
+            if (telTargetHpBar) telTargetHpBar.style.width = `${tPct}%`;
+            if (telTargetHpVal) telTargetHpVal.textContent = `${tHp} / ${tMaxHp} (${Math.round(tPct)}%)`;
+
+            if (telTargetAuras) {
+                if (data.target.auras && data.target.auras.length > 0) {
+                    telTargetAuras.innerHTML = data.target.auras.map(a => 
+                        `<span class="target-aura-chip">${a.name}${a.stacks > 1 ? ' x' + a.stacks : ''} (${a.remaining}s)</span>`
+                    ).join('');
+                } else {
+                    telTargetAuras.innerHTML = `<span class="text-muted" style="font-size: 0.72rem;">No target debuffs</span>`;
+                }
+            }
+        } else {
+            if (telTargetEmpty) telTargetEmpty.classList.remove('hidden');
+            if (telTargetContent) telTargetContent.classList.add('hidden');
+        }
+
+        // 4. Active Auras
+        const auras = data.auras || [];
+        if (telAurasCount) telAurasCount.textContent = auras.length;
+        if (auras.length > 0) {
+            if (telAurasEmpty) telAurasEmpty.classList.add('hidden');
+            if (telAurasList) {
+                telAurasList.innerHTML = auras.map(a => {
+                    const isBuff = (a.type || 'buff').toLowerCase() === 'buff';
+                    const typeClass = isBuff ? 'buff' : 'debuff';
+                    const typeLabel = isBuff ? 'Buff' : 'Debuff';
+                    const timerStr = a.remaining > 0 ? `${a.remaining}s remaining` : 'Active';
+                    return `
+                        <div class="aura-card ${typeClass}">
+                            <div class="aura-header-row">
+                                <span class="aura-name">${a.name}</span>
+                                ${a.stacks > 1 ? `<span class="aura-stacks">x${a.stacks}</span>` : ''}
+                            </div>
+                            <div class="aura-details-row">
+                                <span class="aura-type-tag">${typeLabel}</span>
+                                <span class="aura-timer">${timerStr}</span>
+                            </div>
+                            ${a.spell ? `<div style="font-size: 0.68rem; color: var(--text-secondary); margin-top: 2px;">From: ${a.spell}</div>` : ''}
+                        </div>
+                    `;
+                }).join('');
+            }
+        } else {
+            if (telAurasList) telAurasList.innerHTML = '';
+            if (telAurasEmpty) telAurasEmpty.classList.remove('hidden');
+        }
+
+        // 5. Dropped Items
+        const drops = data.dropped_items || [];
+        if (telDropsCount) telDropsCount.textContent = drops.length;
+        if (telDropsSummary) telDropsSummary.textContent = `${drops.length} item drop(s) recorded in session`;
+
+        if (drops.length > 0) {
+            if (telDropsEmpty) telDropsEmpty.classList.add('hidden');
+            if (telDropsTbody) {
+                telDropsTbody.innerHTML = drops.map(d => {
+                    const acTag = d.is_acs ? '<span class="badge-ac">AC</span>' : '';
+                    const tempTag = d.is_temp ? '<span class="badge-temp">TEMP</span>' : '';
+                    const isLooted = d.picked_up;
+                    const statusBadge = isLooted 
+                        ? '<span class="drop-status-badge looted">Looted</span>' 
+                        : '<span class="drop-status-badge on-ground">On Ground</span>';
+                    const actionBtn = isLooted 
+                        ? '<span class="text-muted" style="font-size: 0.72rem;">Done</span>' 
+                        : `<button class="btn-pickup-drop" data-id="${d.item_id}" data-name="${d.item_name}">Pick Up</button>`;
+                    return `
+                        <tr>
+                            <td>
+                                <div class="drop-item-name-cell">
+                                    <span>${d.item_name}</span>
+                                    ${acTag}
+                                    ${tempTag}
+                                </div>
+                            </td>
+                            <td>${d.qty || 1}</td>
+                            <td><span class="text-muted">${d.s_type || 'Item'}</span></td>
+                            <td><span class="text-muted" style="font-family: monospace;">${d.time || '-'}</span></td>
+                            <td>${statusBadge}</td>
+                            <td style="text-align: center;">${actionBtn}</td>
+                        </tr>
+                    `;
+                }).join('');
+            }
+        } else {
+            if (telDropsTbody) telDropsTbody.innerHTML = '';
+            if (telDropsEmpty) telDropsEmpty.classList.remove('hidden');
+        }
+    }
+
+    // Pick Up Item Click Event Delegation
+    if (telDropsTbody) {
+        telDropsTbody.addEventListener('click', (e) => {
+            const btn = e.target.closest('.btn-pickup-drop');
+            if (btn) {
+                const itemId = btn.getAttribute('data-id');
+                const itemName = btn.getAttribute('data-name');
+                btn.disabled = true;
+                btn.textContent = 'Picking...';
+                if (window.pywebview && window.pywebview.api && window.pywebview.api.pickup_drop) {
+                    window.pywebview.api.pickup_drop(currentTelemetryUsername, itemId).then(res => {
+                        if (res && res.success) {
+                            showToast(`Picked up drop: ${itemName}`);
+                            pollTelemetryDetails();
+                        } else {
+                            showToast(res && res.error ? res.error : 'Failed to pick up item', true);
+                            btn.disabled = false;
+                            btn.textContent = 'Pick Up';
+                        }
+                    }).catch(err => {
+                        showToast('Error picking up item', true);
+                        btn.disabled = false;
+                        btn.textContent = 'Pick Up';
+                    });
+                }
+            }
+        });
+    }
 });

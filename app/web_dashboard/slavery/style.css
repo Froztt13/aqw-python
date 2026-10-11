@@ -601,10 +601,12 @@ body {
     border-left: 3px solid var(--primary-color) !important;
 }
 
-/* Hide Action column when bot is running */
-.slave-table.running .col-action-th,
-.slave-table.running .col-action {
-    display: none !important;
+/* When bot is running: keep action column for telemetry, disable edit/delete */
+.slave-table.running .action-item.edit,
+.slave-table.running .action-item.delete {
+    opacity: 0.35;
+    pointer-events: none;
+    cursor: not-allowed;
 }
 
 /* Account Info Cell */
@@ -1627,6 +1629,434 @@ button:disabled, input:disabled, select:disabled {
 .action-item.delete:hover {
     background: rgba(239, 68, 68, 0.12);
     color: #f87171;
+}
+
+.col-action-wrapper {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 4px;
+    position: relative;
+}
+
+.btn-action-telemetry {
+    background: rgba(14, 165, 233, 0.12);
+    border: 1px solid rgba(14, 165, 233, 0.3);
+    color: #38bdf8;
+    cursor: pointer;
+    width: 28px;
+    height: 28px;
+    border-radius: 6px;
+    display: inline-flex;
+    justify-content: center;
+    align-items: center;
+    transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.btn-action-telemetry * {
+    pointer-events: none;
+}
+
+.btn-action-telemetry:hover {
+    background: rgba(14, 165, 233, 0.25);
+    border-color: rgba(14, 165, 233, 0.5);
+    color: #ffffff;
+    box-shadow: 0 0 10px rgba(14, 165, 233, 0.4);
+    transform: translateY(-1px);
+}
+
+.btn-action-telemetry.pulse-running {
+    border-color: rgba(14, 165, 233, 0.6);
+    color: #38bdf8;
+    box-shadow: 0 0 8px rgba(14, 165, 233, 0.3);
+}
+
+/* Telemetry Modal Styles */
+.modal-telemetry {
+    max-width: 820px;
+    width: 95%;
+}
+
+.telemetry-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 16px;
+    flex-wrap: wrap;
+}
+
+.telemetry-title-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+}
+
+.tel-class-badge {
+    background: rgba(99, 102, 241, 0.18);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #a5b4fc;
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 4px;
+}
+
+.tel-combat-pill {
+    font-size: 0.7rem;
+    font-weight: 700;
+    padding: 2px 8px;
+    border-radius: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    background: rgba(255, 255, 255, 0.06);
+    color: var(--text-secondary);
+}
+
+.tel-combat-pill.combat {
+    background: rgba(239, 68, 68, 0.2);
+    border: 1px solid rgba(239, 68, 68, 0.4);
+    color: #fca5a5;
+    animation: combatBlink 1.5s infinite ease-in-out;
+}
+
+@keyframes combatBlink {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.7; }
+}
+
+.telemetry-account-selector {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.tab-badge {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+    font-size: 0.68rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    margin-left: 6px;
+}
+
+.modal-tab.active .tab-badge {
+    background: var(--primary-color);
+    color: #ffffff;
+}
+
+.tel-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+}
+
+@media (max-width: 768px) {
+    .tel-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+.tel-card {
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px solid rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+    padding: 14px;
+}
+
+.tel-card-title {
+    font-size: 0.82rem;
+    font-weight: 700;
+    color: var(--text-secondary);
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    margin-bottom: 12px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+}
+
+.tel-stats-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 8px;
+}
+
+.tel-stat-box {
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.04);
+    border-radius: 6px;
+    padding: 8px 10px;
+}
+
+.tel-stat-label {
+    font-size: 0.68rem;
+    color: var(--text-secondary);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    display: block;
+    margin-bottom: 2px;
+}
+
+.tel-stat-value {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+    word-break: break-word;
+}
+
+.tel-stat-value.gold-text {
+    color: #facc15;
+}
+
+.tel-stat-value.exp-text {
+    color: #38bdf8;
+}
+
+.target-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: baseline;
+    margin-bottom: 6px;
+}
+
+.target-name {
+    font-size: 0.95rem;
+    font-weight: 700;
+    color: #ef4444;
+}
+
+.target-map-id {
+    font-size: 0.75rem;
+    color: var(--text-secondary);
+    font-family: 'Fira Code', monospace;
+}
+
+.progress-bar-fill.enemy-hp {
+    background: linear-gradient(90deg, #dc2626, #ef4444);
+}
+
+.target-auras-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    min-height: 24px;
+}
+
+.target-aura-chip {
+    font-size: 0.72rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 4px;
+    background: rgba(239, 68, 68, 0.15);
+    color: #fca5a5;
+    border: 1px solid rgba(239, 68, 68, 0.3);
+}
+
+.tel-empty-box {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 30px 16px;
+    color: var(--text-secondary);
+    font-size: 0.85rem;
+    text-align: center;
+}
+
+/* Auras List Grid */
+.tel-auras-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 10px;
+}
+
+.aura-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+    border-radius: 8px;
+    padding: 10px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    position: relative;
+    overflow: hidden;
+}
+
+.aura-card.buff {
+    border-left: 3px solid #10b981;
+}
+
+.aura-card.debuff {
+    border-left: 3px solid #ef4444;
+}
+
+.aura-header-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.aura-name {
+    font-size: 0.85rem;
+    font-weight: 600;
+    color: var(--text-primary);
+}
+
+.aura-stacks {
+    font-size: 0.72rem;
+    font-weight: 700;
+    padding: 1px 6px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--text-primary);
+}
+
+.aura-details-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    font-size: 0.72rem;
+    color: var(--text-secondary);
+}
+
+.aura-type-tag {
+    text-transform: uppercase;
+    font-weight: 700;
+    font-size: 0.65rem;
+    letter-spacing: 0.04em;
+}
+
+.aura-card.buff .aura-type-tag {
+    color: #34d399;
+}
+
+.aura-card.debuff .aura-type-tag {
+    color: #f87171;
+}
+
+.aura-timer {
+    font-family: 'Fira Code', monospace;
+    font-weight: 600;
+    color: #e2e8f0;
+}
+
+/* Dropped Items Table */
+.drops-header-actions {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 10px;
+}
+
+.drops-summary-text {
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+.drops-table-wrapper {
+    overflow-x: auto;
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+}
+
+.drops-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.8rem;
+}
+
+.drops-table th {
+    background: rgba(0, 0, 0, 0.3);
+    padding: 8px 10px;
+    text-align: left;
+    color: var(--text-secondary);
+    font-weight: 600;
+    font-size: 0.72rem;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    border-bottom: 1px solid var(--border-color);
+}
+
+.drops-table td {
+    padding: 8px 10px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    color: var(--text-primary);
+}
+
+.drops-table tr:hover {
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.drop-item-name-cell {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-weight: 500;
+}
+
+.badge-ac {
+    background: #eab308;
+    color: #000;
+    font-size: 0.65rem;
+    font-weight: 800;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.badge-temp {
+    background: rgba(255, 255, 255, 0.12);
+    color: var(--text-secondary);
+    font-size: 0.65rem;
+    font-weight: 600;
+    padding: 1px 4px;
+    border-radius: 3px;
+}
+
+.drop-status-badge {
+    font-size: 0.7rem;
+    font-weight: 600;
+    padding: 2px 7px;
+    border-radius: 12px;
+    display: inline-block;
+}
+
+.drop-status-badge.looted {
+    background: rgba(16, 185, 129, 0.15);
+    color: #34d399;
+    border: 1px solid rgba(16, 185, 129, 0.3);
+}
+
+.drop-status-badge.on-ground {
+    background: rgba(245, 158, 11, 0.15);
+    color: #fbbf24;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+}
+
+.btn-pickup-drop {
+    background: rgba(99, 102, 241, 0.18);
+    border: 1px solid rgba(99, 102, 241, 0.35);
+    color: #818cf8;
+    padding: 3px 8px;
+    border-radius: 4px;
+    font-size: 0.72rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s ease;
+}
+
+.btn-pickup-drop:hover {
+    background: #6366f1;
+    color: #ffffff;
+}
+
+.btn-pickup-drop:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
 }
 
 /* Gaming Style Start/Stop Buttons */
