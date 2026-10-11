@@ -727,7 +727,7 @@ class Bot:
                 self.player.removeAllAuras()
         elif self.is_valid_xml(msg):
             if ("<cross-domain-policy><allow-access-from domain='*'" in msg):
-                self.write_message(f"<msg t='sys'><body action='login' r='0'><login z='zone_master'><nick><![CDATA[SPIDER#0001~{self.player.USER}~5.01]]></nick><pword><![CDATA[{self.player.TOKEN}]]></pword></login></body></msg>")
+                self.write_message(f"<msg t='sys'><body action='login' r='0'><login z='zone_master'><nick><![CDATA[SPIDER#0001~{self.player.USER}~5.1]]></nick><pword><![CDATA[{self.player.TOKEN}]]></pword></login></body></msg>")
             elif "joinOK" in msg:
                 self.extract_user_ids(msg)
             elif "userGone" in msg:
