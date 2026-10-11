@@ -643,9 +643,10 @@ document.addEventListener('DOMContentLoaded', () => {
         }
 
         // Handle action item click
-        if (e.target.classList.contains('action-item')) {
-            const action = e.target.getAttribute('data-action');
-            const id = e.target.getAttribute('data-id');
+        const actionItem = e.target.closest('.action-item');
+        if (actionItem) {
+            const action = actionItem.getAttribute('data-action');
+            const id = actionItem.getAttribute('data-id');
             const slave = globalConfig.slaves.find(s => s.id === id);
 
             // Close dropdown
