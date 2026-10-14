@@ -197,6 +197,17 @@ body {
     transform: translateY(-1px);
 }
 
+.btn-warning {
+    background-color: #f59e0b;
+    color: #fff;
+    box-shadow: 0 4px 12px rgba(245, 158, 11, 0.25);
+}
+
+.btn-warning:hover:not(:disabled) {
+    background-color: #d97706;
+    transform: translateY(-1px);
+}
+
 .btn-secondary {
     background-color: rgba(255, 255, 255, 0.08);
     color: var(--text-primary);
@@ -224,6 +235,10 @@ body {
     overflow-y: auto;
 }
 
+item-slot-card, slot-card {
+    display: contents;
+}
+
 .slots-grid {
     display: grid;
     grid-template-columns: repeat(4, 1fr);
@@ -234,47 +249,58 @@ body {
 .slot-card {
     background-color: var(--card-bg);
     border: 1px solid var(--border-color);
-    border-radius: 12px;
+    border-radius: 14px;
     display: flex;
     flex-direction: column;
     overflow: hidden;
-    backdrop-filter: blur(12px);
-    transition: box-shadow 0.3s, border-color 0.3s;
+    backdrop-filter: blur(14px);
+    transition: transform 0.25s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.25s ease;
 }
 
 .slot-card:hover {
-    border-color: rgba(255, 255, 255, 0.15);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-2px);
 }
 
 .slot-card.sun-theme {
     border-top: 4px solid var(--sun-color);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .slot-card.sun-theme:hover {
-    box-shadow: 0 4px 24px var(--sun-glow);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), 0 0 20px var(--sun-glow);
 }
 
 .slot-card.moon-theme {
     border-top: 4px solid var(--moon-color);
-    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.2);
+    box-shadow: 0 4px 20px rgba(0, 0, 0, 0.25);
 }
 
 .slot-card.moon-theme:hover {
-    box-shadow: 0 4px 24px var(--moon-glow);
+    box-shadow: 0 8px 30px rgba(0, 0, 0, 0.35), 0 0 20px var(--moon-glow);
+}
+
+.slot-card.sun-theme .slot-header {
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.1) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border-bottom: 1px solid rgba(245, 158, 11, 0.18);
+}
+
+.slot-card.moon-theme .slot-header {
+    background: linear-gradient(90deg, rgba(168, 85, 247, 0.1) 0%, rgba(255, 255, 255, 0.01) 100%);
+    border-bottom: 1px solid rgba(168, 85, 247, 0.18);
 }
 
 .slot-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 14px 16px;
+    padding: 12px 16px;
     border-bottom: 1px solid var(--border-color);
     background-color: rgba(255, 255, 255, 0.02);
 }
 
 .badge-role {
-    font-size: 0.75rem;
+    font-size: 0.88rem;
     font-weight: 700;
 }
 
@@ -287,20 +313,80 @@ body {
 }
 
 .status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
     font-size: 0.7rem;
     font-weight: 600;
-    padding: 2px 8px;
+    padding: 3px 10px;
     border-radius: 9999px;
     background-color: rgba(255, 255, 255, 0.08);
     color: var(--text-secondary);
     border: 1px solid var(--border-color);
 }
 
+.status-badge::before {
+    content: '';
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background-color: #64748b;
+    flex-shrink: 0;
+}
+
 .status-badge.online {
     background-color: rgba(16, 185, 129, 0.15);
     color: var(--success-color);
     border-color: rgba(16, 185, 129, 0.25);
+}
+
+.status-badge.online::before {
+    background-color: var(--success-color);
+    box-shadow: 0 0 6px var(--success-color);
     animation: pulse 2s infinite;
+}
+
+.status-badge.dead {
+    background-color: rgba(239, 68, 68, 0.15);
+    color: var(--danger-color);
+    border-color: rgba(239, 68, 68, 0.3);
+}
+
+.status-badge.dead::before {
+    background-color: var(--danger-color);
+    box-shadow: 0 0 6px var(--danger-color);
+}
+
+.status-badge.paused {
+    background-color: rgba(245, 158, 11, 0.15);
+    color: var(--sun-color);
+    border-color: rgba(245, 158, 11, 0.3);
+}
+
+.status-badge.paused::before {
+    background-color: var(--sun-color);
+    box-shadow: 0 0 6px var(--sun-color);
+}
+
+.slot-card .form-group input {
+    background-color: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    transition: all 0.2s ease;
+}
+
+.slot-card .form-group input:focus {
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+    background-color: rgba(15, 23, 42, 0.8);
+}
+
+.slot-card.sun-theme .form-group input:focus {
+    border-color: rgba(245, 158, 11, 0.5);
+    box-shadow: 0 0 0 2px rgba(245, 158, 11, 0.15);
 }
 
 @keyframes pulse {
@@ -469,6 +555,13 @@ body {
     display: flex;
     justify-content: space-between;
     align-items: center;
+    width: 100%;
+}
+
+.telemetry-row.flex-col {
+    flex-direction: column;
+    align-items: stretch;
+    width: 100%;
 }
 
 .tel-label {
@@ -931,39 +1024,43 @@ body {
 }
 
 /* Cooldowns Grid Layout */
-.cooldowns-grid {
-    display: flex;
-    gap: 6px;
-    margin-top: 4px;
-    justify-content: space-between;
-    width: 100%;
-}
+.cooldowns-grid,
 .cooldowns-container {
-    width: 100%;
+    display: grid !important;
+    grid-template-columns: repeat(6, 1fr) !important;
+    gap: 6px !important;
+    width: 100% !important;
+    box-sizing: border-box !important;
+    margin-top: 6px;
 }
 .skill-cd-badge {
-    flex: 1;
-    display: inline-flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    height: 28px;
-    border-radius: 5px;
-    border: 1px solid rgba(255,255,255,0.08);
+    display: flex !important;
+    flex-direction: column !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    min-width: 0 !important;
+    height: 34px !important;
+    border-radius: 6px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
     font-family: inherit;
     font-size: 9px;
     font-weight: 500;
-    gap: 1px;
+    gap: 2px;
+    box-sizing: border-box !important;
+    padding: 2px !important;
 }
 .skill-cd-badge .skill-idx {
-    font-size: 7px;
-    opacity: 0.5;
+    font-size: 8px;
+    font-weight: 600;
+    opacity: 0.6;
     text-transform: uppercase;
     line-height: 1;
 }
 .skill-cd-badge .skill-cd-val {
-    font-size: 9px;
+    font-size: 10px;
     font-weight: bold;
+    font-family: 'Fira Code', monospace;
     line-height: 1;
 }
 .skill-cd-badge.ready {

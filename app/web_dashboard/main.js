@@ -96,15 +96,56 @@ document.addEventListener('DOMContentLoaded', () => {
             pageSubtitle.textContent = tabDetails[tabId].subtitle;
         }
 
-        // 4. Lazy Load Iframes
+        // 4. Lazy Load Iframes on-demand with per-feature Loading UI
         if (tabId !== 'dashboard') {
             const iframe = document.getElementById(`iframe-${tabId}`);
-            if (iframe && iframe.src === 'about:blank') {
-                console.log(`Lazy loading iframe for: ${tabId}`);
-                iframe.src = `/${tabId}/`;
-                iframe.onload = () => {
-                    applyThemeToIframe(iframe, currentTheme);
-                };
+            const loader = document.getElementById(`loader-${tabId}`);
+            
+            if (iframe) {
+                const isLoaded = iframe.getAttribute('data-loaded') === 'true';
+                
+                if (!isLoaded && (iframe.src === 'about:blank' || !iframe.src || iframe.src.endsWith('about:blank'))) {
+                    console.log(`[Hub] Lazy loading feature on-demand: ${tabId}`);
+                    
+                    if (loader) {
+                        loader.style.display = 'flex';
+                        loader.classList.remove('fade-out');
+                    }
+                    iframe.classList.remove('loaded');
+                    iframe.src = `/${tabId}/`;
+                    
+                    iframe.onload = () => {
+                        console.log(`[Hub] Feature loaded successfully: ${tabId}`);
+                        iframe.setAttribute('data-loaded', 'true');
+                        applyThemeToIframe(iframe, currentTheme);
+                        
+                        // Smoothly transition from loader to iframe
+                        if (loader) {
+                            loader.classList.add('fade-out');
+                            setTimeout(() => {
+                                loader.style.display = 'none';
+                            }, 360);
+                        }
+                        iframe.classList.add('loaded');
+                    };
+
+                    iframe.onerror = () => {
+                        console.error(`[Hub] Error loading feature: ${tabId}`);
+                        if (loader) {
+                            const statusText = loader.querySelector('.loader-status-text');
+                            if (statusText) {
+                                statusText.textContent = 'Gagal memuat modul. Klik tab kembali untuk mencoba ulang.';
+                                statusText.style.color = '#EF4444';
+                            }
+                        }
+                    };
+                } else if (isLoaded) {
+                    // Feature already loaded, ensure loader is hidden and iframe is visible
+                    if (loader) {
+                        loader.style.display = 'none';
+                    }
+                    iframe.classList.add('loaded');
+                }
             }
         }
     }
@@ -229,6 +270,10 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (templeTimeEl) {
                     templeTimeEl.textContent = formatTimeRunning(data.temple.time_running);
                 }
+                const templeClearedEl = document.getElementById('temple-cleared-count');
+                if (templeClearedEl) {
+                    templeClearedEl.textContent = data.temple.cleared_count || 0;
+                }
             } else {
                 setBotActiveState('temple', false);
             }
@@ -245,22 +290,84 @@ document.addEventListener('DOMContentLoaded', () => {
                 if (eclipseTimeEl) {
                     eclipseTimeEl.textContent = formatTimeRunning(data.eclipse.time_running);
                 }
+                const eclipseClearedEl = document.getElementById('eclipse-cleared-count');
+                if (eclipseClearedEl) {
+                    eclipseClearedEl.textContent = data.eclipse.cleared_count || 0;
+                }
             } else {
                 setBotActiveState('eclipse', false);
             }
 
-            // 5. Update System Stats
+            // 5. Update Topbar Running Timer & Cleared Pills
+            const topbarTimerPill = document.getElementById('topbar-timer-pill');
+            const topbarTimeVal = document.getElementById('topbar-time-val');
+            const topbarClearedPill = document.getElementById('topbar-cleared-pill');
+            const topbarClearedVal = document.getElementById('topbar-cleared-val');
+
+            let maxTimeRunning = 0;
+            let totalCleared = 0;
+            let hasTimeRunning = false;
+            let hasClears = false;
+
+            if (data.temple && data.temple.running) {
+                if (data.temple.time_running !== undefined && data.temple.time_running > 0) {
+                    maxTimeRunning = Math.max(maxTimeRunning, data.temple.time_running);
+                    hasTimeRunning = true;
+                }
+                if (data.temple.cleared_count !== undefined) {
+                    totalCleared += data.temple.cleared_count;
+                    hasClears = true;
+                }
+            }
+            if (data.eclipse && data.eclipse.running) {
+                if (data.eclipse.time_running !== undefined && data.eclipse.time_running > 0) {
+                    maxTimeRunning = Math.max(maxTimeRunning, data.eclipse.time_running);
+                    hasTimeRunning = true;
+                }
+                if (data.eclipse.cleared_count !== undefined) {
+                    totalCleared += data.eclipse.cleared_count;
+                    hasClears = true;
+                }
+            }
+
+            if (topbarTimerPill && topbarTimeVal) {
+                if (hasTimeRunning) {
+                    topbarTimerPill.style.display = 'flex';
+                    topbarTimeVal.textContent = formatTimeRunning(maxTimeRunning);
+                } else {
+                    topbarTimerPill.style.display = 'none';
+                }
+            }
+
+            if (topbarClearedPill && topbarClearedVal) {
+                if (hasClears && (data.temple?.running || data.eclipse?.running)) {
+                    topbarClearedPill.style.display = 'flex';
+                    topbarClearedVal.textContent = totalCleared;
+                } else {
+                    topbarClearedPill.style.display = 'none';
+                }
+            }
+
+            // 6. Update System Stats
             if (data.system_stats) {
                 sysCpu.textContent = `${data.system_stats.cpu}%`;
                 sysMem.textContent = `${data.system_stats.memory} MB`;
             }
 
             // Update Summary Banner
+            const bannerStatusBadge = document.getElementById('banner-status-badge');
+            const bannerActiveCount = document.getElementById('banner-active-count');
+            if (bannerActiveCount) {
+                bannerActiveCount.textContent = `${activeBots.length} / 4`;
+            }
+
             if (activeBots.length > 0) {
                 bannerDot.classList.add('active');
+                if (bannerStatusBadge) bannerStatusBadge.textContent = 'ACTIVE';
                 bannerDescription.textContent = `Running: ${activeBots.join(', ')}`;
             } else {
                 bannerDot.classList.remove('active');
+                if (bannerStatusBadge) bannerStatusBadge.textContent = 'STANDBY';
                 bannerDescription.textContent = 'All bots are currently inactive.';
             }
         }).catch(err => {
@@ -273,17 +380,20 @@ document.addEventListener('DOMContentLoaded', () => {
         const badge = badges[botId];
         const cardDetails = details[botId];
         const card = cards[botId];
+        const navDot = document.getElementById(`nav-dot-${botId}`);
 
         if (isActive) {
             badge.classList.add('active');
             badge.textContent = 'Active';
             cardDetails.classList.remove('hidden');
             card.classList.add('active-card');
+            if (navDot) navDot.classList.add('active');
         } else {
             badge.classList.remove('active');
             badge.textContent = 'Offline';
             cardDetails.classList.add('hidden');
             card.classList.remove('active-card');
+            if (navDot) navDot.classList.remove('active');
         }
     }
 
@@ -382,7 +492,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 
     // --- Global Log Forwarding to nested iframes ---
-    window.addSlaveLog = function(username, htmlMsg) {
+    window.addSlaveLog = function(username, htmlMsg, targetBot) {
+        if (targetBot) {
+            const iframe = document.getElementById(`iframe-${targetBot}`);
+            if (iframe && iframe.contentWindow && iframe.contentWindow.addSlaveLog) {
+                iframe.contentWindow.addSlaveLog(username, htmlMsg);
+            }
+            return;
+        }
         document.querySelectorAll('.bot-iframe').forEach(iframe => {
             try {
                 if (iframe.contentWindow && iframe.contentWindow.addSlaveLog) {

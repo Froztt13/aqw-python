@@ -21,7 +21,9 @@ class AscendEclipseBot:
                  moon_haze_taunter: bool = False,
                  sunset_knight_taunter: bool = False,
                  
-                 debug_mon: bool = False):
+                 debug_mon: bool = False,
+                 slot_number: int = 1,
+                 **kwargs):
         """
         Base bot untuk dungeon Ascend Eclipse
 
@@ -34,6 +36,7 @@ class AscendEclipseBot:
         :param moon_haze_taunter: taunter for "moon haze"
         :param sunset_knight_taunter: taunter for "sunset knight"
         :param debug_mon: showing monster HP
+        :param slot_number: slot number (1-4)
         """
         self.cmd = cmd
         self.role = role
@@ -44,6 +47,7 @@ class AscendEclipseBot:
         self.moon_haze_taunter = moon_haze_taunter
         self.sunset_knight_taunter = sunset_knight_taunter
         self.debug_mon = debug_mon
+        self.slot_number = slot_number
 
         # state variables
         self.pid = None
@@ -58,6 +62,8 @@ class AscendEclipseBot:
         self.is_attacking = False
         self.skill_list = [0, 1, 2, 0, 3, 4]
         self.skill_index = 0
+        self.is_paused = False
+        self.was_paused = False
         
         self.bot_timeleapse = time.monotonic()
 
@@ -201,16 +207,85 @@ class AscendEclipseBot:
             await self.cmd.sleep(200)
             self.reset_counters()
             
+            # Check pause outside monster combat
+            is_paused = getattr(self.cmd.bot, "is_paused", False) or getattr(self.cmd.bot, "is_script_paused", False) or getattr(self, "is_paused", False)
+            if is_paused:
+                self.is_attacking = False
+                if not getattr(self, "was_paused", False):
+                    self.was_paused = True
+                    self.print_debug("Pausing bot: stopping aggro, clearing targets, and leaving combat.")
+                    self.cmd.stop_aggro()
+                    self.cmd.bot.target = []
+                    player = self.cmd.get_player()
+                    if player:
+                        player.setLastTarget(None)
+                    await self.cmd.leave_combat(safeLeave=False)
+                    await self.cmd.sleep(500)
+                    player = self.cmd.get_player()
+                    if player and player.IS_IN_COMBAT:
+                        await self.cmd.leave_combat(safeLeave=True)
+                    elif player:
+                        await self.cmd.jump_cell(player.CELL, player.PAD)
+                else:
+                    player = self.cmd.get_player()
+                    if player and player.IS_IN_COMBAT:
+                        self.cmd.stop_aggro()
+                        self.cmd.bot.target = []
+                        player.setLastTarget(None)
+                        await self.cmd.leave_combat(safeLeave=True)
+                await self.cmd.sleep(500)
+                continue
+            else:
+                if getattr(self, "was_paused", False):
+                    self.print_debug("Resuming bot.")
+                self.was_paused = False
+
             if self.role == "master" and not self.cmd.is_monster_alive():
                 await self.to_next_cell()
             if self.role == "slave":
                 await self.go_to_master()
                 
             while not self.cmd.wait_count_player(4):  # ganti 4 sesuai jumlah slave
+                is_paused = getattr(self.cmd.bot, "is_paused", False) or getattr(self.cmd.bot, "is_script_paused", False) or getattr(self, "is_paused", False)
+                if is_paused:
+                    break
                 await self.cmd.sleep(100)
 
             while self.cmd.is_monster_alive():
                 await self.cmd.sleep(200)
+                
+                # Check pause during combat
+                is_paused = getattr(self.cmd.bot, "is_paused", False) or getattr(self.cmd.bot, "is_script_paused", False) or getattr(self, "is_paused", False)
+                if is_paused:
+                    self.is_attacking = False
+                    if not getattr(self, "was_paused", False):
+                        self.was_paused = True
+                        self.print_debug("Pausing bot: stopping aggro, clearing targets, and leaving combat.")
+                        self.cmd.stop_aggro()
+                        self.cmd.bot.target = []
+                        player = self.cmd.get_player()
+                        if player:
+                            player.setLastTarget(None)
+                        await self.cmd.leave_combat(safeLeave=False)
+                        await self.cmd.sleep(500)
+                        player = self.cmd.get_player()
+                        if player and player.IS_IN_COMBAT:
+                            await self.cmd.leave_combat(safeLeave=True)
+                        elif player:
+                            await self.cmd.jump_cell(player.CELL, player.PAD)
+                    else:
+                        player = self.cmd.get_player()
+                        if player and player.IS_IN_COMBAT:
+                            self.cmd.stop_aggro()
+                            self.cmd.bot.target = []
+                            player.setLastTarget(None)
+                            await self.cmd.leave_combat(safeLeave=True)
+                    await self.cmd.sleep(500)
+                    continue
+                else:
+                    if getattr(self, "was_paused", False):
+                        self.print_debug("Resuming bot.")
+                    self.was_paused = False
                 
                 master = self.cmd.get_player_in_map(self.cmd.get_followed_player())
                 check_master_in_cell = self.role == "master" or (master and master.str_frame == self.cmd.get_player().CELL)

@@ -1,0 +1,127 @@
+name: Build App Bundles (macOS & Windows)
+
+on:
+  workflow_dispatch:
+    inputs:
+      tag_name:
+        description: 'Release Tag (e.g. v1.1.1). Leave blank for build-only (artifacts).'
+        required: false
+        type: string
+        default: ''
+      draft:
+        description: 'Create as Draft Release?'
+        required: false
+        type: boolean
+        default: false
+      prerelease:
+        description: 'Create as Pre-release?'
+        required: false
+        type: boolean
+        default: false
+  push:
+    tags:
+      - 'v*'
+
+jobs:
+  build-macos:
+    name: Build macOS (.app)
+    runs-on: macos-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build macOS App Bundles
+        run: |
+          python app/build_hub_app.py build
+          python app/build_slavery_app.py build
+
+      - name: Compress macOS .app Bundles
+        run: |
+          cd dist
+          zip -r -y AQW_Bot_Hub-macOS.zip AQW_Bot_Hub.app
+          zip -r -y AQW_Maid_Slavery-macOS.zip AQW_Maid_Slavery.app
+
+      - name: Upload macOS Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-Bundles
+          path: |
+            dist/AQW_Bot_Hub-macOS.zip
+            dist/AQW_Maid_Slavery-macOS.zip
+          if-no-files-found: error
+
+  build-windows:
+    name: Build Windows (.exe)
+    runs-on: windows-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Build Windows Executables
+        run: |
+          python app/build_hub_app_win.py
+          python app/build_slavery_app_win.py
+
+      - name: Upload Windows Artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Binaries
+          path: |
+            dist/AQW_Bot_Hub-Windows.exe
+            dist/AQW_Maid_Slavery-Windows.exe
+          if-no-files-found: error
+
+  release:
+    name: Create GitHub Release
+    needs: [build-macos, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v') || (github.event_name == 'workflow_dispatch' && github.event.inputs.tag_name != '')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download macOS Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: macOS-Bundles
+          path: release_assets
+
+      - name: Download Windows Artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: Windows-Binaries
+          path: release_assets
+
+      - name: Publish Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.event.inputs.tag_name != '' && github.event.inputs.tag_name || github.ref_name }}
+          draft: ${{ github.event.inputs.draft || false }}
+          prerelease: ${{ github.event.inputs.prerelease || false }}
+          files: |
+            release_assets/AQW_Bot_Hub-macOS.zip
+            release_assets/AQW_Maid_Slavery-macOS.zip
+            release_assets/AQW_Bot_Hub-Windows.exe
+            release_assets/AQW_Maid_Slavery-Windows.exe
+          generate_release_notes: true

@@ -308,19 +308,35 @@ async def main(cmd: Command):
                     coordinator.unregister_taunter(cmd.bot.username)
                 skills = [s for s in skills if s.index != 5]
             
-        is_paused = getattr(cmd.bot, "is_paused", False)
+        is_paused = getattr(cmd.bot, "is_paused", False) or getattr(cmd.bot, "is_script_paused", False)
         if is_paused:
             if not getattr(cmd.bot, "was_paused", False):
                 cmd.bot.was_paused = True
-                print(f"[{cmd.bot.username}] Pausing bot: leaving combat, waiting 1s, and jumping to current cell.")
-                await cmd.leave_combat(safeLeave=False)
-                await cmd.sleep(1000)
+                print(f"[{cmd.bot.username}] Pausing bot: stopping aggro, clearing targets, and leaving combat.")
+                cmd.stop_aggro()
+                cmd.bot.target = []
                 player = cmd.get_player()
                 if player:
+                    player.setLastTarget(None)
+                await cmd.leave_combat(safeLeave=False)
+                await cmd.sleep(500)
+                player = cmd.get_player()
+                if player and player.IS_IN_COMBAT:
+                    await cmd.leave_combat(safeLeave=True)
+                elif player:
                     await cmd.jump_cell(player.CELL, player.PAD)
+            else:
+                player = cmd.get_player()
+                if player and player.IS_IN_COMBAT:
+                    cmd.stop_aggro()
+                    cmd.bot.target = []
+                    player.setLastTarget(None)
+                    await cmd.leave_combat(safeLeave=True)
             await cmd.sleep(500)
             continue
         else:
+            if getattr(cmd.bot, "was_paused", False):
+                print(f"[{cmd.bot.username}] Resuming bot.")
             cmd.bot.was_paused = False
         
         if getattr(cmd.bot, "checking_locked_zone", False):

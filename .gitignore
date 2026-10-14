@@ -167,3 +167,7 @@ bot/templeshrine/eclipse/bot_temple_me.py
 bot/templeshrine/temple/bot_temple_me.py
 **/bot_temple_me.py
 *bot_temple_me.py
+bot_cmds/afk.py
+eclipse_config.json
+slavery_config.json
+temple_config.json

@@ -18,6 +18,8 @@ from bottle import Bottle, static_file, request
 # Determine project root path
 def get_project_root():
     if getattr(sys, 'frozen', False):
+        if hasattr(sys, '_MEIPASS'):
+            return sys._MEIPASS
         contents_dir = os.path.dirname(os.path.dirname(sys.executable))
         app_dir = os.path.dirname(contents_dir)
         parent_dir = os.path.dirname(app_dir)
@@ -121,10 +123,12 @@ def ansi_to_html(text):
 
 # --- Define Unified Log Redirector ---
 class UnifiedThreadRedirector:
-    def __init__(self, original_stream):
+    def __init__(self, original_stream, log_file=None):
         self.original_stream = original_stream
+        self.log_file = log_file
         self.thread_callbacks = {}  # thread_id -> (username, callback)
         self.combined_api = None
+        self.standalone_callback = None
         self.default_callback = lambda x: None
 
     def register_thread(self, thread_id, username, callback):
@@ -135,36 +139,71 @@ class UnifiedThreadRedirector:
             del self.thread_callbacks[thread_id]
 
     def write(self, message):
-        self.original_stream.write(message)
-        if not message:
+        if self.original_stream and hasattr(self.original_stream, 'write'):
+            try:
+                self.original_stream.write(message)
+            except Exception:
+                pass
+        if self.log_file:
+            try:
+                self.log_file.write(message)
+                self.log_file.flush()
+            except Exception:
+                pass
+        if not message or not message.strip():
             return
             
         current_thread_id = threading.get_ident()
         if current_thread_id in self.thread_callbacks:
             username, callback = self.thread_callbacks[current_thread_id]
             callback(username, message)
+        elif self.standalone_callback:
+            try:
+                self.standalone_callback("System", message)
+            except Exception:
+                pass
         else:
             # Fallback/default logging based on active page
-            if self.combined_api and self.combined_api.window:
-                try:
-                    url = self.combined_api.window.get_current_url() or ""
-                    if "/slavery" in url:
-                        self.combined_api.slavery_api.handle_slave_log("System", message)
-                    elif "/temple" in url:
-                        self.combined_api.temple_api.handle_slave_log("System", message)
-                    elif "/eclipse" in url:
-                        self.combined_api.eclipse_api.handle_slave_log("System", message)
-                    elif "/aqw" in url:
-                        self.combined_api.aqw_api.handle_log(message)
-                except Exception:
-                    pass
+            # CRITICAL: Only check get_current_url if window is loaded and ready,
+            # otherwise calling get_current_url() blocks for 20s and deadlocks the GUI thread!
+            if self.combined_api and getattr(self.combined_api, '_window', None):
+                win = self.combined_api._window
+                if hasattr(win, 'events') and hasattr(win.events, 'loaded') and win.events.loaded.is_set():
+                    try:
+                        url = win.get_current_url() or ""
+                        if "/slavery" in url:
+                            self.combined_api._slavery_api.handle_slave_log("System", message)
+                        elif "/temple" in url:
+                            self.combined_api._temple_api.handle_slave_log("System", message)
+                        elif "/eclipse" in url:
+                            self.combined_api._eclipse_api.handle_slave_log("System", message)
+                        elif "/aqw" in url:
+                            self.combined_api._aqw_api.handle_log(message)
+                    except Exception:
+                        pass
 
     def flush(self):
-        self.original_stream.flush()
+        if self.original_stream and hasattr(self.original_stream, 'flush'):
+            try:
+                self.original_stream.flush()
+            except Exception:
+                pass
+        if hasattr(self, 'log_file') and self.log_file:
+            try:
+                self.log_file.flush()
+            except Exception:
+                pass
 
-# Setup unified global redirectors
-unified_redirector_out = UnifiedThreadRedirector(sys.stdout)
-unified_redirector_err = UnifiedThreadRedirector(sys.stderr)
+# Setup unified global redirectors with persistent file log
+try:
+    _log_dir = os.path.expanduser("~/.aqw_bot")
+    os.makedirs(_log_dir, exist_ok=True)
+    _hub_log_file = open(os.path.join(_log_dir, "hub_app.log"), "a", encoding="utf-8", errors="replace")
+except Exception:
+    _hub_log_file = None
+
+unified_redirector_out = UnifiedThreadRedirector(sys.stdout, _hub_log_file)
+unified_redirector_err = UnifiedThreadRedirector(sys.stderr, _hub_log_file)
 
 # Assign global overrides
 sys.stdout = unified_redirector_out
@@ -233,7 +272,11 @@ class SlaveBotThread(threading.Thread):
                 muteSpamWarning=True,
                 antiMod=True
             )
-            self.bot_instance.set_login_info(self.username, self.password, self.config.get("server", "Artix"))
+            self.bot_instance.set_login_info(self.username, self.password, self.config.get("server", "Alteon"))
+            self.bot_instance.is_script_paused = False
+            self.bot_instance.is_paused = False
+            self.bot_instance.was_paused = False
+            self.bot_instance.taunt_error = False
             
             # Inject properties into bot instance for thread safety
             self.bot_instance.default_room_number = int(self.config.get("room_number", 9099))
@@ -279,6 +322,7 @@ class TempleBotThread(threading.Thread):
         self.callback = callback
         self.taunt_coordinator = taunt_coordinator
         self.bot_instance = None
+        self.bot_core = None
         self.daemon = True
 
     def run(self):
@@ -316,6 +360,7 @@ class TempleBotThread(threading.Thread):
                 role=self.role,
                 is_taunter=self.is_taunter
             )
+            self.bot_core = bot_inst
             await bot_inst.start()
         
         try:
@@ -338,6 +383,7 @@ class EclipseBotThread(threading.Thread):
         self.config = config
         self.callback = callback
         self.bot_instance = None
+        self.bot_core = None
         self.daemon = True
 
     def run(self):
@@ -370,6 +416,7 @@ class EclipseBotThread(threading.Thread):
 
         async def run_bot(cmd):
             bot_inst = self.bot_class(cmd, **self.bot_kwargs)
+            self.bot_core = bot_inst
             await bot_inst.prepare_items()    
             if isinstance(bot_inst, EclipseMasterBot):
                 await bot_inst.setup_party()
@@ -390,16 +437,21 @@ class AqwSoloApi:
     def __init__(self):
         self.bot_instance = None
         self.bot_thread = None
-        self.window = None
-        self.config_path = os.path.join(get_project_root(), "gui_config.json")
+        self._window = None
+        if getattr(sys, 'frozen', False):
+            config_dir = os.path.expanduser("~/.aqw_bot")
+            os.makedirs(config_dir, exist_ok=True)
+            self.config_path = os.path.join(config_dir, "gui_config.json")
+        else:
+            self.config_path = os.path.join(get_project_root(), "gui_config.json")
 
     def set_window(self, window):
-        self.window = window
+        self._window = window
 
     def handle_log(self, message):
         html_msg = ansi_to_html(message)
-        if self.window:
-            self.window.evaluate_js(f"if(window.addLog) window.addLog({json.dumps(html_msg)});")
+        if self._window:
+            self._window.evaluate_js(f"if(window.addLog) window.addLog({json.dumps(html_msg)});")
 
     def load_config(self):
         default_config = {
@@ -471,10 +523,10 @@ class AqwSoloApi:
             }
 
     def select_script(self):
-        if not self.window:
+        if not self._window:
             return None
         file_types = ('Python files (*.py)', 'All files (*.*)')
-        result = self.window.create_file_dialog(
+        result = self._window.create_file_dialog(
             dialog_type=webview.OPEN_DIALOG,
             file_types=file_types
         )
@@ -590,7 +642,7 @@ class AqwSoloApi:
 
 class SlaveryApi:
     def __init__(self):
-        self.window = None
+        self._window = None
         if getattr(sys, 'frozen', False):
             config_dir = os.path.expanduser("~/.aqw_bot")
             os.makedirs(config_dir, exist_ok=True)
@@ -601,14 +653,14 @@ class SlaveryApi:
         self.taunt_coordinator = TauntCoordinator()
 
     def set_window(self, window):
-        self.window = window
+        self._window = window
 
     def handle_slave_log(self, username, message):
         html_msg = ansi_to_html(message)
-        if self.window:
+        if self._window:
             try:
-                self.window.evaluate_js(
-                    f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username)}, {json.dumps(html_msg)});"
+                self._window.evaluate_js(
+                    f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username)}, {json.dumps(html_msg)}, 'slavery');"
                 )
             except Exception:
                 pass
@@ -736,9 +788,11 @@ class SlaveryApi:
         return {"success": True}
 
     def toggle_pause_slaves(self, pause_state):
+        state = bool(pause_state)
         for username, thread in self.active_threads.items():
             if thread.bot_instance:
-                thread.bot_instance.is_script_paused = bool(pause_state)
+                thread.bot_instance.is_paused = state
+                thread.bot_instance.is_script_paused = state
         return {"success": True}
 
     def update_slave_taunter(self, username, taunter_state):
@@ -755,42 +809,66 @@ class SlaveryApi:
     def get_status(self):
         from datetime import datetime
         statuses = {}
+        now = datetime.now()
         for username, thread in list(self.active_threads.items()):
             running = thread.is_alive()
             if running and thread.bot_instance:
                 bot = thread.bot_instance
-                player = bot.player
+                player = getattr(bot, "player", None)
                 
-                cooldowns = {}
-                now = datetime.now()
+                cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
                 if player and hasattr(player, "SKILLS"):
-                    for i in range(0, 6):
-                        if i < len(player.SKILLS):
-                            skill_data = player.SKILLS[i]
-                            next_use = skill_data.get("nextUse")
-                            if next_use and next_use > now:
-                                cooldowns[i] = round((next_use - now).total_seconds(), 1)
-                            else:
-                                cooldowns[i] = 0.0
-                        else:
-                            cooldowns[i] = 0.0
-                else:
-                    cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
+                    try:
+                        skills = player.SKILLS
+                        if isinstance(skills, (list, tuple)):
+                            for i in range(0, 6):
+                                if i < len(skills):
+                                    skill_data = skills[i]
+                                    if isinstance(skill_data, dict):
+                                        next_use = skill_data.get("nextUse")
+                                        if isinstance(next_use, datetime) and next_use > now:
+                                            cooldowns[i] = round((next_use - now).total_seconds(), 1)
+                    except Exception:
+                        pass
+
+                scroll_qty = 0
+                if player and hasattr(player, "get_item_inventory"):
+                    try:
+                        item_enrage = player.get_item_inventory("Scroll of Enrage")
+                        if item_enrage and hasattr(item_enrage, "qty"):
+                            scroll_qty = int(item_enrage.qty)
+                    except Exception:
+                        scroll_qty = 0
+
+                is_active_taunter = False
+                if self.taunt_coordinator:
+                    try:
+                        is_active_taunter = (self.taunt_coordinator.get_active_taunter() == username)
+                    except Exception:
+                        pass
 
                 try:
+                    hp_val = int(player.CURRENT_HP) if player and player.CURRENT_HP is not None else 0
+                    max_hp_val = int(player.MAX_HP) if player and player.MAX_HP is not None else 0
+                    mp_val = int(player.MANA) if player and player.MANA is not None else 0
+                    max_mp_val = int(player.MAX_MP) if player and player.MAX_MP is not None else 0
+                    
                     statuses[username] = {
-                        "running": running,
-                        "is_connected": bot.is_client_connected,
-                        "hp": player.CURRENT_HP if player else 0,
-                        "max_hp": player.MAX_HP if player else 0,
-                        "mp": player.MANA if player else 0,
-                        "max_mp": player.MAX_MP if player else 0,
-                        "is_dead": player.ISDEAD if player else False,
-                        "map": bot.strMapName or "-",
-                        "cell": player.CELL if player else "-",
-                        "pad": player.PAD if player else "-",
-                        "is_paused": bot.is_script_paused,
-                        "cooldowns": cooldowns
+                        "running": True,
+                        "is_connected": bool(getattr(bot, "is_client_connected", False)),
+                        "hp": hp_val,
+                        "max_hp": max_hp_val,
+                        "mp": mp_val,
+                        "max_mp": max_mp_val,
+                        "is_dead": bool(player.ISDEAD) if player else False,
+                        "map": str(getattr(bot, "strMapName", "-") or "-"),
+                        "cell": str(player.CELL if player and player.CELL else "-"),
+                        "pad": str(player.PAD if player and player.PAD else "-"),
+                        "is_paused": bool(getattr(bot, "is_paused", False) or getattr(bot, "is_script_paused", False)),
+                        "cooldowns": cooldowns,
+                        "scroll_enrage_qty": scroll_qty,
+                        "taunt_error": bool(getattr(bot, "taunt_error", False)),
+                        "is_active_taunter": is_active_taunter
                     }
                 except Exception as e:
                     statuses[username] = {
@@ -810,7 +888,7 @@ class SlaveryApi:
 
 class TempleApi:
     def __init__(self):
-        self.window = None
+        self._window = None
         if getattr(sys, 'frozen', False):
             config_dir = os.path.expanduser("~/.aqw_bot")
             os.makedirs(config_dir, exist_ok=True)
@@ -819,25 +897,39 @@ class TempleApi:
             self.config_path = os.path.join(get_project_root(), "temple_config.json")
         self.active_threads = {}
         self.start_time = None
+        self.cleared_count = 0
         self.taunt_coordinator = TauntCoordinator()
         
         try:
             import psutil
-            self.process = psutil.Process(os.getpid())
-            self.process.cpu_percent(interval=None)
+            self._process = psutil.Process(os.getpid())
+            self._process.cpu_percent(interval=None)
         except Exception:
-            self.process = None
+            self._process = None
 
     def set_window(self, window):
-        self.window = window
+        self._window = window
 
     def handle_slave_log(self, username, message):
         html_msg = ansi_to_html(message)
-        if self.window:
+        if "Dungeon cleared" in message:
+            import re
+            m = re.search(r"Dungeon cleared (\d+) times", message)
+            if m:
+                self.cleared_count = int(m.group(1))
+
+        if self._window:
             try:
-                self.window.evaluate_js(
-                    f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username)}, {json.dumps(html_msg)});"
+                self._window.evaluate_js(
+                    f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username)}, {json.dumps(html_msg)}, 'temple');"
                 )
+                # Duplicate cleared logs (clear time, clear count, total time running) to System logs tab
+                if "Finished in" in message or "Total time taken" in message or "Clear time" in message or "Dungeon cleared" in message or "Total time running" in message:
+                    sys_msg = f"[{username}] {message}"
+                    html_sys_msg = ansi_to_html(sys_msg)
+                    self._window.evaluate_js(
+                        f"if(window.addSlaveLog) window.addSlaveLog('System', {json.dumps(html_sys_msg)}, 'temple');"
+                    )
             except Exception:
                 pass
 
@@ -920,6 +1012,7 @@ class TempleApi:
             
         self.taunt_coordinator = TauntCoordinator()
         self.start_time = time.time()
+        self.cleared_count = 0
         server = config.get("server", "Alteon")
         room_number = int(config.get("room_number", 9099))
         temple_bot_type = config.get("temple_bot_type", "MidnightSunBot")
@@ -981,8 +1074,9 @@ class TempleApi:
     def get_status(self):
         from datetime import datetime
         status_data = {}
-        for s_id, thread in self.active_threads.items():
-            if thread.bot_instance:
+        for s_id, thread in list(self.active_threads.items()):
+            running = thread.is_alive()
+            if running and thread.bot_instance:
                 b = thread.bot_instance
                 p = b.player
                 
@@ -1004,52 +1098,95 @@ class TempleApi:
 
                 scroll_qty = 0
                 if p:
-                    item_enrage = p.get_item_inventory("Scroll of Enrage")
-                    if item_enrage:
-                        scroll_qty = item_enrage.qty
+                    try:
+                        item_enrage = p.get_item_inventory("Scroll of Enrage")
+                        if item_enrage:
+                            scroll_qty = item_enrage.qty
+                    except Exception:
+                        scroll_qty = 0
 
-                status_data[s_id] = {
-                    "running": True,
-                    "is_connected": b.is_client_connected,
-                    "map": getattr(b, "strMapName", "-"),
-                    "cell": p.CELL if p else "-",
-                    "pad": p.PAD if p else "-",
-                    "hp": p.CURRENT_HP if p else 0,
-                    "max_hp": p.MAX_HP if p else 0,
-                    "mp": p.MANA if p else 0,
-                    "max_mp": p.MAX_MP if p else 0,
-                    "is_dead": p.ISDEAD if p else False,
-                    "cooldowns": cooldowns,
-                    "scroll_enrage_qty": scroll_qty,
-                    "taunt_error": getattr(b, "taunt_error", False)
-                }
+                try:
+                    status_data[s_id] = {
+                        "running": running,
+                        "is_connected": b.is_client_connected,
+                        "map": getattr(b, "strMapName", "-"),
+                        "cell": p.CELL if p else "-",
+                        "pad": p.PAD if p else "-",
+                        "hp": p.CURRENT_HP if p else 0,
+                        "max_hp": p.MAX_HP if p else 0,
+                        "mp": p.MANA if p else 0,
+                        "max_mp": p.MAX_MP if p else 0,
+                        "is_dead": p.ISDEAD if p else False,
+                        "cooldowns": cooldowns,
+                        "scroll_enrage_qty": scroll_qty,
+                        "taunt_error": getattr(b, "taunt_error", False)
+                    }
+                except Exception as e:
+                    status_data[s_id] = {
+                        "running": running,
+                        "is_connected": False,
+                        "error": str(e)
+                    }
             else:
-                status_data[s_id] = {"running": False}
+                status_data[s_id] = {"running": False, "is_connected": False}
                 
         for s_id in ["slot1", "slot2", "slot3", "slot4"]:
             if s_id not in status_data:
-                status_data[s_id] = {"running": False}
+                status_data[s_id] = {"running": False, "is_connected": False}
+
+        monsters_info = []
+        for slot_id, thread in list(self.active_threads.items()):
+            if thread.is_alive() and thread.bot_instance:
+                bot = thread.bot_instance
+                player = bot.player
+                current_cell = player.CELL if player else None
+                if current_cell and hasattr(bot, "monsters") and bot.monsters:
+                    for mon in bot.monsters:
+                        if mon.frame == current_cell and mon.current_hp > 0:
+                            monsters_info.append({
+                                "name": mon.mon_name,
+                                "id": mon.mon_map_id,
+                                "hp": mon.current_hp,
+                                "max_hp": mon.max_hp
+                            })
+                    if monsters_info:
+                        break
         
         mem_mb = 0.0
         cpu_pct = 0.0
-        if hasattr(self, "process") and self.process:
+        if hasattr(self, "_process") and self._process:
             try:
-                mem_mb = round(self.process.memory_info().rss / (1024 * 1024), 1)
-                cpu_pct = round(self.process.cpu_percent(interval=None), 1)
+                mem_mb = round(self._process.memory_info().rss / (1024 * 1024), 1)
+                cpu_pct = round(self._process.cpu_percent(interval=None), 1)
             except Exception:
                 pass
 
-        status_data["_active_taunter"] = self.taunt_coordinator.active_taunter if hasattr(self, "taunt_coordinator") else None
-        status_data["_time_running"] = int(time.time() - self.start_time) if getattr(self, "start_time", None) else 0
-        status_data["system_stats"] = {
-            "cpu": cpu_pct,
-            "memory": mem_mb
+        slot_statuses = {s_id: status_data[s_id] for s_id in ["slot1", "slot2", "slot3", "slot4"]}
+        time_running = int(time.time() - self.start_time) if getattr(self, "start_time", None) else 0
+        active_taunter = self.taunt_coordinator.active_taunter if hasattr(self, "taunt_coordinator") else None
+
+        for thread in self.active_threads.values():
+            if hasattr(thread, "bot_core") and thread.bot_core:
+                c = getattr(thread.bot_core, "cleared_count", 0)
+                if c > self.cleared_count:
+                    self.cleared_count = c
+
+        return {
+            "statuses": slot_statuses,
+            "monsters": monsters_info,
+            "_active_taunter": active_taunter,
+            "_time_running": time_running,
+            "cleared_count": self.cleared_count,
+            "system_stats": {
+                "cpu": cpu_pct,
+                "memory": mem_mb
+            },
+            **slot_statuses
         }
-        return status_data
 
 class EclipseApi:
     def __init__(self):
-        self.window = None
+        self._window = None
         if getattr(sys, 'frozen', False):
             config_dir = os.path.expanduser("~/.aqw_bot")
             os.makedirs(config_dir, exist_ok=True)
@@ -1059,16 +1196,17 @@ class EclipseApi:
             
         self.active_threads = {}
         self.start_time = None
+        self.cleared_count = 0
         
         try:
             import psutil
-            self.process = psutil.Process(os.getpid())
-            self.process.cpu_percent(interval=None)
+            self._process = psutil.Process(os.getpid())
+            self._process.cpu_percent(interval=None)
         except Exception:
-            self.process = None
+            self._process = None
 
     def set_window(self, window):
-        self.window = window
+        self._window = window
 
     def validate_password(self, password):
         target_hash = "080dcf0b2c402cb9ac5be3dc6907f79a3a2b113325755ecdd792bdc6b8c7399e"
@@ -1077,16 +1215,22 @@ class EclipseApi:
 
     def handle_slave_log(self, username, message):
         html_msg = ansi_to_html(message)
-        if self.window:
+        if "Dungeon cleared" in message:
+            import re
+            m = re.search(r"Dungeon cleared (\d+) times", message)
+            if m:
+                self.cleared_count = int(m.group(1))
+
+        if self._window:
             try:
-                self.window.evaluate_js(
-                    f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username)}, {json.dumps(html_msg)});"
+                self._window.evaluate_js(
+                    f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username)}, {json.dumps(html_msg)}, 'eclipse');"
                 )
-                if "Finished in" in message or "Dungeon cleared" in message or "Total time running" in message:
+                if "Finished in" in message or "Total time taken" in message or "Clear time" in message or "Dungeon cleared" in message or "Total time running" in message:
                     sys_msg = f"[{username}] {message}"
                     html_sys_msg = ansi_to_html(sys_msg)
-                    self.window.evaluate_js(
-                        f"if(window.addSlaveLog) window.addSlaveLog('System', {json.dumps(html_sys_msg)});"
+                    self._window.evaluate_js(
+                        f"if(window.addSlaveLog) window.addSlaveLog('System', {json.dumps(html_sys_msg)}, 'eclipse');"
                     )
             except Exception:
                 pass
@@ -1103,7 +1247,7 @@ class EclipseApi:
                     "char_class": "Legion Revenant",
                     "taunt_parity": "odd",
                     "converge_type": "sun",
-                    "light_gather_taunter": False
+                    "light_gather_taunter": True
                 },
                 "slot2": {
                     "username": "",
@@ -1111,7 +1255,7 @@ class EclipseApi:
                     "char_class": "StoneCrusher",
                     "taunt_parity": "even",
                     "converge_type": "sun",
-                    "light_gather_taunter": False
+                    "light_gather_taunter": True
                 },
                 "slot3": {
                     "username": "",
@@ -1173,6 +1317,7 @@ class EclipseApi:
             return {"success": False, "error": "Party is already running!"}
             
         self.start_time = time.time()
+        self.cleared_count = 0
         server = config.get("server", "Alteon")
         room_number = 99999
         slots = config.get("slots", {})
@@ -1198,7 +1343,8 @@ class EclipseApi:
             "default_target": "Ascended Solstice,Blessless Deer",
             "taunt_parity": "odd",
             "converge_type": "sun",
-            "light_gather_taunter": bool(s1.get("light_gather_taunter", False))
+            "slot_number": 1,
+            "light_gather_taunter": bool(s1.get("light_gather_taunter", True))
         }
         t1 = EclipseBotThread("slot1", s1["username"], s1["password"], s1["char_class"], EclipseMasterBot, s1_kwargs, execution_config, self.handle_slave_log)
         self.active_threads["slot1"] = t1
@@ -1210,8 +1356,8 @@ class EclipseApi:
             "default_target": "Ascended Solstice",
             "taunt_parity": "even",
             "converge_type": "sun",
-            "light_gather_taunter": bool(s2.get("light_gather_taunter", False)),
-            "debug_mon": True
+            "slot_number": 2,
+            "light_gather_taunter": bool(s2.get("light_gather_taunter", True)),
         }
         t2 = EclipseBotThread("slot2", s2["username"], s2["password"], s2["char_class"], EclipseSlaveBot, s2_kwargs, execution_config, self.handle_slave_log)
         self.active_threads["slot2"] = t2
@@ -1223,6 +1369,7 @@ class EclipseApi:
             "default_target": "Ascended Midnight",
             "taunt_parity": "odd",
             "converge_type": "moon",
+            "slot_number": 3,
             "light_gather_taunter": bool(s3.get("light_gather_taunter", True)),
             "moon_haze_taunter": bool(s3.get("moon_haze_taunter", True))
         }
@@ -1236,6 +1383,7 @@ class EclipseApi:
             "default_target": "Ascended Midnight",
             "taunt_parity": "even",
             "converge_type": "moon",
+            "slot_number": 4,
             "light_gather_taunter": bool(s4.get("light_gather_taunter", True)),
             "sunset_knight_taunter": bool(s4.get("sunset_knight_taunter", True))
         }
@@ -1261,6 +1409,16 @@ class EclipseApi:
             thread.join(timeout=1.0)
             
         self.active_threads.clear()
+        return {"success": True}
+
+    def toggle_pause(self, pause_state):
+        state = bool(pause_state)
+        for slot_id, thread in self.active_threads.items():
+            if thread.bot_instance:
+                thread.bot_instance.is_paused = state
+                thread.bot_instance.is_script_paused = state
+            if thread.bot_core:
+                thread.bot_core.is_paused = state
         return {"success": True}
 
     def get_status(self):
@@ -1290,9 +1448,14 @@ class EclipseApi:
 
                 scroll_qty = 0
                 if player:
-                    item_enrage = player.get_item_inventory("Scroll of Enrage")
-                    if item_enrage:
-                        scroll_qty = item_enrage.qty
+                    try:
+                        item_enrage = player.get_item_inventory("Scroll of Enrage")
+                        if item_enrage:
+                            scroll_qty = item_enrage.qty
+                    except Exception:
+                        scroll_qty = 0
+
+                is_paused = getattr(bot, "is_paused", False) or (getattr(thread.bot_core, "is_paused", False) if thread.bot_core else False)
 
                 try:
                     statuses[slot_id] = {
@@ -1306,6 +1469,7 @@ class EclipseApi:
                         "map": getattr(bot, "strMapName", "-"),
                         "is_connected": bot.is_client_connected,
                         "is_dead": player.ISDEAD if player else False,
+                        "is_paused": is_paused,
                         "username": thread.username,
                         "cooldowns": cooldowns,
                         "scroll_enrage_qty": scroll_qty,
@@ -1325,7 +1489,7 @@ class EclipseApi:
         
         for s_id in ["slot1", "slot2", "slot3", "slot4"]:
             if s_id not in statuses:
-                statuses[s_id] = {"running": False}
+                statuses[s_id] = {"running": False, "is_connected": False}
 
         monsters_info = []
         for slot_id, thread in list(self.active_threads.items()):
@@ -1334,53 +1498,65 @@ class EclipseApi:
                 player = bot.player
                 current_cell = player.CELL if player else None
                 if current_cell and hasattr(bot, "monsters") and bot.monsters:
-                    for mon in bot.monsters:
-                        if mon.frame == current_cell and mon.current_hp > 0:
-                            monsters_info.append({
-                                "name": mon.mon_name,
-                                "id": mon.mon_map_id,
-                                "hp": mon.current_hp,
-                                "max_hp": mon.max_hp
-                            })
+                    try:
+                        for mon in list(bot.monsters):
+                            if mon.frame == current_cell and mon.current_hp > 0:
+                                monsters_info.append({
+                                    "name": mon.mon_name,
+                                    "id": mon.mon_map_id,
+                                    "hp": mon.current_hp,
+                                    "max_hp": mon.max_hp
+                                })
+                    except Exception:
+                        pass
                     if monsters_info:
                         break
 
         mem_mb = 0.0
         cpu_pct = 0.0
-        if hasattr(self, "process") and self.process:
+        if hasattr(self, "_process") and self._process:
             try:
-                mem_mb = round(self.process.memory_info().rss / (1024 * 1024), 1)
-                cpu_pct = round(self.process.cpu_percent(interval=None), 1)
+                mem_mb = round(self._process.memory_info().rss / (1024 * 1024), 1)
+                cpu_pct = round(self._process.cpu_percent(interval=None), 1)
             except Exception:
                 pass
 
+        slot_statuses = {s_id: statuses[s_id] for s_id in ["slot1", "slot2", "slot3", "slot4"]}
         time_running = int(time.time() - self.start_time) if getattr(self, "start_time", None) else 0
 
+        for thread in self.active_threads.values():
+            if hasattr(thread, "bot_core") and thread.bot_core:
+                c = getattr(thread.bot_core, "cleared_count", 0)
+                if c > self.cleared_count:
+                    self.cleared_count = c
+
         return {
-            "statuses": statuses,
+            "statuses": slot_statuses,
             "monsters": monsters_info,
             "system_stats": {
                 "cpu": cpu_pct,
                 "memory": mem_mb
             },
-            "_time_running": time_running
+            "_time_running": time_running,
+            "cleared_count": self.cleared_count,
+            **slot_statuses
         }
 
 # --- Combined API class ---
 class CombinedApi:
     def __init__(self, aqw_api, slavery_api, temple_api, eclipse_api):
-        self.aqw_api = aqw_api
-        self.slavery_api = slavery_api
-        self.temple_api = temple_api
-        self.eclipse_api = eclipse_api
-        self.window = None
+        self._aqw_api = aqw_api
+        self._slavery_api = slavery_api
+        self._temple_api = temple_api
+        self._eclipse_api = eclipse_api
+        self._window = None
         
         try:
             import psutil
-            self.process = psutil.Process(os.getpid())
-            self.process.cpu_percent(interval=None)
+            self._process = psutil.Process(os.getpid())
+            self._process.cpu_percent(interval=None)
         except Exception:
-            self.process = None
+            self._process = None
 
     def get_theme(self):
         config_path = os.path.expanduser("~/.aqw_bot/hub_config.json")
@@ -1413,130 +1589,151 @@ class CombinedApi:
             return {"success": False, "error": str(e)}
 
     def set_window(self, window):
-        self.window = window
-        self.aqw_api.set_window(window)
-        self.slavery_api.set_window(window)
-        self.temple_api.set_window(window)
-        self.eclipse_api.set_window(window)
+        self._window = window
+        self._aqw_api.set_window(window)
+        self._slavery_api.set_window(window)
+        self._temple_api.set_window(window)
+        self._eclipse_api.set_window(window)
 
     # --- NAMESPACED API FOR AQW BOT (IFRAME) ---
     def aqw_load_config(self):
-        return self.aqw_api.load_config()
+        return self._aqw_api.load_config()
 
     def aqw_save_config(self, config):
-        return self.aqw_api.save_config(config)
+        return self._aqw_api.save_config(config)
 
     def aqw_get_status(self):
-        return self.aqw_api.get_status()
+        return self._aqw_api.get_status()
 
     def aqw_select_script(self):
-        return self.aqw_api.select_script()
+        return self._aqw_api.select_script()
 
     def aqw_start_bot(self, config):
-        res = self.aqw_api.start_bot(config)
-        if res.get("success") and self.aqw_api.bot_thread:
-            thread_id = self.aqw_api.bot_thread.ident
+        res = self._aqw_api.start_bot(config)
+        if res.get("success") and self._aqw_api.bot_thread:
+            thread_id = self._aqw_api.bot_thread.ident
             if thread_id:
-                unified_redirector_out.register_thread(thread_id, "AQW", lambda name, msg: self.aqw_api.handle_log(msg))
-                unified_redirector_err.register_thread(thread_id, "AQW", lambda name, msg: self.aqw_api.handle_log(msg))
+                unified_redirector_out.register_thread(thread_id, "AQW", lambda name, msg: self._aqw_api.handle_log(msg))
+                unified_redirector_err.register_thread(thread_id, "AQW", lambda name, msg: self._aqw_api.handle_log(msg))
         return res
 
     def aqw_stop_bot(self):
-        if self.aqw_api.bot_thread:
-            thread_id = self.aqw_api.bot_thread.ident
+        if self._aqw_api.bot_thread:
+            thread_id = self._aqw_api.bot_thread.ident
             if thread_id:
                 unified_redirector_out.unregister_thread(thread_id)
                 unified_redirector_err.unregister_thread(thread_id)
-        return self.aqw_api.stop_bot()
+        return self._aqw_api.stop_bot()
 
     # --- NAMESPACED API FOR SLAVERY BOT (IFRAME) ---
     def slavery_load_config(self):
-        return self.slavery_api.load_config()
+        return self._slavery_api.load_config()
 
     def slavery_save_config(self, config):
-        return self.slavery_api.save_config(config)
+        return self._slavery_api.save_config(config)
 
     def slavery_get_status(self):
-        return self.slavery_api.get_status()
+        return self._slavery_api.get_status()
 
     def start_slaves(self, config, usernames):
-        return self.slavery_api.start_slaves(config, usernames)
+        return self._slavery_api.start_slaves(config, usernames)
 
     def stop_slaves(self):
-        return self.slavery_api.stop_slaves()
+        return self._slavery_api.stop_slaves()
 
     def toggle_pause_slaves(self, pause_state):
-        return self.slavery_api.toggle_pause_slaves(pause_state)
+        return self._slavery_api.toggle_pause_slaves(pause_state)
 
     def update_slave_taunter(self, username, taunter_state):
-        return self.slavery_api.update_slave_taunter(username, taunter_state)
+        return self._slavery_api.update_slave_taunter(username, taunter_state)
 
     def get_version(self):
-        return self.slavery_api.get_version()
+        return self._slavery_api.get_version()
 
     # --- NAMESPACED API FOR TEMPLE BOT (IFRAME) ---
     def temple_load_config(self):
-        return self.temple_api.load_config()
+        return self._temple_api.load_config()
 
     def temple_save_config(self, config):
-        return self.temple_api.save_config(config)
+        return self._temple_api.save_config(config)
 
     def temple_get_status(self):
-        return self.temple_api.get_status()
+        return self._temple_api.get_status()
 
     def temple_reset_config(self):
-        return self.temple_api.reset_config()
+        return self._temple_api.reset_config()
 
     def temple_start_party(self, config):
-        return self.temple_api.start_party(config)
+        return self._temple_api.start_party(config)
 
     def temple_stop_party(self):
-        return self.temple_api.stop_party()
+        return self._temple_api.stop_party()
 
     # --- NAMESPACED API FOR ECLIPSE BOT (IFRAME) ---
     def eclipse_load_config(self):
-        return self.eclipse_api.load_config()
+        return self._eclipse_api.load_config()
 
     def eclipse_save_config(self, config):
-        return self.eclipse_api.save_config(config)
+        return self._eclipse_api.save_config(config)
 
     def eclipse_get_status(self):
-        return self.eclipse_api.get_status()
+        return self._eclipse_api.get_status()
 
     def eclipse_reset_config(self):
-        return self.eclipse_api.reset_config()
+        return self._eclipse_api.reset_config()
 
     def eclipse_start_party(self, config):
-        return self.eclipse_api.start_party(config)
+        return self._eclipse_api.start_party(config)
 
     def eclipse_stop_party(self):
-        return self.eclipse_api.stop_party()
+        return self._eclipse_api.stop_party()
+
+    def eclipse_toggle_pause(self, pause_state):
+        return self._eclipse_api.toggle_pause(pause_state)
 
     def validate_password(self, password):
-        return self.eclipse_api.validate_password(password)
+        return self._eclipse_api.validate_password(password)
 
     def toggle_debug(self):
-        if self.window:
+        if self._window:
             try:
-                self.window.toggle_developer_tools()
+                self._window.toggle_developer_tools()
                 return {"success": True}
             except Exception as e:
                 print(f"Error toggling developer tools: {e}")
                 return {"success": False, "error": str(e)}
 
+    def stop_all(self):
+        try:
+            self.aqw_stop_bot()
+        except Exception:
+            pass
+        try:
+            self.stop_slaves()
+        except Exception:
+            pass
+        try:
+            self.temple_stop_party()
+        except Exception:
+            pass
+        try:
+            self.eclipse_stop_party()
+        except Exception:
+            pass
+
     # --- Dashboard Hub Status ---
     def get_hub_status(self):
         # 1. AQW Bot
         aqw_status = {"running": False}
-        if self.aqw_api.bot_thread and self.aqw_api.bot_thread.is_alive():
+        if self._aqw_api.bot_thread and self._aqw_api.bot_thread.is_alive():
             try:
-                aqw_status = self.aqw_api.get_status()
+                aqw_status = self._aqw_api.get_status()
             except Exception:
                 aqw_status = {"running": True}
         
         # 2. Slavery Bot
         slavery_status = {"running": False}
-        active_slaves = [username for username, thread in self.slavery_api.active_threads.items() if thread.is_alive()]
+        active_slaves = [username for username, thread in self._slavery_api.active_threads.items() if thread.is_alive()]
         if active_slaves:
             slavery_status = {
                 "running": True,
@@ -1546,46 +1743,48 @@ class CombinedApi:
 
         # 3. Temple Bot
         temple_status = {"running": False}
-        active_temple = [s_id for s_id, thread in self.temple_api.active_threads.items() if thread.is_alive()]
+        active_temple = [s_id for s_id, thread in self._temple_api.active_threads.items() if thread.is_alive()]
         if active_temple:
-            members = [thread.username for thread in self.temple_api.active_threads.values() if thread.is_alive()]
+            members = [thread.username for thread in self._temple_api.active_threads.values() if thread.is_alive()]
             elapsed = 0
-            if getattr(self.temple_api, "start_time", None):
-                elapsed = int(time.time() - self.temple_api.start_time)
+            if getattr(self._temple_api, "start_time", None):
+                elapsed = int(time.time() - self._temple_api.start_time)
             temple_status = {
                 "running": True,
                 "count": len(active_temple),
                 "slots": active_temple,
                 "members": members,
-                "time_running": elapsed
+                "time_running": elapsed,
+                "cleared_count": getattr(self._temple_api, "cleared_count", 0)
             }
         else:
-            self.temple_api.start_time = None
+            self._temple_api.start_time = None
 
         # 4. Eclipse Bot
         eclipse_status = {"running": False}
-        active_eclipse = [s_id for s_id, thread in self.eclipse_api.active_threads.items() if thread.is_alive()]
+        active_eclipse = [s_id for s_id, thread in self._eclipse_api.active_threads.items() if thread.is_alive()]
         if active_eclipse:
-            members = [thread.username for thread in self.eclipse_api.active_threads.values() if thread.is_alive()]
+            members = [thread.username for thread in self._eclipse_api.active_threads.values() if thread.is_alive()]
             elapsed = 0
-            if getattr(self.eclipse_api, "start_time", None):
-                elapsed = int(time.time() - self.eclipse_api.start_time)
+            if getattr(self._eclipse_api, "start_time", None):
+                elapsed = int(time.time() - self._eclipse_api.start_time)
             eclipse_status = {
                 "running": True,
                 "count": len(active_eclipse),
                 "slots": active_eclipse,
                 "members": members,
-                "time_running": elapsed
+                "time_running": elapsed,
+                "cleared_count": getattr(self._eclipse_api, "cleared_count", 0)
             }
         else:
-            self.eclipse_api.start_time = None
+            self._eclipse_api.start_time = None
 
         mem_mb = 0.0
         cpu_pct = 0.0
-        if hasattr(self, "process") and self.process:
+        if hasattr(self, "_process") and self._process:
             try:
-                mem_mb = round(self.process.memory_info().rss / (1024 * 1024), 1)
-                cpu_pct = round(self.process.cpu_percent(interval=None), 1)
+                mem_mb = round(self._process.memory_info().rss / (1024 * 1024), 1)
+                cpu_pct = round(self._process.cpu_percent(interval=None), 1)
             except Exception:
                 pass
 
@@ -1690,6 +1889,7 @@ def serve_injected_html(filepath, bot_type):
                             reset_config: () => topApi.eclipse_reset_config(),
                             start_party: (cfg) => topApi.eclipse_start_party(cfg),
                             stop_party: () => topApi.eclipse_stop_party(),
+                            toggle_pause: (p) => topApi.eclipse_toggle_pause(p),
                             validate_password: (pwd) => topApi.validate_password(pwd)
                         }
                     };
@@ -1779,8 +1979,77 @@ def start_local_server(web_dashboard_dir, web_dir, web_slavery_dir, web_temple_d
     t.start()
     return f"http://127.0.0.1:{port}"
 
+def cleanup_orphaned_processes():
+    """
+    Terminates any zombie / orphaned instances of AQW_Bot_Hub or msedgewebview2 processes
+    locking the webview UserDataFolder from previous unfinished sessions.
+    """
+    current_pid = os.getpid()
+    protected_pids = {current_pid}
+    try:
+        import psutil
+        curr = psutil.Process(current_pid)
+        for parent in curr.parents():
+            protected_pids.add(parent.pid)
+        for child in curr.children(recursive=True):
+            protected_pids.add(child.pid)
+    except Exception:
+        if hasattr(os, 'getppid'):
+            protected_pids.add(os.getppid())
+
+    try:
+        import psutil
+        for proc in psutil.process_iter(['pid', 'name', 'cmdline']):
+            try:
+                if proc.info['pid'] in protected_pids:
+                    continue
+                pname = (proc.info['name'] or '').lower()
+                cmdline = ' '.join(proc.info['cmdline'] or []).lower()
+                
+                # Check for orphaned AQW_Bot_Hub.exe from a previous closed session
+                if 'aqw_bot_hub' in pname:
+                    print(f"Cleaning up orphaned hub process PID {proc.info['pid']}...")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+                # Check for orphaned msedgewebview2 attached to our specific ~/.aqw_bot/webview directory
+                elif 'msedgewebview2' in pname and ('.aqw_bot' in cmdline or 'aqw' in cmdline):
+                    print(f"Cleaning up orphaned webview process PID {proc.info['pid']}...")
+                    try:
+                        proc.kill()
+                    except Exception:
+                        pass
+            except (psutil.NoSuchProcess, psutil.AccessDenied):
+                pass
+    except Exception as e:
+        print(f"Process cleanup notice: {e}")
+
 # --- Launcher (Run) ---
 def run_gui():
+    # Clean up any leftover zombie processes from previous sessions
+    cleanup_orphaned_processes()
+
+    # Verify WebView2 Runtime availability on Windows before launching
+    if sys.platform == "win32":
+        try:
+            from webview.platforms import winforms
+            if not winforms._is_chromium():
+                import ctypes
+                msg = (
+                    "Aplikasi AQW Multi-Bot Hub memerlukan 'Microsoft Edge WebView2 Runtime' agar dapat berjalan di Windows.\n\n"
+                    "Di perangkat ini WebView2 Runtime belum terdeteksi. Silakan unduh dan pasang WebView2 Runtime dari situs resmi Microsoft:\n"
+                    "https://developer.microsoft.com/en-us/microsoft-edge/webview2/\n\n"
+                    "Klik OK untuk membuka halaman unduhan resmi Microsoft."
+                )
+                res = ctypes.windll.user32.MessageBoxW(0, msg, "Microsoft Edge WebView2 Diperlukan", 0x30 | 0x1)
+                if res == 1:
+                    import webbrowser
+                    webbrowser.open("https://go.microsoft.com/fwlink/p/?LinkId=2124703")
+                sys.exit(1)
+        except Exception as e:
+            pass
+
     aqw_api = AqwSoloApi()
     slavery_api = SlaveryApi()
     temple_api = TempleApi()
@@ -1825,16 +2094,39 @@ def run_gui():
     storage_path = os.path.expanduser("~/.aqw_bot/webview")
     os.makedirs(storage_path, exist_ok=True)
     
-    webview.start(debug=True, private_mode=False, storage_path=storage_path)
+    def on_closed():
+        print("Application closing, stopping all bot tasks and background processes...")
+        try:
+            combined_api.stop_all()
+        except Exception:
+            pass
+        try:
+            import psutil
+            current_process = psutil.Process(os.getpid())
+            for child in current_process.children(recursive=True):
+                try:
+                    child.kill()
+                except Exception:
+                    pass
+        except Exception:
+            pass
+        os._exit(0)
+
+    window.events.closed += on_closed
+
+    try:
+        webview.start(debug=True, private_mode=False, storage_path=storage_path)
+    finally:
+        on_closed()
 
 # --- Icon Generator ---
 def generate_icons():
     system = platform.system()
-    png_path = os.path.join(project_root, "app", "web_dashboard", "aqw_icon.png")
+    png_path = os.path.join(project_root, "app", "web_dashboard", "temple_icon.png")
     if not os.path.exists(png_path):
         return
         
-    print("Generating application icons from aqw_icon.png...")
+    print("Generating application icons from temple_icon.png...")
     if system == "Darwin":
         try:
             iconset_dir = "app.iconset"
@@ -1864,28 +2156,19 @@ def generate_icons():
         except Exception as e:
             print(f"Failed to generate Windows app.ico: {e}")
 
-# --- Packager (Build) ---
+# --- Packager (Build macOS App Bundle) ---
 def build_app():
-    system = platform.system()
     app_name = "AQW_Bot_Hub"
     entrypoint = os.path.join("app", "build_hub_app.py")
     
     generate_icons()
-    print(f"Building AQW Bot Hub for {system}...")
+    print("Building AQW Bot Hub macOS app bundle (.app)...")
     
-    # Define outputs to clean depending on the OS
-    if system == "Windows":
-        outputs_to_clean = [
-            os.path.join("build", app_name),
-            os.path.join("dist", app_name),
-            os.path.join("dist", f"{app_name}.exe")
-        ]
-    else:  # macOS / Linux
-        outputs_to_clean = [
-            os.path.join("build", app_name),
-            os.path.join("dist", f"{app_name}.app"),
-            os.path.join("dist", app_name)
-        ]
+    outputs_to_clean = [
+        os.path.join("build", app_name),
+        os.path.join("dist", f"{app_name}.app"),
+        os.path.join("dist", app_name)
+    ]
         
     for path in outputs_to_clean:
         if os.path.exists(path):
@@ -1900,16 +2183,17 @@ def build_app():
                 
     data_folders = [
         ("app/web_dashboard", "web_dashboard"),
-        ("bot", "bot")
+        ("bot", "bot"),
+        ("commands", "commands"),
+        ("abstracts", "abstracts"),
+        ("templates", "templates"),
+        ("bot_cmds", "bot_cmds")
     ]
     
-    icon_file = "app.icns" if system == "Darwin" else "app.ico"
-    separator = ";" if system == "Windows" else ":"
+    icon_file = "app.icns"
     
     pyinstaller_bin = "pyinstaller"
     venv_pyinstaller = os.path.join("venv", "bin", "pyinstaller")
-    if system == "Windows":
-        venv_pyinstaller = os.path.join("venv", "Scripts", "pyinstaller.exe")
     if os.path.exists(venv_pyinstaller):
         pyinstaller_bin = venv_pyinstaller
 
@@ -1919,12 +2203,22 @@ def build_app():
         "--noconfirm",
         "--clean",
         "--windowed",
+        "--collect-all=webview",
         "--hidden-import=psutil",
+        "--hidden-import=bottle",
+        "--hidden-import=webview",
+        "--hidden-import=commands",
+        "--hidden-import=abstracts",
+        "--hidden-import=templates",
+        "--hidden-import=bot_cmds",
+        "--hidden-import=handlers",
+        "--hidden-import=model",
+        "--hidden-import=core",
         f"--paths={project_root}"
     ]
     
     for src, dest in data_folders:
-        cmd.append(f"--add-data={src}{separator}{dest}")
+        cmd.append(f"--add-data={src}:{dest}")
         
     if os.path.exists(icon_file):
         cmd.append(f"--icon={icon_file}")
@@ -1938,8 +2232,8 @@ def build_app():
     
     if result.returncode == 0:
         print("\n" + "="*60)
-        output_file_desc = os.path.join("dist", f"{app_name}.app" if system == "Darwin" else f"{app_name}.exe")
-        print("SUCCESS! Standing app bundle built successfully.")
+        output_file_desc = os.path.join("dist", f"{app_name}.app")
+        print("SUCCESS! macOS App bundle built successfully.")
         print(f"You can find the standalone client at: {os.path.abspath(output_file_desc)}")
         print("="*60 + "\n")
     else:
@@ -1948,10 +2242,23 @@ def build_app():
 
 # --- Main Routing Entrypoint ---
 def main():
-    if len(sys.argv) > 1 and sys.argv[1] in ("build", "--build"):
-        build_app()
-    else:
-        run_gui()
+    try:
+        if len(sys.argv) > 1 and sys.argv[1] in ("build", "--build"):
+            build_app()
+        else:
+            run_gui()
+    except Exception as e:
+        import traceback
+        err_msg = traceback.format_exc()
+        print(f"[AQW Hub] Critical startup exception:\n{err_msg}")
+        try:
+            log_dir = os.path.expanduser("~/.aqw_bot")
+            os.makedirs(log_dir, exist_ok=True)
+            with open(os.path.join(log_dir, "crash.log"), "w", encoding="utf-8") as f:
+                f.write(err_msg)
+        except Exception:
+            pass
+        sys.exit(1)
 
 if __name__ == "__main__":
     main()

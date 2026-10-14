@@ -20,6 +20,7 @@ class CoreTempleBot:
         self._target_monsters = target_monsters
         self.timeleapse = 0
         self.cleared_count = 0
+        self.bot_timeleapse = time.monotonic()
 
         # skill setup
         self.skill_list = [0, 1, 2, 0, 3, 4]
@@ -99,14 +100,20 @@ class CoreTempleBot:
         elif self.cmd.get_player().CELL == "r2" and not self.cmd.is_monster_alive():
             await self.cmd.jump_cell("r3", "Left")
         elif self.cmd.get_player().CELL == "r3" and not self.cmd.is_monster_alive():
+            bot_elapsed_seconds = time.monotonic() - self.bot_timeleapse
+            bot_minutes = int(bot_elapsed_seconds // 60)
+            bot_seconds = int(bot_elapsed_seconds % 60)
+
             elapsed_seconds = time.monotonic() - self.timeleapse
             minutes = int(elapsed_seconds // 60)
             seconds = int(elapsed_seconds % 60)
             self.cleared_count += 1
-            self.print_debug(f"Dungeon cleared {self.cleared_count} times.")
+
+            self.print_debug(f"{Fore.CYAN}Finished in : {minutes} minutes and {seconds} seconds.{Fore.RESET}")
+            self.print_debug(f"{Fore.CYAN}Dungeon cleared {self.cleared_count} times.{Fore.RESET}")
+            self.print_debug(f"{Fore.CYAN}Total time running : {bot_minutes} minutes and {bot_seconds} seconds.{Fore.RESET}")
             await self.cmd.send_chat(f"Dungeon cleared {self.cleared_count} times.")
             await self.cmd.sleep(1000)
-            self.print_debug(f"Total time taken: {minutes} minutes and {seconds} seconds.")
             await self.cmd.send_chat(f"Total time taken: {minutes} minutes and {seconds} seconds.")
             await self.cmd.sleep(1000)
             await self.cmd.join_map("templeshrine", roomNumber=999999)
