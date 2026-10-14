@@ -16,66 +16,35 @@ from model.player_area import PlayerArea
 from model.shop import Shop
 
 def check_alive(func):
+    """Wait for the player to come back, then run the function.
+
+    Respawn is owned by ``handlers.death_handler`` (fired on ``playerDeath``)
+    and by the queue loop.  This decorator must never respawn and must never
+    block:
+
+    * the old **sync** path looped on ``time.sleep(1)`` inside the event loop,
+      so a dead player hitting a sync method (``get_monster_hp`` is called on
+      every fight tick) froze the whole bot -- the async death handler could not
+      tick and the respawn looked "stopped";
+    * both paths also sent their own ``resPlayerTimed``, racing that handler.
+    """
+
     @wraps(func)
     def sync_wrapper(self: 'Command', *args, **kwargs):
-        if self.is_player_alive():
-            return func(self, *args, **kwargs)
-        start_time = time.time()
-        timeout = 11  # Maximum time to wait (in seconds)
-        count = 1
-        while self.is_still_connected():
-            if self.is_player_alive():
-                return func(self, *args, **kwargs)
-            if time.time() - start_time > timeout:
-                print("timeout from @check_alive sync")
-                self.bot.debug(Fore.MAGENTA + "respawned: from @check_alive sync" + Fore.WHITE)
-                self.bot.write_message(f"%xt%zm%resPlayerTimed%{self.bot.areaId}%{self.bot.user_id}%")
-                self.bot.jump_cell(self.bot.player.CELL, self.bot.player.PAD)
-                self.bot.player.ISDEAD = False
-                print("Spawned at cell:", self.bot.player.CELL, "pad:", self.bot.player.PAD)
-                # self.stopBot("from @check_alive sync")
-                return func(self, *args, **kwargs)
-            time.sleep(1)  # Avoid busy-waiting
-            count += 1
         if not self.is_still_connected():
-            print("STOPPPPPPPP SYNC")
             return
-        self.bot.debug(Fore.MAGENTA + "respawned: from @check_alive sync" + Fore.WHITE)
-        self.bot.write_message(f"%xt%zm%resPlayerTimed%{self.bot.areaId}%{self.bot.user_id}%")
-        self.bot.jump_cell(self.bot.player.CELL, self.bot.player.PAD)
-        self.bot.player.ISDEAD = False
-        print("Spawned at cell:", self.bot.player.CELL, "pad:", self.bot.player.PAD)
         return func(self, *args, **kwargs)
 
     @wraps(func)
     async def async_wrapper(self: 'Command', *args, **kwargs):
-        if self.is_player_alive():
-            return await func(self, *args, **kwargs)
         start_time = time.time()
-        timeout = 11  # Maximum time to wait (in seconds)
-
-        while self.is_still_connected():
-            if self.is_player_alive():
-                return await func(self, *args, **kwargs)
-            if time.time() - start_time > timeout:
-                print("timeout from @check_alive async")
-                self.bot.debug(Fore.MAGENTA + "respawned: from @check_alive sync" + Fore.WHITE)
-                self.bot.write_message(f"%xt%zm%resPlayerTimed%{self.bot.areaId}%{self.bot.user_id}%")
-                self.bot.jump_cell(self.bot.player.CELL, self.bot.player.PAD)
-                self.bot.player.ISDEAD = False
-                print("Spawned at cell:", self.bot.player.CELL, "pad:", self.bot.player.PAD)
-                # self.stopBot("from @check_alive async")
-                return await func(self, *args, **kwargs)
-            await asyncio.sleep(1)  # Non-blocking wait
+        while (not self.is_player_alive() and self.is_still_connected()
+               and time.time() - start_time <= 11):
+            await asyncio.sleep(0.2)   # non-blocking; the death handler respawns
         if not self.is_still_connected():
-            print("STOPPPPPPPP ASYNC")
             return
-        self.bot.debug(Fore.MAGENTA + "respawned: from @check_alive async" + Fore.WHITE)
-        self.bot.write_message(f"%xt%zm%resPlayerTimed%{self.bot.areaId}%{self.bot.user_id}%")
-        self.bot.jump_cell(self.bot.player.CELL, self.bot.player.PAD)
-        self.bot.player.ISDEAD = False
-        print("Spawned at cell:", self.bot.player.CELL, "pad:", self.bot.player.PAD)
         return await func(self, *args, **kwargs)
+
     # Check if the function is async and use the appropriate wrapper
     return async_wrapper if iscoroutinefunction(func) else sync_wrapper
 
@@ -91,11 +60,34 @@ class Command:
     quest_to_check: Optional[int] = None
     is_green_quest_var: Optional[bool] = None
     is_completed_before_var: Optional[bool] = None
-    skill_reload_time: int = 0
+
+    # Pacing floors between two consecutive skill packets, in ms, measured from
+    # the previous packet of ANY kind.
+    #
+    # These are not arbitrary: they reproduce the envelope the original code was
+    # implicitly testing for, which the baseline capture proved safe (2 warnings
+    # / 803 casts / 605 s). Flattening them to a single 300 ms floor was tried
+    # and measured to fail badly (SKILL_ANALYSIS.md 3.6):
+    #
+    #   transition   baseline      flat 300 ms floor
+    #   nz  -> nz    0.5% reject   42.3% reject
+    #   aa  -> nz    0%            11.1%
+    #   nz  -> aa    0.4%          11.1%
+    #   aa  -> aa    0%            0%
+    #
+    # So a real skill needs ~700 ms of clearance after the previous action,
+    # while the auto-attack ("aa", slot 0) only needs the ~300 ms the old code
+    # produced via its 200 ms sleep + 100 ms loop sleep. Slot 0's own 1161 ms
+    # cooldown is the real constraint on it, not pacing.
+    MIN_SKILL_GAP_MS: int = 700
+    AUTO_ATTACK_MIN_GAP_MS: int = 300
+    # Latency allowance handed to Player.updateNextUse -- see its docstring.
+    CD_START_DELAY_MS: int = 200
 
     def __init__(self, bot, init_handler = False):
         from core.bot import Bot
         self.bot: Bot = bot
+        self.last_skill_cast_ms: int = 0
 
         if init_handler:
             self.bot.subscribe(self._message_handler)
@@ -442,23 +434,59 @@ class Command:
                 await asyncio.sleep(1)
 
     @check_alive
-    async def equip_item(self, item_name: str) -> None:
-        """Equip an inventory item if it is present and not already equipped.
+    async def equip_item(self, item_name: str) -> bool:
+        """Equip an inventory item, withdrawing it from the bank if needed.
+
+        Lookup order is deliberate, and is what a caller relies on to decide
+        whether to abort:
+
+        1. in inventory and already equipped -> True, nothing sent;
+        2. in inventory -> equip it, True;
+        3. in the **bank** only -> withdraw it (``bank_to_inv``), then equip,
+           True -- classes are commonly banked, so this stops "the class is
+           owned but not worn" from looking like a missing item;
+        4. in neither -> False, with a message saying which was checked.
 
         Args:
             item_name (str): Name of the item to equip.
 
         Returns:
-            None: Updates the equipped state and sends the equip packet.
+            bool: True when the item is equipped afterwards, False when it is
+            in neither inventory nor bank.  Callers that must not run with the
+            wrong gear (see ``bot.ultra.core_ultra.CoreUltra.apply_loadout``)
+            stop the bot on False instead of fighting in whatever was on.
         """
         await self.bot.ensure_leave_from_combat()
 
+        if await self._equip_held_item(item_name):
+            return True
+
+        if self.is_in_bank(item_name):
+            print(Fore.CYAN +
+                  f"[equip_item] {item_name!r} is in the bank -- withdrawing it"
+                  + Fore.RESET)
+            await self.bank_to_inv(item_name)
+            if await self._equip_held_item(item_name):
+                return True
+
+        print(Fore.YELLOW +
+              f"[equip_item] {item_name!r} is in neither inventory nor bank "
+              f"({len(self.bot.player.INVENTORY)} in inventory, "
+              f"{len(self.bot.player.BANK)} in bank)." + Fore.RESET)
+        return False
+
+    async def _equip_held_item(self, item_name: str) -> bool:
+        """Equip from ``INVENTORY`` only; False when the name matches nothing.
+
+        Split out so ``equip_item`` can retry it after withdrawing from the
+        bank rather than duplicating the match-and-packet logic.
+        """
         is_equipped = False
         s_type = None
         for item in self.bot.player.INVENTORY:
             if normalize(item.item_name.lower()) == normalize(item_name.lower()):
                 if item.is_equipped:
-                    return
+                    return True
                 print(f"equipping {item_name}")
                 packet = f"%xt%zm%equipItem%{self.bot.areaId}%{item.item_id}%"
                 self.bot.write_message(packet)
@@ -473,9 +501,10 @@ class Command:
                 if item.s_type == s_type and item.is_equipped and not item.item_name == item_name.lower():
                     item.is_equipped = False
                     break
+        return is_equipped
 
     @check_alive
-    async def equip_scroll(self, item_name: str, item_type: ScrollType = ScrollType.SCROLL) -> None:
+    async def equip_scroll(self, item_name: str, item_type: ScrollType = ScrollType.SCROLL) -> bool:
         """Equip a scroll or potion from the player's inventory.
 
         Args:
@@ -483,7 +512,9 @@ class Command:
             item_type (ScrollType): Scroll category to include in the packet.
 
         Returns:
-            None: Sends the equip packet when the item is found.
+            bool: True when the scroll was found and its packet sent, False
+            when inventory has no item by that name -- so a caller can refuse
+            to start a fight that depends on the scroll.
         """
         for item in self.bot.player.INVENTORY:
             if item.item_name.lower() == item_name.lower():
@@ -491,22 +522,227 @@ class Command:
                 self.bot.scroll_id = item.item_id
                 self.bot.write_message(packet)
                 await asyncio.sleep(1)
-                break
+                return True
+        print(Fore.YELLOW +
+              f"[equip_scroll] {item_name!r} is not in inventory "
+              f"({len(self.bot.player.INVENTORY)} items checked)." + Fore.RESET)
+        return False
 
     @check_alive
-    async def equip_item_by_enhancement(self, enh_id: int) -> None:
-        """Equip the item that matches a specific enhancement identifier.
+    async def equip_item_by_enhancement(self, enh_id: int) -> bool:
+        """Equip the first item carrying a given enhancement.
+
+        Backwards-compatible wrapper over :meth:`equip_enhancement`.
 
         Args:
-            enh_id (int): Enhancement identifier bound to the desired item.
+            enh_id (int): Prefer an ``EnhID`` (the enhancement's unique item
+                id, e.g. 70752 = Valiance R7).  An ``EnhPatternID`` is still
+                accepted for old call sites, but patterns are ambiguous --
+                pattern 10 covers seven different weapon enhancements -- so
+                prefer the name (``equip_enhancement("Valiance")``) or the id.
 
         Returns:
-            None: Calls :meth:`equip_item` when a matching item exists.
+            bool: True when an item was found and equip was attempted.
         """
-        # TODO: should change the enhance_pattern_id to enhance name
-        item = self.bot.player.get_item_inventory_by_enhance_id(enh_id)
-        if item:
-            await self.equip_item(item.item_name)
+        return await self.equip_enhancement(enh_id)
+
+    @check_alive
+    async def equip_enhancement(self, enhancement: Union[int, str],
+                                slot: Optional[str] = None, *,
+                                level: Optional[int] = None,
+                                rarity: Optional[int] = None) -> bool:
+        """Equip whatever item has a given enhancement socketed.
+
+        This is the "which weapon do I want" selector: pick the enhancement and
+        the item carrying it gets equipped, rather than naming the item.
+
+        An enhancement only fits one slot -- Valiance a weapon, Penitence a
+        cape, Vim a helm -- so when a name maps to a single slot the filter is
+        applied automatically and you do not need to repeat it.
+
+        Args:
+            enhancement: An enhancement name (``"Valiance"``), an ``EnhID``
+                (70752), a numeric string (``"70752"``), or an ``EnhPatternID``
+                (legacy; see the ambiguity note below).
+            slot (str): Overrides the slot inferred from the enhancement.
+                Accepts readable names (``"weapon"``, ``"helm"``, ``"cape"``,
+                ``"class"``, ``"armor"``) or raw ``sES`` codes (``"Weapon"``,
+                ``"he"``, ``"ba"``, ``"ar"``, ``"co"``).
+            level (int): Only meaningful for a *basic* enhancement named as
+                text.  Those shops sell one name at every level 51..100, so
+                the name is a family and ``level`` picks the tier.  Ignored
+                when ``enhancement`` is an id, since an id is already unique.
+            rarity (int): Further narrows a ``level`` lookup.  Needed only at
+                the cap, where level 100 exists at both rarity 5 and 6.
+
+        Returns:
+            bool: True when a matching item was found and the equip packet was
+                sent.  False means *nothing matched* -- unknown name, empty
+                inventory, ambiguous target with no slot, a ``level`` the shop
+                does not sell, or no owned item -- and prints why, so callers
+                fail loudly instead of silently doing nothing.
+
+        Example::
+
+            await cmd.equip_enhancement("Valiance")      # equips a weapon
+            await cmd.equip_enhancement("Penitence")     # equips a cape
+            await cmd.equip_enhancement("Forge", slot="he")
+            await cmd.equip_enhancement(70752)           # Valiance R7 by id
+            await cmd.equip_enhancement("Wizard Armor Enhancement",
+                                        level=100)       # basic, by tier
+            await cmd.equip_enhancement("Wizard Armor Enhancement",
+                                        level=100, rarity=6)  # -> 52276
+
+        Note:
+            Passing a raw pattern id (the old ``enh_pattern_id=`` style) is
+            ambiguous for pattern 10, which seven weapon enhancements share --
+            "equip pattern 10" has no single right answer.  A warning names the
+            candidates and asks for ``slot=``; every other pattern maps to one
+            enhancement and resolves cleanly.  Pattern 6 became shared too
+            once the basic file was added: forge *Elysium* and basic *Wizard*
+            both report it, so prefer a name or an EnhID there as well.
+        """
+        from model import enhancement as enh
+
+        # --- normalise / validate the slot -----------------------------
+        try:
+            wanted_slot = enh.slot_code(slot)
+        except ValueError as exc:
+            print(Fore.YELLOW + f"[equip_enhancement] {exc}" + Fore.RESET)
+            return False
+
+        # --- resolve the enhancement itself ----------------------------
+        records: List = []
+        # What we ultimately match inventory against.  A `level` lookup
+        # narrows a *name* to a set of EnhIDs, so the name is matched first
+        # and then filtered down to `tier_ids`.
+        target: Union[int, str] = enhancement
+        tier_ids: Optional[set] = None
+        tier_by_id: dict = {}
+        named = isinstance(enhancement, str) and not enhancement.strip().isdigit()
+        if named:
+            records = enh.find(enhancement)
+            if not records:
+                known = ", ".join(enh.names()) or "(no enhancement data loaded)"
+                print(Fore.YELLOW +
+                      f"[equip_enhancement] no enhancement named "
+                      f"{enhancement!r}. Known: {known}." + Fore.RESET)
+                return False
+            if level is not None:
+                # Basic shops sell one name at every level 51..100, so the
+                # name is a family and level picks the tier out of it.
+                narrowed = enh.by_name_level(enhancement, level,
+                                             slot=wanted_slot, rarity=rarity)
+                if not narrowed:
+                    tiers = sorted({r.level for r in records})
+                    print(Fore.YELLOW +
+                          f"[equip_enhancement] {enhancement!r} has no tier at "
+                          f"level {level}{' rarity ' + str(rarity) if rarity is not None else ''} "
+                          f"(shop sells levels {tiers[0]}..{tiers[-1]})."
+                          + Fore.RESET)
+                    return False
+                # Keep every tier at this level and let inventory decide:
+                # level 100 exists at rarity 5 and 6, and committing to one
+                # up front fails when the account only owns the other.
+                # `target` stays the name so the match is broad, then the
+                # filter below restricts it to exactly these ids.
+                records = narrowed
+                tier_ids = {r.item_id for r in narrowed}
+                tier_by_id = {r.item_id: r for r in narrowed}
+        else:
+            enh_id = int(enhancement)
+            rec = enh.get(enh_id)
+            records = [rec] if rec else enh.by_pattern(enh_id)
+            if not records:
+                # No name for this id -- it came from a shop we never
+                # captured.  The id itself is still unique, so match
+                # inventory on it directly (this is what the old
+                # equip_item_by_by_enhancement(enh_id) did).  Slot stays
+                # unknown: pass slot= if the enhancement could span slots.
+                target = enh_id
+                print(Fore.CYAN +
+                      f"[equip_enhancement] EnhID {enh_id} is not in "
+                      f"forge_enhancement.jsonl or basic_enhancement.jsonl; "
+                      f"matching it by raw id." + Fore.RESET)
+
+        # --- infer the slot when the enhancement implies exactly one ----
+        implied = {r.slot for r in records}
+        if wanted_slot is None and len(implied) == 1:
+            wanted_slot = implied.pop()
+        elif wanted_slot is None and len(implied) > 1:
+            labels = ", ".join(sorted(enh.SLOT_LABELS.get(s, s)
+                                      for s in implied))
+            print(Fore.YELLOW +
+                  f"[equip_enhancement] {enhancement!r} fits more than one "
+                  f"slot ({labels}); pass slot= to choose." + Fore.RESET)
+            return False
+
+        # --- warn when the target is a pattern shared by several names ---
+        # Only meaningful when the id actually resolved through the pattern
+        # table.  An id in neither capture leaves `records` empty and takes
+        # the raw-id path above, where there is nothing shared to warn about.
+        if records and (isinstance(enhancement, (int,)) or
+                        str(enhancement).isdigit()):
+            pattern_id = int(enhancement)
+            if not enh.get(pattern_id) and not enh.is_pattern_unique(pattern_id):
+                labels = ", ".join(sorted({r.name for r in records}))
+                print(Fore.YELLOW +
+                      f"[equip_enhancement] pattern {pattern_id} is shared by "
+                      f"{len(records)} enhancements ({labels}); matching all "
+                      f"of them. Prefer the name or an EnhID." + Fore.RESET)
+
+        if not self.bot.player.INVENTORY:
+            print(Fore.YELLOW +
+                  "[equip_enhancement] inventory is empty, cannot select an "
+                  "item. Load it first." + Fore.RESET)
+            return False
+
+        items = self.bot.player.get_items_by_enhancement(target,
+                                                         slot=wanted_slot)
+        if tier_ids is not None:
+            # Keep only the tiers this level actually sells.  Among them prefer
+            # the highest rarity: at level 100 both cost the same, so the
+            # rarity-6 one is simply the better item.
+            items = [i for i in items if i.enh_id in tier_ids]
+            items.sort(key=lambda i: (
+                tier_by_id[i.enh_id].rarity, i.enh_id), reverse=True)
+        if not items:
+            label = records[0].name if len(records) == 1 else str(enhancement)
+            tier = f" (level {level})" if level is not None else ""
+            scope = (f" in slot "
+                     f"{enh.SLOT_LABELS.get(wanted_slot, wanted_slot)}"
+                     if wanted_slot else "")
+            owned = sum(1 for i in self.bot.player.INVENTORY
+                        if i.enh_id or i.enh_pattern_id)
+            want = ""
+            if tier_ids:
+                want = (f"; shop tiers for this level are "
+                        f"{', '.join(str(i) for i in sorted(tier_ids))}")
+            print(Fore.YELLOW +
+                  f"[equip_enhancement] no owned item carries {label}{tier}"
+                  f"{scope} ({owned} enhancements in inventory){want}."
+                  + Fore.RESET)
+            return False
+
+        if len(items) > 1:
+            names = ", ".join(i.item_name for i in items[:4])
+            more = "" if len(items) <= 4 else f", +{len(items) - 4} more"
+            if tier_ids:
+                # Sorted best-first by rarity; say which one won.
+                top = items[0]
+                print(Fore.CYAN +
+                      f"[equip_enhancement] {len(items)} owned items carry "
+                      f"this enhancement ({names}{more}); using the "
+                      f"highest-rarity one -- {top.item_name} (EnhID "
+                      f"{top.enh_id}). Pass rarity= to choose." + Fore.RESET)
+            else:
+                print(Fore.YELLOW +
+                      f"[equip_enhancement] {len(items)} items carry this "
+                      f"enhancement ({names}{more}); equipping the first. Pass "
+                      f"slot= or name the item directly to choose." + Fore.RESET)
+
+        await self.equip_item(items[0].item_name)
+        return True
 
     def add_drop(self, itemName: Union[str, List[str]]) -> None:
         """Add items to the drop whitelist handled by the bot.
@@ -949,35 +1185,58 @@ class Command:
                         target_monsters: str = "*", 
                         hunt: bool = False, 
                         skill_mode: SkillMode = SkillMode.ALL,
-                        reload_delay: int = 500
+                        reload_delay: int = MIN_SKILL_GAP_MS,
+                        *,
+                        buff_only: bool = False,
         ) -> bool:
         """Execute a skill with optional hunting, targeting, and cooldown handling.
 
         Args:
-            index (int): Skill slot that should be triggered.
+            index (int): Skill slot that should be triggered. ``5`` is the
+                scroll/potion slot: call ``equip_scroll(...)`` once first so
+                ``bot.scroll_id`` is set, then ``use_skill(5, ...)``. There is
+                no per-call scroll id -- the equipped scroll is the scroll.
             target_monsters (str): Target filter, ``*`` for any or comma-separated list.
             hunt (bool): When True, jump to the monster before casting.
             skill_mode (SkillType): Defines which types of skills (buff, attack, all, none) can be used.
-            reload_delay (int): Cooldown buffer in milliseconds after casting.
+            reload_delay (int): Pacing floor in milliseconds before a non-zero
+                slot may fire again after the previous packet. This used to be a
+                global "reload gate" armed by every cast and read only by
+                non-zero slots; it is kept, because removing it was measured to
+                get 42% of casts rejected as "too soon" (see class constants).
+                Slot 0 ignores it and uses AUTO_ATTACK_MIN_GAP_MS instead.
+            buff_only (bool): Shorthand for ``skill_mode=SkillMode.BUFF_ONLY``.
+                When True it wins over ``skill_mode``.
+
+        Keyword-only after ``reload_delay``:
+            ``buff_only`` is keyword-only, so no positional caller -- existing
+            or new -- can shift into it. ``scroll_id`` used to sit here too and
+            has been removed: every caller passes ``index == 5`` and lets the
+            scroll come from ``bot.scroll_id``.
 
         Returns:
             bool: True if the skill was successfully executed, False otherwise.
         """
+        if buff_only:
+            skill_mode = SkillMode.BUFF_ONLY
         if skill_mode == SkillMode.NONE:
             return False
-        if not self.bot.player.canUseSkill(int(index)) or not self.check_is_skill_safe(int(index)):
+        index = int(index)
+        if not self.bot.player.canUseSkill(index) or not self.check_is_skill_safe(index):
             return False
 
-        skill = self.bot.player.SKILLS[int(index)]
+        skill = self.bot.player.SKILLS[index]
         self.bot.skillAnim = skill.get("anim", None)
-        max_target = int(skill.get("tgtMax", 1))
+        # skill.max_targets coerces the payload's `tgtMax: null` (which the
+        # item/scroll slot sends) to 1 instead of raising int(None).
+        max_target = skill.max_targets
+        # Which pacing floor governs this slot -- see the class constants for
+        # why slot 0 (auto-attack) gets a much shorter one than real skills.
+        gap_ms = self.AUTO_ATTACK_MIN_GAP_MS if index == 0 else reload_delay
 
-        wait_reload_s = (self.skill_reload_time - int(round(datetime.now().timestamp() * 1000))) / 1000
-        if wait_reload_s > 0 and index != 0:
-            # print(Fore.BLUE + f"[{datetime.now().strftime('%H:%M:%S')}] wait reload skill:{index} cd:{wait_reload_s:.2f} s" + Fore.RESET)
-            await self.sleep(wait_reload_s*1000)
+        packet_sent = False
 
-        if skill["tgt"] == "h" and skill_mode in (SkillMode.ALL, SkillMode.ATTACK_ONLY): 
+        if skill.target == "h" and skill_mode in (SkillMode.ALL, SkillMode.ATTACK_ONLY): 
             priority_monsters_id = []
             if hunt and len(target_monsters.split(",")) == 1 and target_monsters != "*":
                 await self.jump_to_monster(target_monsters, byAliveMonster=True)
@@ -1034,22 +1293,106 @@ class Command:
             if not final_ids:
                 return False
 
+            await self._pace_skill_cast(gap_ms)
             if index == 5:
+                # The scroll id comes from bot.scroll_id, set by equip_scroll().
                 self.bot.use_scroll(final_ids, max_target)
             if index < 5:
                 self.bot.use_skill_to_monster("a" if index == 0 else index, final_ids, max_target)
+            packet_sent = True
         
         if skill_mode in (SkillMode.ALL, SkillMode.BUFF_ONLY):
-            if skill["tgt"] == "f":
+            if skill.target == "f":
+                await self._pace_skill_cast(gap_ms)
                 self.bot.use_skill_to_player(index, max_target)
-            if skill["tgt"] == "s":
+                packet_sent = True
+            if skill.target == "s":
+                await self._pace_skill_cast(gap_ms)
                 self.bot.use_skill_to_myself(index)
+                packet_sent = True
 
-        await self.sleep(200)
-        self.bot.player.updateNextUse(index) # do this if skills is REALLY exetuced
+        if not packet_sent:
+            # skill_mode filtered this slot out, so nothing went on the wire.
+            # Previously this still armed the cooldown and returned True, which
+            # locked a slot for a full cooldown without ever casting it.
+            return False
 
-        self.skill_reload_time = int(round(datetime.now().timestamp() * 1000)) + reload_delay
+        # Arm the cooldown at the moment the packet goes out. The 200 ms the old
+        # code spent sleeping here is now the explicit start_delay_ms inside
+        # updateNextUse, so server-side timing is unchanged but this coroutine
+        # returns immediately and the scheduler can line up the next cast.
+        self._mark_skill_cast()
+        self.bot.player.updateNextUse(index, start_delay_ms=self.CD_START_DELAY_MS)
         return True
+
+    async def _pace_skill_cast(self, min_gap_ms: int) -> None:
+        """Hold the loop until ``min_gap_ms`` elapsed since the previous cast.
+
+        This is a *floor*, not a fixed delay: if the last cast was already long
+        ago the coroutine returns immediately. The server's backoff
+        (``Bot.spam_backoff_ms``) is added on top so a "slow down" warning
+        actually slows the bot down -- the old ``skill_delay_ms`` counter was
+        incremented but never read by anything, so it never could.
+        """
+        now = int(round(datetime.now().timestamp() * 1000))
+        wait = min_gap_ms + max(0, getattr(self.bot, "spam_backoff_ms", 0)) \
+               - (now - self.last_skill_cast_ms)
+        if wait > 0:
+            await self.sleep(wait)
+
+    def _mark_skill_cast(self) -> None:
+        """Record the moment the most recent skill packet went out."""
+        self.last_skill_cast_ms = int(round(datetime.now().timestamp() * 1000))
+
+    @check_alive
+    async def use_next_skill(self,
+                             skill_list: list[int],
+                             target_monsters: str = "*",
+                             hunt: bool = False,
+                             skill_mode: SkillMode = SkillMode.ALL,
+                             reload_delay: int = MIN_SKILL_GAP_MS) -> bool:
+        """Cast whichever listed skill is ready, instead of round-robining.
+
+        The old templates advanced one position per iteration no matter what,
+        so 1096 of 1899 attempts in the baseline run bounced off a cooldown and
+        the 1.5 s skill was starved by 6-12 s skills holding rotation slots.
+        This picks from the ready set instead, and when *nothing* is ready it
+        sleeps exactly until the earliest cooldown expires rather than polling
+        on a blind delay.
+
+        Args:
+            skill_list (list[int]): Candidate slots. Duplicates such as the
+                ``[0,1,2,0,3,4]`` rotation are collapsed on the way in.
+
+        Returns:
+            bool: True only when a packet was actually sent.
+        """
+        ready: list[int] = []
+        soonest: Optional[float] = None
+        for slot in dict.fromkeys(skill_list):
+            if not self.check_is_skill_safe(slot):
+                continue
+            wait = self.bot.player.skill_ready_in_ms(slot)
+            if wait <= 0:
+                ready.append(slot)
+            elif soonest is None or wait < soonest:
+                soonest = wait
+
+        if not ready:
+            await self.sleep(max(20, min(soonest if soonest is not None else 100.0, 500.0)))
+            return False
+
+        # Rarest cooldown first: a long-cooldown skill starts its long timer as
+        # early as possible, and the short-cooldown slot fills the gaps left.
+        slot = max(ready, key=lambda s: self.bot.player.effective_cd_ms(s))
+        if await self.use_skill(slot, target_monsters, hunt, skill_mode, reload_delay):
+            return True
+
+        # Ready but refused (no target in the cell, filtered by skill_mode, or
+        # the player died mid-call): back off so the same slot cannot spin the
+        # caller's loop at full speed.
+        await self.sleep(100)
+        return False
 
     @check_alive
     def do_pwd(self, monster_id: str) -> None:

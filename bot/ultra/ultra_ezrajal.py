@@ -1,88 +1,80 @@
-from core.bot import Bot
+"""Ultra Ezrajal -- quest 8152 in ``ultraezrajal``.
+
+One boss, one class.  What each of the four launcher slots wears lives in
+``bot.ultra.config.LOADOUTS["ezrajal"]``; this file only says when and how
+to fight.
+
+Ezrajal is the boss that telegraphs a counter attack, so this fight
+subscribes ``CoreUltra.message_handler`` for the duration (``finish`` removes
+it again) and passes ``respect_counter_attack=True`` to the rotation.
+"""
+
+from __future__ import annotations
+
 from core.command import Command
-import json
+from bot.ultra.core_ultra import CoreUltra
 
-counter_attack = False
-async def main(cmd: Command):
-    global counter_attack
-    private_room_number = 1231
 
-    if cmd.bot.soloClass:
-        await cmd.equip_item(cmd.bot.soloClass)
-        await cmd.equip_item_by_enhancement(enh_pattern_id=29) # 29 for penitence
-        await cmd.equip_item_by_enhancement(enh_pattern_id=10) # 10 for valiance
-    
-    await cmd.ensure_accept_quest(8152)
-    await cmd.join_map("ultraezrajal", private_room_number)
+class UltraEzrajal(CoreUltra):
+    """Ultra Ezrajal -- the boss that telegraphs a counter attack.
 
-    while not cmd.wait_count_player(4):
-        await cmd.sleep(100)
+    The loop is identical to Engineer's apart from the target, which is
+    left open (no ``monster=`` and an empty ``monster_prio``) because
+    Ezrajal has no adds worth naming.  What makes it different is the
+    subscribe: this is the one daily fight that reads server telegraphs.
 
-    await cmd.jump_cell("r2", "Left")
-    skill_list = [0,1,2,0,3,4]
-    skill_index = 0
+    ========  ==========================================================
+    quest     8152
+    map       ``ultraezrajal``, cell ``r2`` / ``Left``
+    target    whatever is alive (no ``monster=``, no ``monster_prio``)
+    skills    ``0 1 2 0 3 4``
+    heal      below 50% with skill 2
+    telegraph subscribes ``message_handler`` for the run and passes
+              ``respect_counter_attack=True``, so the rotation skips while
+              the counter-attack aura is up; ``finish(..., unsubscribe=True)``
+              removes it again
+    finishes  ``finish(8152, unsubscribe=True)``
+    ========  ==========================================================
+    """
 
-    cmd.bot.subscribe(message_handler)
+    BOSS = "ezrajal"
+    QUEST = 8152
+    MAP = "ultraezrajal"
 
-    while cmd.is_monster_alive("Ultra Ezrajal") and cmd.is_still_connected():
-        mons_hp = cmd.get_monster_hp("Ultra Ezrajal")
-        # print("my hp:", cmd.bot.player.CURRENT_HP,"/", cmd.bot.player.MAX_HP)
-        if mons_hp > -1:
-            print(f"Ultra Ezrajal: {mons_hp} : {cmd.get_monster_hp_percentage('Ultra Ezrajal')}%")
-        if cmd.hp_below_percentage(60):
-            equipped_class = cmd.get_equipped_class()
-            if equipped_class:
-                class_name = equipped_class.item_name.lower()
-                if class_name == "archpaladin" or class_name == "lord of order":
-                    await cmd.use_skill(2)
-                elif class_name == "legion revenant":
-                    await cmd.use_skill(3)
-        if counter_attack:
-            await cmd.sleep(100)
-            continue
-        await cmd.use_skill(skill_list[skill_index], "Ultra Ezrajal")
-        skill_index += 1
-        if skill_index >= len(skill_list):
-            skill_index = 0
-        await cmd.sleep(100)
-    
-    await cmd.join_map("battleon", private_room_number)
-    await cmd.turn_in_quest(8152)
-
-    print("finished ultra ezrajal")
-    await cmd.sleep(100000)
-
-def message_handler(message):
-    global counter_attack
-    if message:
-        if is_valid_json(message):
-            data = json.loads(message)
-        try:
-            data = data["b"]["o"]
-        except:
+    async def run(self) -> None:
+        """Equip, accept the quest, fight, turn in, go rest."""
+        loadout = await self.apply_loadout(self.BOSS)
+        if loadout is None:
             return
-        cmd = data["cmd"]
-        if cmd == "ct":
-            anims = data.get("anims")
-            a = data.get("a")
-            if anims:
-                for anim in anims:
-                    msg = anim.get("msg")
-                    if msg:
-                        if "prepares a counter attack" in msg:
-                            counter_attack = True
-                            print("Counter Attack", counter_attack)
-            if a:
-                for action in a:
-                    if action.get('cmd') == 'aura-':
-                        removed_aura = action.get('aura', {}).get('nam')
-                        if "Counter Attack" in removed_aura:
-                            counter_attack = False
-                            print("Counter Attack", counter_attack)
+        monster_prio = loadout.monster_prio
 
-def is_valid_json(s):
-    try:
-        json.loads(s)
-        return True
-    except json.JSONDecodeError:
-        return False
+        self.cmd.bot.subscribe(self.message_handler)
+        await self.cmd.accept_quest(self.QUEST)
+        await self.join_and_wait(self.MAP)
+        await self.precast_buffs()
+        await self.cmd.jump_cell("r2", "Left")
+
+        print("attacking")
+        async def fight() -> None:
+            await self.attack_loop(
+                [0, 1, 2, 0, 3, 4],
+                monster="Ultra Ezrajal",
+                monster_prio=monster_prio,
+                heal_below=50,
+                heal_skill=2,
+                respect_counter_attack=True,
+            )
+
+        await self.fight_until_party_ready(self.QUEST, fight)
+
+        print("finished ultra ezrajal")
+        await self.finish(self.QUEST, unsubscribe=True)
+
+
+async def main(cmd: Command) -> None:
+    """Standalone entry for ``start.py`` / ``gui.py`` (``bot.ultra.ultra_ezrajal``).
+
+    Uses launcher slot 1.  For the four-pane layout use ``bot.ultra.daily``,
+    which picks the slot from stdin the way ``ultra_daily_pane.bat`` feeds it.
+    """
+    await UltraEzrajal(cmd, 1).run()
