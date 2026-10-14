@@ -108,6 +108,66 @@ body.cfg-page {
 .aqw-tab-x:disabled { opacity: .35; cursor: not-allowed; }
 .aqw-tab-x:disabled:hover { color: var(--text-muted, #64748B); background: transparent; }
 
+/* Make selects inside slot cards match Temple's input look (Temple styles
+   .form-group input only). */
+.slot-card .form-group label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-secondary, #94A3B8);
+    margin-bottom: 4px;
+}
+.slot-card .form-group select {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    color: #fff;
+    transition: all 0.2s ease;
+}
+.slot-card .form-group select:focus {
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+    background-color: rgba(15, 23, 42, 0.8);
+}
+
+/* Auto-equip hint inside the loadout info panel */
+.role-info .hint { display: block; margin-top: 6px; color: var(--text-muted, #64748B); }
+
+/* Header config controls (Server / Room / Missing item) match the pane
+   Player select, instead of Temple's borderless inline style. */
+.app-header .global-config-group {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+.app-header .input-inline select {
+    appearance: auto;
+    background-image: none;
+    background-color: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    height: auto;
+    min-width: 130px;
+}
+.app-header .input-inline input[type="number"] {
+    background-color: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #fff;
+    font-size: 0.85rem;
+    height: auto;
+    width: 84px;
+    text-align: center;
+}
+
 .logs {
     background: rgba(5, 6, 10, .8);
     border: 1px solid rgba(148, 163, 184, .15);

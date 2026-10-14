@@ -32,7 +32,8 @@
                 '<div style="margin-bottom:5px">' +
                 part('W', lo.weapon) + ' &middot; ' + part('H', lo.helm) + ' &middot; ' + part('C', lo.cape) +
                 (lo.scroll ? ' &middot; ' + part('S', lo.scroll) : '') + '</div>';
-        }).join('');
+        }).join('') +
+        '<span class="hint">Auto-equip: each item is searched in the inventory &amp; bank and equipped automatically.</span>';
     }
 
     function updateSlotInfo(card) {

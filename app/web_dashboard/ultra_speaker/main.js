@@ -28,7 +28,8 @@
         return '<div><span class="cls">' + esc(info.cls || role) + '</span></div>' +
             '<div>' + part('Weapon', info.weapon) + ' &middot; ' + part('Helm', info.helm) + '</div>' +
             '<div>' + part('Cape', info.cape) + ' &middot; ' +
-            '<span class="k">Scroll (required):</span> ' + esc(info.scroll || 'Scroll of Enrage') + '</div>';
+            '<span class="k">Scroll (required):</span> ' + esc(info.scroll || 'Scroll of Enrage') + '</div>' +
+            '<span class="hint">Auto-equip: each item is searched in the inventory &amp; bank and equipped automatically.</span>';
     }
 
     function updateRoleInfo(card) {
