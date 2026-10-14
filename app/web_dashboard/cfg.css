@@ -1,0 +1,231 @@
+/* Shared styles for the Config Player, Ultra Daily and Ultra Speaker pages.
+   Links after /style.css so the hub's :root variables and theme classes apply. */
+
+/* The hub's /style.css pins body to overflow:hidden (it is a fixed-layout
+   single-page shell). These sub-pages are normal scrollable documents, so
+   re-enable scrolling with a more specific selector. */
+html { height: 100%; }
+body.cfg-page {
+    margin: 0;
+    padding: 24px;
+    height: 100%;
+    box-sizing: border-box;
+    overflow-y: auto;
+    overflow-x: hidden;
+    font-family: 'Inter', 'Segoe UI', sans-serif;
+}
+.cfg-wrap { max-width: 980px; margin: 0 auto; padding-bottom: 48px; }
+.cfg-head h1 { margin: 0 0 4px; font-size: 1.4rem; color: var(--text-primary, #F8FAFC); }
+.cfg-head p { margin: 0 0 18px; color: var(--text-secondary, #94A3B8); font-size: .85rem; }
+
+.cfg-card, .u-slot {
+    background: var(--bg-card, rgba(18, 20, 32, .55));
+    border: 1px solid rgba(148, 163, 184, .15);
+    border-radius: 12px;
+    padding: 16px;
+    margin-bottom: 16px;
+}
+.cfg-card h2, .u-slot h3 { margin: 0 0 12px; font-size: 1rem; color: var(--text-primary, #F8FAFC); }
+
+.cfg-row { display: flex; gap: 8px; flex-wrap: wrap; }
+.cfg-row input, .cfg-grid input, .cfg-grid select, .slot-grid input, .slot-grid select {
+    padding: 9px 11px;
+    border-radius: 8px;
+    border: 1px solid rgba(148, 163, 184, .25);
+    background: rgba(9, 10, 16, .6);
+    color: var(--text-primary, #F8FAFC);
+    width: 100%;
+    box-sizing: border-box;
+}
+.cfg-row input { flex: 1 1 160px; width: auto; }
+
+.cfg-btn {
+    padding: 9px 16px;
+    border-radius: 8px;
+    border: 1px solid transparent;
+    cursor: pointer;
+    font-weight: 600;
+    font-size: .82rem;
+    color: #fff;
+    background: var(--primary-color, #7c3aed);
+}
+.cfg-btn:hover { filter: brightness(1.12); }
+.cfg-btn.small { padding: 5px 10px; font-size: .74rem; margin-right: 4px; }
+.cfg-btn.ghost { background: transparent; border-color: rgba(148, 163, 184, .4); color: var(--text-secondary, #94A3B8); }
+.cfg-btn.danger { background: #b91c1c; }
+
+.cfg-msg { min-height: 16px; margin-top: 8px; font-size: .8rem; }
+.cfg-msg.ok { color: #34d399; }
+.cfg-msg.err { color: #f87171; }
+
+.cfg-table { width: 100%; border-collapse: collapse; font-size: .84rem; }
+.cfg-table th, .cfg-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid rgba(148, 163, 184, .12); color: var(--text-primary, #F8FAFC); }
+.cfg-table th { color: var(--text-muted, #64748B); font-weight: 600; font-size: .72rem; text-transform: uppercase; letter-spacing: .04em; }
+.cfg-table .masked { color: var(--text-muted, #64748B); }
+.cfg-empty { color: var(--text-muted, #64748B); font-size: .82rem; }
+
+.slot-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.slot-grid .full { grid-column: 1 / -1; }
+.slot-grid label { display: block; font-size: .7rem; color: var(--text-muted, #64748B); margin-bottom: 4px; text-transform: uppercase; letter-spacing: .04em; }
+
+.cfg-actions { display: flex; gap: 8px; margin: 4px 0 16px; flex-wrap: wrap; }
+.slot-status { margin-top: 10px; font-size: .78rem; color: var(--text-secondary, #94A3B8); display: flex; gap: 10px; flex-wrap: wrap; }
+.slot-status .pill { padding: 3px 9px; border-radius: 999px; background: rgba(148, 163, 184, .12); }
+
+.role-info {
+    margin-top: 8px;
+    font-size: .74rem;
+    line-height: 1.55;
+    color: var(--text-secondary, #94A3B8);
+    background: rgba(148, 163, 184, .07);
+    border: 1px solid rgba(148, 163, 184, .12);
+    border-radius: 8px;
+    padding: 8px 10px;
+}
+.role-info .cls { color: var(--primary-color, #a855f7); font-weight: 600; }
+.role-info .k { color: var(--text-muted, #64748B); }
+
+/* AQW Solo account tabs */
+.aqw-tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
+.aqw-tab {
+    display: flex; align-items: center; gap: 2px;
+    background: rgba(148, 163, 184, .08);
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 8px;
+}
+.aqw-tab.active { background: var(--bg-card, rgba(18, 20, 32, .7)); border-color: var(--primary-color, #a855f7); }
+.aqw-tab-label {
+    background: transparent; border: none; cursor: pointer; padding: 6px 8px;
+    color: var(--text-secondary, #94A3B8); font-size: .78rem; font-weight: 600;
+    max-width: 180px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.aqw-tab.active .aqw-tab-label { color: var(--text-primary, #F8FAFC); }
+.aqw-tab-x {
+    background: transparent; border: none; cursor: pointer; padding: 4px 7px;
+    color: var(--text-muted, #64748B); font-size: .95rem; border-radius: 6px;
+}
+.aqw-tab-x:hover { color: #f87171; background: rgba(248, 113, 113, .12); }
+.aqw-tab-x:disabled { opacity: .35; cursor: not-allowed; }
+.aqw-tab-x:disabled:hover { color: var(--text-muted, #64748B); background: transparent; }
+
+/* Make selects inside slot cards match Temple's input look (Temple styles
+   .form-group input only). */
+.slot-card .form-group label {
+    display: block;
+    font-size: 0.72rem;
+    color: var(--text-secondary, #94A3B8);
+    margin-bottom: 4px;
+}
+.slot-card .form-group select {
+    width: 100%;
+    box-sizing: border-box;
+    background-color: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    font-size: 0.85rem;
+    color: #fff;
+    transition: all 0.2s ease;
+}
+.slot-card .form-group select:focus {
+    border-color: rgba(168, 85, 247, 0.5);
+    box-shadow: 0 0 0 2px rgba(168, 85, 247, 0.15);
+    background-color: rgba(15, 23, 42, 0.8);
+}
+
+/* Auto-equip hint inside the loadout info panel */
+.role-info .hint { display: block; margin-top: 6px; color: var(--text-muted, #64748B); }
+
+/* Header config controls (Server / Room / Missing item) match the pane
+   Player select, instead of Temple's borderless inline style. */
+.app-header .global-config-group {
+    background: transparent;
+    border: none;
+    padding: 0;
+}
+.app-header .input-inline select {
+    appearance: auto;
+    background-image: none;
+    background-color: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #fff;
+    font-size: 0.85rem;
+    font-weight: 500;
+    height: auto;
+    min-width: 130px;
+}
+.app-header .input-inline input[type="number"] {
+    background-color: rgba(15, 23, 42, 0.55);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    padding: 8px 12px;
+    color: #fff;
+    font-size: 0.85rem;
+    height: auto;
+    width: 84px;
+    text-align: center;
+}
+
+.logs {
+    background: rgba(5, 6, 10, .8);
+    border: 1px solid rgba(148, 163, 184, .15);
+    border-radius: 10px;
+    padding: 10px;
+    height: 220px;
+    overflow: auto;
+    font-family: 'Fira Code', 'Consolas', monospace;
+    font-size: .74rem;
+    white-space: pre-wrap;
+    color: #cbd5e1;
+}
+.logs .who { color: var(--primary-color, #a855f7); font-weight: 600; }
+
+/* AQW Solo: item/bank/temp explorer */
+.items-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.items-tab {
+    background: rgba(148, 163, 184, .08);
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 8px;
+    color: var(--text-secondary, #94A3B8);
+    font-size: .78rem; font-weight: 600;
+    padding: 6px 12px; cursor: pointer;
+}
+.items-tab.active {
+    background: var(--bg-card, rgba(18, 20, 32, .7));
+    border-color: var(--primary-color, #a855f7);
+    color: var(--text-primary, #F8FAFC);
+}
+.items-groups { display: flex; flex-wrap: wrap; gap: 12px; }
+.item-group {
+    flex: 1 1 320px; min-width: 260px;
+    background: rgba(9, 10, 16, .45);
+    border: 1px solid rgba(148, 163, 184, .15);
+    border-radius: 10px; padding: 10px;
+}
+.item-group-title {
+    font-size: .75rem; font-weight: 700; color: var(--text-primary, #F8FAFC);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em;
+}
+.item-group-title .k { color: var(--text-muted, #64748B); font-weight: 500; }
+.item-group-body { max-height: 220px; overflow-y: auto; }
+.item-row {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 4px 2px; border-bottom: 1px solid rgba(148, 163, 184, .08);
+    font-size: .78rem;
+}
+.item-row:last-child { border-bottom: none; }
+.item-row .qty { color: var(--primary-color, #a855f7); font-weight: 600; min-width: 36px; }
+.item-row .nm { color: var(--text-primary, #F8FAFC); }
+.item-row .meta { color: var(--text-muted, #64748B); font-size: .7rem; margin-left: auto; text-align: right; }
+
+/* Solo: account tabs live outside the scroll area, right under the header,
+   so they never scroll and nothing shows through. */
+#account-tabs {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 10px 24px;
+    background-color: var(--bg-secondary, #0f0b21);
+    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, .08));
+}

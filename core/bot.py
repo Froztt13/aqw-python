@@ -16,6 +16,7 @@ import asyncio
 from model import Shop
 from model import Monster
 from model import ItemInventory, ItemType, Faction, PlayerArea
+from model import Skill
 from handlers import register_quest_task, death_handler_task, aggro_handler_task
 import time
 import traceback
@@ -58,8 +59,11 @@ class Bot:
         self.respawn_cell_pad = respawnCellPad
         self.mute_spam_warning = muteSpamWarning
         self.anti_mod = antiMod
+        #: Total deaths this session; the ultra party reads the delta to spot wipes.
+        self.deaths = 0
 
-        self.auto_relogin = False # sementara diset ke False untuk cegah stop_bot() di function read_server_in_background()
+        # autoRelogin is honoured as passed: the old force-disable only dodged a
+        # stop_bot() in read_server_in_background() that read_batch() can never reach.
         
         self.is_char_load_complete= False
         self.is_joining_map = False
@@ -74,6 +78,13 @@ class Bot:
         self.cmds = []
         self.index = 0
         self.areaId = None
+        # Player identity in the current cell. These three used to be created
+        # lazily inside extract_user_ids, so calling get_user_id() before the
+        # first cell load raised AttributeError -- see extract_user_ids for the
+        # user_id/username_id mix-up this also fixes.
+        self.user_ids: list[str] = []
+        self.username_id: str | None = None   # our own character id
+        self.user_id: str | None = None       # alias of username_id, see extract_user_ids
         self.canuseskill = True
         self.skillAnim = None
         self.username = ""
@@ -97,9 +108,13 @@ class Bot:
         self.battle_analyzer: bool = False
 
         self.auto_adjust_skill_delay = autoAdjustSkillDelay
-        self.skill_delay_ms = 1300
-        self.adjust_skill_delay_by_ms = 500
         self.check_spam_time = None
+        # Added on top of Command.MIN_SKILL_GAP_MS whenever the server says we
+        # are acting too soon, and bled back off one step per quiet minute.
+        # Starts at 0 so normal pacing is unaffected. This replaces the old
+        # skill_delay_ms counter, which was written on a warning but never read
+        # by any sleep, so autoAdjustSkillDelay could not slow anything down.
+        self.spam_backoff_ms = 0
 
         self.missing_turn_in_item_questid: list[int] = [] # this mean quest is unlocked (green quest)
         self.missing_quest_progress_questid: list[int] = [] # this mean quest is locked (red quest)
@@ -146,7 +161,7 @@ class Bot:
                         self.run_register_quest_task()
                         self.is_register_quest_task_running = True
                     
-                    await botMain(self.command)
+                    await botMain(self._resolve_script_arg(botMain))
                     self.stop_bot()
                 if self.auto_relogin:
                     print("Relogin from start bot")
@@ -154,6 +169,29 @@ class Bot:
             else:
                 await self.run_commands()
         return
+
+    def _resolve_script_arg(self, botMain):
+        """Pass the object the script's ``main`` expects.
+
+        Two conventions coexist in ``bot/``: the current ``main(cmd)`` (a
+        ``Command``) and the legacy ``main(bot: Bot)`` that wraps it again with
+        ``Command(bot)``.  The harness always sent the ``Command``, so the
+        legacy scripts raised ``'Command' object has no attribute 'player'``
+        (they treat the argument as a ``Bot``).  Tell them apart by the first
+        parameter's name/annotation.
+        """
+        try:
+            params = list(inspect.signature(botMain).parameters.values())
+        except (TypeError, ValueError):
+            return self.command
+        if not params:
+            return self.command
+        first = params[0]
+        annotation = first.annotation
+        ann_name = annotation if isinstance(annotation, str) else getattr(annotation, "__name__", "")
+        if first.name == "bot" or ann_name == "Bot":
+            return self
+        return self.command
             
     def run_register_quest_task(self):
         asyncio.create_task(register_quest_task(self))  
@@ -197,13 +235,15 @@ class Bot:
         self.loaded_quest_datas = []
         self.loaded_shop_datas: List[Shop] = []
         self.registered_auto_quest_ids = []
-        self.skill_delay_ms = 1500
-        self.adjust_skill_delay_by_ms = 500
         self.check_spam_time = None
+        self.spam_backoff_ms = 0
         try:
             print("Restarting bot in 35 secs...")
             await asyncio.sleep(35)
-            if self.isScriptable and async_bot and self.auto_relogin:
+            if not self.auto_relogin:
+                print("Relogin cancelled (bot stopped).")
+                return
+            if self.isScriptable and async_bot:
                 await self.start_bot(async_bot)
             else:
                 await self.start_bot()
@@ -325,10 +365,13 @@ class Bot:
             msg = self.decompress_message(msg)
 
         if self.auto_adjust_skill_delay and self.check_spam_time:
-            if (time.time() - self.check_spam_time) > 300 and self.skill_delay_ms > 1500:
-                # self.check_spam_time = None
-                self.skill_delay_ms -= self.adjust_skill_delay_by_ms
-                print(f"set skill delay to: {self.skill_delay_ms}")
+            # One step per quiet minute, not one per message: the old version
+            # left check_spam_time pinned, so once the 300 s window elapsed it
+            # subtracted on every single inbound packet.
+            if (time.time() - self.check_spam_time) > 60 and self.spam_backoff_ms > 0:
+                self.spam_backoff_ms = max(0, self.spam_backoff_ms - 300)
+                self.check_spam_time = time.time()
+                print(f"skill pacing backoff: +{self.spam_backoff_ms} ms")
         self.notify_subscribers(msg)
         if "counter" in msg.lower():
             self.debug(Fore.RED + msg + Fore.WHITE)
@@ -425,23 +468,35 @@ class Bot:
                         self.player_in_area.append(PlayerArea(data["o"]))
                     
             elif cmd == "sAct":
-                self.player.SKILLS = data["actions"]["active"]
-                # print(self.player.SKILLS)
-                count_skill = 0
+                # Wrap each entry in model.Skill.  Skill subclasses dict, so
+                # every existing `SKILLS[n]["cd"]` / `.get("anim")` call site
+                # keeps working -- only the type changes.  See model/skill.py
+                # for the field map (21 keys, not all present on all slots).
+                self.player.SKILLS = [
+                    Skill.from_payload(s) for s in data["actions"]["active"]
+                ]
                 for skill in self.player.SKILLS:
-                    anim_strl = {
-                        "anim" : skill.get("anim", ""),
-                        "strl" : skill.get("strl", "")
+                    self.player.skills_ref[skill.ref] = {
+                        "anim": skill.animation,
+                        "strl": skill.string_label,
                     }
-                    self.player.skills_ref[skill["ref"]] = anim_strl
-                    self.player.SKILLS[count_skill]["nextUse"] = datetime.now()
-                    count_skill += 1
-                # print(self.player.skills_ref)
+                    # Slots start off-cooldown so the first rotation is not
+                    # held back by an arbitrary deadline.
+                    skill.next_use = datetime.now()
             elif cmd == "stu":
-                if data["sta"].get("$tha"):
-                    self.player.CDREDUCTION = data["sta"].get("$tha")
-                if data["sta"].get("$cmc"):
-                    self.player.ManaCost = data["sta"].get("$cmc")    
+                # Merge the delta the server sent.  `sta` carries only changed
+                # keys, so PlayerStats.update() merges rather than replaces.
+                # CDREDUCTION/ManaCost stay in sync below for existing readers.
+                self.player.STATS.update(
+                    data.get("sta"),
+                    data.get("tempSta"),
+                    data.get("wDPS"),
+                )
+                sta = data.get("sta") or {}
+                if sta.get("$tha") is not None:
+                    self.player.CDREDUCTION = sta["$tha"]
+                if sta.get("$cmc") is not None:
+                    self.player.ManaCost = sta["$cmc"]
             elif cmd == "ct":
                 anims = data.get("anims")
                 a = data.get("a")
@@ -532,6 +587,11 @@ class Bot:
                             saraType = actionResult.get("type", "")
                             self.debug(Fore.CYAN + f"[SARA] [{saraType.upper()}] {actionResult['hp']} DMG to {saraTInf}" + Fore.WHITE)
             elif cmd == "seia":
+                # Some classes ship fewer than six slots in sAct; the item
+                # slot arrives here instead.  Pad with an empty Skill so this
+                # handler can fill it in rather than raising IndexError.
+                while len(self.player.SKILLS) <= 5:
+                    self.player.SKILLS.append(Skill())
                 self.player.SKILLS[5]["anim"] = data["o"]["anim"]
                 self.player.SKILLS[5]["strl"] = data["o"]["strl"]
                 self.player.SKILLS[5]["cd"] = data["o"]["cd"]
@@ -549,6 +609,7 @@ class Bot:
                 if int(data["userID"]) == self.player.LOGINUSERID:
                     print(Fore.RED + "DEATH" + Fore.WHITE)
                     self.player.ISDEAD = True
+                    self.deaths += 1
                     if self.isScriptable:
                         self.run_death_hanlder_task()
             elif cmd == "getQuests":
@@ -556,13 +617,18 @@ class Bot:
                     self.loaded_quest_datas.append(quest_data)
             elif cmd == "loadShop":
                 shop = Shop(data["shopinfo"])
+                # Opening a forge shop teaches the enhancement registry every
+                # enhancement it sells (name <-> EnhID <-> pattern <-> slot),
+                # so equip_enhancement() works without the jsonl on disk.
+                if shop.is_forge:
+                    shop.register_enhancements()
                 found = False
                 for loaded_shop in self.loaded_shop_datas:
                     if str(loaded_shop.shop_id) == str(shop.shop_id):
                         found = True
                         break
                 if found == False:
-                    self.loaded_shop_datas.append(Shop(data["shopinfo"]))
+                    self.loaded_shop_datas.append(shop)
             elif cmd == "buyItem":
                 if data["bitSuccess"] == 1:
                     for loaded_shop in self.loaded_shop_datas:
@@ -759,11 +825,15 @@ class Bot:
                         print(Fore.RED + f"[{datetime.now().strftime('%H:%M:%S')}] server warning: {text}" + Fore.WHITE)
                 else:
                     print(Fore.RED + f"[{datetime.now().strftime('%H:%M:%S')}] server warning: {text}" + Fore.WHITE)                    
-                if "spamming the server" in text:
+                # Both server texts count: the baseline run produced two
+                # "Last action was too soon!" warnings and zero "spamming the
+                # server", so matching only the latter meant the backoff never
+                # fired for the failure this bot actually hits.
+                if "spamming the server" in text or "too soon" in text:
                     if self.auto_adjust_skill_delay:
-                        self.skill_delay_ms += self.adjust_skill_delay_by_ms
+                        self.spam_backoff_ms = min(self.spam_backoff_ms + 300, 2400)
                         self.check_spam_time = time.time()
-                        print(f"set skill delay to: {self.skill_delay_ms}")
+                        print(f"skill pacing backoff: +{self.spam_backoff_ms} ms")
             elif "exitArea" in msg:
                 if msg.split('%')[5].lower() == self.follow_player.lower():
                     self.followed_player_cell = None
@@ -836,12 +906,9 @@ class Bot:
                         if msg.startswith("Z"):
                             msg = self.decompress_message(msg)
                         await self.handle_server_response(msg)
-                if messages is None:
-                    if self.isScriptable and self.auto_relogin:
-                        self.stop_bot()
-                        # print("Relogin and restart bot on timeout...")
-                        # await self.relogin_and_restart(async_bot=self.bot_main)
-                    
+                # read_batch_async() returns a list ([] on timeout), never None,
+                # so the old `if messages is None: stop_bot()` branch was dead.
+                # Removed; autoRelogin is now honoured as passed.
             except CustomError as e:
                 print(f"Critical error encountered: {e}")
                 self.run = False  # Stop the bot
@@ -977,6 +1044,17 @@ class Bot:
         self.do_wait(500)
 
     def use_scroll(self, monsterid, max_target):
+        """Cast the equipped scroll/potion at up to ``max_target`` monsters.
+
+        The scroll fired is always ``bot.scroll_id``, set by
+        :meth:`Command.equip_scroll`. Callers reach this through
+        ``use_skill(5, ...)``; there is no per-call scroll id, matching the
+        android tree and ``bot/templeshrine``'s usage.
+
+        Args:
+            monsterid: Monster map ids to target.
+            max_target (int): Cap on how many get targeted.
+        """
         self.target = [f"i1>m:{i}" for i in monsterid][:max_target]
         self.write_message(f"%xt%zm%gar%1%0%{','.join(self.target)}%{self.scroll_id}%wvz%")
         
@@ -1015,11 +1093,19 @@ class Bot:
         self.user_ids = []
         self.username_id = None
         for user in root.findall(".//u"):
-            self.user_id = user.get("i")  # Get the id
-            self.user_ids.append(self.user_id)  # Append to the list
+            user_id: str = user.get("i")
+            self.user_ids.append(user_id)  # Append to the list
             name: str = user.find("n").text  # Get the username
             if name.lower() == self.player.USER.lower():
-                self.username_id = self.user_id  # Store the ID of the target username
+                self.username_id = user_id  # Store the ID of the target username
+        # self.user_id used to be assigned inside the loop, so it was left
+        # pointing at whichever <u> element happened to come last -- anyone in
+        # the cell but us. Everything that identifies this player reads it: the
+        # respawn packets in check_alive() and death_handler, the potion target
+        # in use_potion(), get_user_id(), and the tInf comparisons in
+        # bot/templeshrine. Pin it to our own id instead.
+        if self.username_id is not None:
+            self.user_id = self.username_id
 
     def extract_new_user(self, xml_message: str):
         root = ET.fromstring(xml_message)

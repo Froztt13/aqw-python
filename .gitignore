@@ -171,3 +171,12 @@ bot_cmds/afk.py
 eclipse_config.json
 slavery_config.json
 temple_config.json
+gui_config.json
+hub_config.json
+ultra_daily_config.json
+ultra_speaker_config.json
+weekly_doom_config.json
+CharSelect.cfg
+capture_logs/
+*.bak
+.opencode/

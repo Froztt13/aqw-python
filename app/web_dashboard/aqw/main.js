@@ -1,579 +1,437 @@
-document.addEventListener('DOMContentLoaded', () => {
-    // Whitelist tags list
-    let whitelistItems = [];
-    let statusInterval = null;
-    let selectedScript = null;
+(function () {
+    var BOT_PRESET = [
+        "Gem of Nulgath", "Diamond of Nulgath", "Voucher of Nulgath (non-mem)",
+        "Tainted Gem", "Dark Crystal Shard"
+    ];
 
-    // Elements
-    const navButtons = document.querySelectorAll('.nav-btn');
-    const tabContents = document.querySelectorAll('.tab-content');
-    const tabTitle = document.getElementById('tab-title');
-    const tabSubtitle = document.getElementById('tab-subtitle');
-    
-    const btnStart = document.getElementById('btn-start');
-    const btnStop = document.getElementById('btn-stop');
-    const btnGotoLogs = document.getElementById('btn-goto-logs');
-    
-    const connIndicator = document.getElementById('connection-indicator');
-    const connText = document.getElementById('connection-text');
-    
-    // Inputs
-    const usernameInput = document.getElementById('input-username');
-    const passwordInput = document.getElementById('input-password');
-    const serverSelect = document.getElementById('select-server');
-    const roomInput = document.getElementById('input-room');
-    
-    const inputScriptPath = document.getElementById('input-script-path');
-    const btnSelectScript = document.getElementById('btn-select-script');
-    
-    const farmClassInput = document.getElementById('input-farm-class');
-    const soloClassInput = document.getElementById('input-solo-class');
-    
-    // Whitelist Elements
-    const whitelistTagsContainer = document.getElementById('whitelist-tags');
-    const newTagInput = document.getElementById('input-new-tag');
-    const btnAddTag = document.getElementById('btn-add-tag');
-    const presetButtons = document.querySelectorAll('.btn-preset');
-    
-    // Settings switches
-    const chkAutoRelogin = document.getElementById('chk-auto-relogin');
-    const chkAntiMod = document.getElementById('chk-anti-mod');
-    const chkMuteSpam = document.getElementById('chk-mute-spam');
-    const chkShowChat = document.getElementById('chk-show-chat');
-    
-    const btnSaveSettings = document.getElementById('btn-save-settings');
-    const btnResetSettings = document.getElementById('btn-reset-settings');
-    const btnTogglePassword = document.getElementById('btn-toggle-password');
+    //: One entry per tab.  The editor is a single persistent form that reads
+    //: from / writes to accounts[active], so switching tabs never rebuilds it.
+    var accounts = [];
+    var active = 0;
+    var runningNames = {};   // username -> true while its bot is running
 
-    // Dashboard values
-    const valHpProgress = document.getElementById('hp-progress');
-    const valHpValues = document.getElementById('hp-values');
-    const valMpProgress = document.getElementById('mp-progress');
-    const valMpValues = document.getElementById('mp-values');
-    const valMap = document.getElementById('val-map');
-    const valCellPad = document.getElementById('val-cell-pad');
-    const valState = document.getElementById('val-state');
-    
-    const valGold = document.getElementById('val-gold');
-    const valGoldFarmed = document.getElementById('val-gold-farmed');
-    const valExpFarmed = document.getElementById('val-exp-farmed');
-    const valCmdIndex = document.getElementById('val-cmd-index');
-    
-    const valInventoryCount = document.getElementById('val-inventory-count');
-    const valBankCount = document.getElementById('val-bank-count');
-    
-    // Console Logs
-    const consoleViewport = document.getElementById('console-viewport');
-    const miniConsole = document.getElementById('mini-console');
-    const logFilterInput = document.getElementById('input-log-filter');
-    const btnClearLogs = document.getElementById('btn-clear-logs');
-    const chkAutoScroll = document.getElementById('chk-auto-scroll');
+    function api() { return window.pywebview && window.pywebview.api; }
 
-    // Tab Information configuration
-    const tabInfo = {
-        'dashboard': {
-            title: 'Player Stats',
-            subtitle: 'Real-time character statistics and combat status'
-        },
-        'script': {
-            title: 'Script & Account',
-            subtitle: 'Set up credentials, target map scripts, and class setups'
-        },
-        'settings': {
-            title: 'Bot Toggles',
-            subtitle: 'Manage client notifications, relogging timers, and moderator protection'
-        },
-        'logs': {
-            title: 'Live Terminal Console',
-            subtitle: 'Raw diagnostic console outputs directly from the running Python bot'
-        }
-    };
-
-    // 1. Navigation Controller
-    navButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const targetTab = btn.getAttribute('data-tab');
-            
-            navButtons.forEach(b => b.classList.remove('active'));
-            tabContents.forEach(c => c.classList.remove('active'));
-            
-            btn.classList.add('active');
-            document.getElementById(`tab-${targetTab}`).classList.add('active');
-            
-            // Update Title
-            if (tabInfo[targetTab]) {
-                tabTitle.textContent = tabInfo[targetTab].title;
-                tabSubtitle.textContent = tabInfo[targetTab].subtitle;
-            }
-        });
-    });
-
-    btnGotoLogs.addEventListener('click', () => {
-        const logsBtn = document.querySelector('[data-tab="logs"]');
-        if (logsBtn) logsBtn.click();
-    });
-
-    // Toggle Password Visibility
-    btnTogglePassword.addEventListener('click', () => {
-        const isPassword = passwordInput.getAttribute('type') === 'password';
-        passwordInput.setAttribute('type', isPassword ? 'text' : 'password');
-        btnTogglePassword.style.color = isPassword ? 'var(--primary-color)' : 'var(--text-secondary)';
-    });
-
-    // 2. Log Stream Receiver
-    window.addLog = function(htmlMsg) {
-        if (!htmlMsg) return;
-        
-        // Append to main console
-        const mainLine = document.createElement('div');
-        mainLine.className = 'log-line';
-        mainLine.innerHTML = htmlMsg;
-        consoleViewport.appendChild(mainLine);
-
-        // Append to dashboard summary mini console
-        const miniLine = document.createElement('div');
-        miniLine.className = 'log-line';
-        miniLine.innerHTML = htmlMsg;
-        miniConsole.appendChild(miniLine);
-
-        // Keep viewports clean (max 500 lines to avoid slow rendering)
-        while (consoleViewport.childNodes.length > 500) {
-            consoleViewport.removeChild(consoleViewport.firstChild);
-        }
-        while (miniConsole.childNodes.length > 30) {
-            miniConsole.removeChild(miniConsole.firstChild);
-        }
-
-        // Apply filter on the new line if log filter is active
-        applyFilterToLine(mainLine);
-
-        // Scroll to bottom if auto-scroll checked
-        if (chkAutoScroll.checked) {
-            consoleViewport.scrollTop = consoleViewport.scrollHeight;
-            miniConsole.scrollTop = miniConsole.scrollHeight;
-        }
-    };
-
-    btnClearLogs.addEventListener('click', () => {
-        consoleViewport.innerHTML = '<div class="log-line text-muted">Console logs cleared.</div>';
-        miniConsole.innerHTML = '<div class="log-line text-muted">Console logs cleared.</div>';
-    });
-
-    // Search filter for logs
-    logFilterInput.addEventListener('input', () => {
-        const filterText = logFilterInput.value.toLowerCase();
-        const lines = consoleViewport.querySelectorAll('.log-line');
-        lines.forEach(line => {
-            if (line.textContent.toLowerCase().includes(filterText)) {
-                line.style.display = 'block';
-            } else {
-                line.style.display = 'none';
-            }
-        });
-    });
-
-    function applyFilterToLine(line) {
-        const filterText = logFilterInput.value.toLowerCase();
-        if (filterText && !line.textContent.toLowerCase().includes(filterText)) {
-            line.style.display = 'none';
-        }
-    }
-
-    // 3. Whitelist Tag Manager Controller
-    function renderTags() {
-        whitelistTagsContainer.innerHTML = '';
-        const isRunning = btnStart.classList.contains('hidden');
-        whitelistItems.forEach((item, index) => {
-            const tagEl = document.createElement('span');
-            tagEl.className = 'tag';
-            tagEl.innerHTML = `${item} <button class="btn-tag-remove" data-index="${index}" ${isRunning ? 'disabled' : ''}>&times;</button>`;
-            whitelistTagsContainer.appendChild(tagEl);
-        });
-
-        // Update presets active states
-        presetButtons.forEach(btn => {
-            const item = btn.getAttribute('data-item');
-            if (whitelistItems.includes(item)) {
-                btn.classList.add('active');
-            } else {
-                btn.classList.remove('active');
-            }
+    function esc(s) {
+        return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+            return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c];
         });
     }
 
-    whitelistTagsContainer.addEventListener('click', (e) => {
-        if (e.target.classList.contains('btn-tag-remove')) {
-            const index = parseInt(e.target.getAttribute('data-index'));
-            whitelistItems.splice(index, 1);
-            renderTags();
-        }
-    });
-
-    function addCustomTag() {
-        const val = newTagInput.value.trim();
-        if (val && !whitelistItems.includes(val)) {
-            whitelistItems.push(val);
-            renderTags();
-            newTagInput.value = '';
-        }
+    function msg(text, ok) {
+        var el = document.getElementById('msg');
+        if (!el) return;
+        el.textContent = text || '';
+        el.className = 'cfg-msg' + (text ? (ok ? ' ok' : ' err') : '');
     }
 
-    btnAddTag.addEventListener('click', addCustomTag);
-    newTagInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter') {
-            e.preventDefault();
-            addCustomTag();
-        }
-    });
+    function el(id) { return document.getElementById(id); }
 
-    presetButtons.forEach(btn => {
-        btn.addEventListener('click', () => {
-            const item = btn.getAttribute('data-item');
-            const idx = whitelistItems.indexOf(item);
-            if (idx === -1) {
-                whitelistItems.push(item);
-            } else {
-                whitelistItems.splice(idx, 1);
-            }
-            renderTags();
-        });
-    });
-
-    // File selection handler
-    btnSelectScript.addEventListener('click', () => {
-        if (window.pywebview && window.pywebview.api) {
-            window.pywebview.api.select_script().then(result => {
-                if (result) {
-                    selectedScript = result;
-                    inputScriptPath.value = selectedScript.display_name;
-                }
-            });
-        }
-    });
-
-    // 4. PyWebview Integration Hooks
-    function checkPythonAPI() {
-        if (window.pywebview && window.pywebview.api) {
-            initApp();
-        } else {
-            setTimeout(checkPythonAPI, 100);
-        }
-    }
-
-    checkPythonAPI();
-
-    function initApp() {
-        // Load settings and start polling status
-        loadUserConfig();
-        startStatusPolling();
-    }
-
-    function loadUserConfig() {
-        window.pywebview.api.load_config().then(config => {
-            if (!config) return;
-            usernameInput.value = config.username || '';
-            passwordInput.value = config.password || '';
-            serverSelect.value = config.server || 'Artix';
-            roomInput.value = config.room_number || '1';
-            
-            selectedScript = config.selected_script || null;
-            if (selectedScript) {
-                inputScriptPath.value = selectedScript.display_name || selectedScript.path || '';
-            } else {
-                // Fallback for old configs that stored just path
-                if (config.bot_path) {
-                    selectedScript = {
-                        display_name: config.bot_display_name || config.bot_path.split('.').pop() + '.py',
-                        path: config.bot_path,
-                        abs_path: config.bot_abs_path || '',
-                        external: !!config.bot_external,
-                        parent_dir: config.bot_parent_dir || ''
-                    };
-                    inputScriptPath.value = selectedScript.display_name;
-                } else {
-                    inputScriptPath.value = '';
-                }
-            }
-
-            farmClassInput.value = config.farm_class || '';
-            soloClassInput.value = config.solo_class || '';
-            
-            chkAutoRelogin.checked = config.auto_relogin !== false;
-            chkAntiMod.checked = config.anti_mod !== false;
-            chkMuteSpam.checked = config.mute_spam !== false;
-            chkShowChat.checked = config.show_chat !== false;
-
-            whitelistItems = config.whitelist || [];
-            renderTags();
-        });
-    }
-
-    function compileConfig() {
+    function accountTemplate() {
         return {
-            username: usernameInput.value.trim(),
-            password: passwordInput.value,
-            server: serverSelect.value,
-            room_number: parseInt(roomInput.value) || 1,
-            
-            bot_path: selectedScript ? selectedScript.path : '',
-            bot_display_name: selectedScript ? selectedScript.display_name : '',
-            bot_abs_path: selectedScript ? selectedScript.abs_path : '',
-            bot_external: selectedScript ? !!selectedScript.external : false,
-            bot_parent_dir: selectedScript ? selectedScript.parent_dir : '',
-            selected_script: selectedScript,
-            
-            farm_class: farmClassInput.value.trim(),
-            solo_class: soloClassInput.value.trim(),
-            whitelist: whitelistItems,
-            auto_relogin: chkAutoRelogin.checked,
-            anti_mod: chkAntiMod.checked,
-            mute_spam: chkMuteSpam.checked,
-            show_chat: chkShowChat.checked
+            username: "", password: "", server: "Artix", room_number: "1",
+            bot_path: "", farm_class: "", solo_class: "",
+            whitelist: BOT_PRESET.slice(),
+            auto_relogin: true, show_chat: true, mute_spam: true, anti_mod: true,
+            bot_external: false, bot_parent_dir: ""
         };
     }
 
-    btnSaveSettings.addEventListener('click', () => {
-        const payload = compileConfig();
-        window.pywebview.api.save_config(payload).then(res => {
-            if (res.success) {
-                alert('Configuration saved successfully.');
-            } else {
-                alert(`Error saving configuration: ${res.error}`);
-            }
+    function current() { return accounts[active]; }
+
+    // ---- tabs -------------------------------------------------------
+    function tabLabel(i) {
+        var a = accounts[i] || {};
+        var user = (a.username || '').trim();
+        // Running -> the account name; otherwise a default name.
+        if (user && runningNames[user]) return user;
+        return 'Account ' + (i + 1);
+    }
+
+    function renderTabs() {
+        var bar = el('account-tabs');
+        bar.innerHTML = '';
+        accounts.forEach(function (a, i) {
+            var wrap = document.createElement('div');
+            wrap.className = 'aqw-tab' + (i === active ? ' active' : '');
+
+            var lbl = document.createElement('button');
+            lbl.className = 'aqw-tab-label';
+            lbl.innerHTML = ((tabLabel(i) !== ('Account ' + (i + 1))) ? '&#9679; ' : '') + esc(tabLabel(i));
+            lbl.title = tabLabel(i);
+            lbl.onclick = function () { active = i; renderTabs(); loadEditor(); };
+
+            var x = document.createElement('button');
+            x.className = 'aqw-tab-x';
+            x.textContent = '\u00d7';
+            x.disabled = !!runningNames[(a.username || '').trim()];
+            x.title = x.disabled ? 'Stop the bot before removing' : 'Remove account';
+            x.onclick = function (e) { e.stopPropagation(); if (x.disabled) return; removeAccount(i); };
+
+            wrap.appendChild(lbl);
+            wrap.appendChild(x);
+            bar.appendChild(wrap);
         });
-    });
+    }
 
-    btnResetSettings.addEventListener('click', () => {
-        if (confirm('Are you sure you want to restore default settings?')) {
-            whitelistItems = [
-                "Gem of Nulgath",
-                "Diamond of Nulgath",
-                "Voucher of Nulgath (non-mem)",
-                "Tainted Gem",
-                "Dark Crystal Shard"
-            ];
-            usernameInput.value = '';
-            passwordInput.value = '';
-            serverSelect.value = 'Artix';
-            roomInput.value = '1';
-            selectedScript = null;
-            inputScriptPath.value = '';
-            farmClassInput.value = '';
-            soloClassInput.value = '';
-            chkAutoRelogin.checked = true;
-            chkAntiMod.checked = true;
-            chkMuteSpam.checked = true;
-            chkShowChat.checked = true;
-            renderTags();
+    // ---- editor <-> accounts ---------------------------------------
+    function loadEditor() {
+        var a = current() || accountTemplate();
+        el('f-user').value = a.username || '';
+        el('f-pass').value = a.password || '';
+        el('f-server').value = a.server || 'Artix';
+        el('f-room').value = a.room_number || '1';
+        el('f-script').value = a.bot_path || '';
+        el('f-script').dataset.external = a.bot_external ? '1' : '';
+        el('f-script').dataset.parent = a.bot_parent_dir || '';
+        el('f-farm').value = a.farm_class || '';
+        el('f-solo').value = a.solo_class || '';
+        el('f-whitelist').value = Array.isArray(a.whitelist) ? a.whitelist.join(', ') : (a.whitelist || '');
+        el('f-player').value = '';
+        el('editor-title').textContent = tabLabel(active);
+        renderEditorStatus();
+        renderLog();
+        el('chk-items').checked = !!a._showItems;
+        updateItemsCard();
+    }
+
+    function syncFromEditor() {
+        var a = current();
+        if (!a) return;
+        a.username = el('f-user').value;
+        a.password = el('f-pass').value;
+        a.server = el('f-server').value || 'Artix';
+        a.room_number = el('f-room').value || '1';
+        a.bot_path = el('f-script').value;
+        a.bot_external = el('f-script').dataset.external === '1';
+        a.bot_parent_dir = el('f-script').dataset.parent || '';
+        a.farm_class = el('f-farm').value;
+        a.solo_class = el('f-solo').value;
+        a.whitelist = el('f-whitelist').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    // ---- items explorer (inventory / bank / temp) -------------------
+    var itemsTab = 'inventory';
+    var itemsData = { inventory: [], bank: [], temp: [] };
+    var itemsSig = '';
+
+    function itemsKey() {
+        var a = current();
+        return a && (a.username || '').trim();
+    }
+
+    function updateItemsCard() {
+        var a = current() || {};
+        var card = el('items-card');
+        if (!card) return;
+        var show = !!a._showItems;
+        card.style.display = show ? '' : 'none';
+        if (show) {
+            el('items-owner').textContent = itemsKey() || '(no username)';
+            pollItems();
         }
-    });
+    }
 
-    // 5. Bot Runner Control Hooks
-    btnStart.addEventListener('click', () => {
-        const config = compileConfig();
-        
-        if (!config.username || !config.password) {
-            alert('Username and Password are required to start the bot!');
-            document.querySelector('[data-tab="script"]').click();
-            return;
-        }
+    function pollItems() {
+        var card = el('items-card');
+        if (!card || card.style.display === 'none') return;
+        var key = itemsKey();
+        if (!key) { itemsData = { inventory: [], bank: [], temp: [] }; renderItems(); return; }
+        api().get_items(key).then(function (data) {
+            itemsData = data || { inventory: [], bank: [], temp: [] };
+            renderItems();
+        }).catch(function () {});
+    }
 
-        if (!config.bot_path) {
-            alert('Please select a bot script file first!');
-            document.querySelector('[data-tab="script"]').click();
-            return;
-        }
+    function renderItems() {
+        var box = el('items-groups');
+        if (!box) return;
+        var items = (itemsData && itemsData[itemsTab]) || [];
 
-        btnStart.disabled = true;
-        btnStart.textContent = 'Launching...';
-        
-        connIndicator.className = 'status-indicator connecting';
-        connText.textContent = 'Connecting...';
+        // Nothing changed -> don't rebuild (no flicker, no scroll jump).
+        var sig = itemsTab + '\u0000' + JSON.stringify(itemsData);
+        if (sig === itemsSig && box.childNodes.length) { return; }
 
-        window.pywebview.api.start_bot(config).then(res => {
-            if (res.success) {
-                btnStart.classList.add('hidden');
-                btnStop.classList.remove('hidden');
-                btnStart.disabled = false;
-                btnStart.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg> Start Bot
-                `;
-                setTimeout(() => {
-                    const logsBtn = document.querySelector('[data-tab="logs"]');
-                    if (logsBtn) logsBtn.click();
-                }, 800);
-            } else {
-                btnStart.disabled = false;
-                btnStart.innerHTML = `
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                        <polygon points="5 3 19 12 5 21 5 3"></polygon>
-                    </svg> Start Bot
-                `;
-                alert(`Failed to start bot: ${res.error}`);
-                connIndicator.className = 'status-indicator disconnected';
-                connText.textContent = 'Disconnected';
-            }
+        // Keep the reader's place: remember each group body's scroll and the page.
+        var page = document.querySelector('.app-body') || document.scrollingElement;
+        var pageTop = page ? page.scrollTop : 0;
+        var keep = {};
+        box.querySelectorAll('.item-group').forEach(function (g) {
+            var t = g.querySelector('.item-group-title');
+            var b = g.querySelector('.item-group-body');
+            if (t && b) { keep[t.dataset.slot || ''] = b.scrollTop; }
         });
-    });
 
-    btnStop.addEventListener('click', () => {
-        btnStop.disabled = true;
-        btnStop.textContent = 'Stopping...';
-        window.pywebview.api.stop_bot().then(res => {
-            btnStop.disabled = false;
-            btnStop.innerHTML = `
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="btn-icon">
-                    <rect x="4" y="4" width="16" height="16" rx="2" ry="2"></rect>
-                </svg> Stop Bot
-            `;
-            if (res.success) {
-                btnStop.classList.add('hidden');
-                btnStart.classList.remove('hidden');
-                connIndicator.className = 'status-indicator disconnected';
-                connText.textContent = 'Disconnected';
-            } else {
-                alert(`Error stopping bot: ${res.error}`);
-            }
-        });
-    });
-
-    // 6. Polling Status Loop
-    function startStatusPolling() {
-        if (statusInterval) clearInterval(statusInterval);
-        
-        statusInterval = setInterval(() => {
-            if (!window.pywebview || !window.pywebview.api) return;
-
-            window.pywebview.api.get_status().then(status => {
-                updateDashboard(status);
-            }).catch(err => {
-                console.error("Status check failed", err);
+        itemsSig = sig;
+        if (!items.length) {
+            box.innerHTML = '<p class="cfg-empty">No items.</p>';
+        } else {
+            var groups = {};
+            items.forEach(function (it) {
+                var slot = it.slot || 'Misc';
+                if (!groups[slot]) { groups[slot] = []; }
+                groups[slot].push(it);
             });
-        }, 1000);
-    }
-
-    function setBotRunningUIState(isRunning) {
-        const navDashboard = document.getElementById('nav-dashboard');
-        if (!navDashboard) return;
-
-        if (isRunning) {
-            navDashboard.classList.remove('hidden');
-        } else {
-            navDashboard.classList.add('hidden');
-            // If the active tab was dashboard (Player Stats), switch back to script tab
-            const activeBtn = document.querySelector('.nav-btn.active');
-            if (activeBtn && activeBtn.getAttribute('data-tab') === 'dashboard') {
-                const scriptBtn = document.querySelector('[data-tab="script"]');
-                if (scriptBtn) scriptBtn.click();
-            }
-        }
-
-        // Disable/Enable all controls inside Script & Account tab
-        const scriptTab = document.getElementById('tab-script');
-        if (scriptTab) {
-            const inputs = scriptTab.querySelectorAll('input, select, button');
-            inputs.forEach(el => {
-                el.disabled = isRunning;
+            box.innerHTML = Object.keys(groups).sort().map(function (slot) {
+                var rows = groups[slot].map(function (it) {
+                    var meta = [];
+                    if (it.level) { meta.push('Lv' + it.level); }
+                    if (it.dps) { meta.push('DPS ' + it.dps); }
+                    if (it.rarity) { meta.push('R' + it.rarity); }
+                    if (it.enh) { meta.push('Enh: ' + it.enh); }
+                    if (it.equipped) { meta.push('equipped'); }
+                    return '<div class="item-row">' +
+                        '<span class="qty">' + (it.qty || 1) + 'x</span>' +
+                        '<span class="nm">' + esc(it.name) + '</span>' +
+                        (meta.length ? '<span class="meta">' + esc(meta.join(' \u00b7 ')) + '</span>' : '') +
+                        '</div>';
+                }).join('');
+                return '<div class="item-group"><div class="item-group-title" data-slot="' + esc(slot) + '">' + esc(slot) +
+                    ' <span class="k">(' + groups[slot].length + ')</span></div>' +
+                    '<div class="item-group-body">' + rows + '</div></div>';
+            }).join('');
+            box.querySelectorAll('.item-group').forEach(function (g) {
+                var t = g.querySelector('.item-group-title');
+                var b = g.querySelector('.item-group-body');
+                if (t && b && keep[t.dataset.slot || ''] != null) {
+                    b.scrollTop = keep[t.dataset.slot || ''];
+                }
             });
         }
-        
-        // Also disable preset tags
-        const presetBtns = document.querySelectorAll('.btn-preset');
-        presetBtns.forEach(btn => {
-            btn.disabled = isRunning;
+        if (page) { page.scrollTop = pageTop; }
+    }
+
+    // ---- accounts ---------------------------------------------------
+    function addAccount(acc) {
+        accounts.push(acc || accountTemplate());
+        active = accounts.length - 1;
+        renderTabs();
+        loadEditor();
+    }
+
+    function removeAccount(i) {
+        accounts.splice(i, 1);
+        if (!accounts.length) { accounts.push(accountTemplate()); }
+        if (active >= accounts.length) { active = accounts.length - 1; }
+        renderTabs();
+        loadEditor();
+    }
+
+    function accountPayload(acc) {
+        return {
+            username: (acc.username || '').trim(),
+            password: acc.password || '',
+            server: acc.server || 'Artix',
+            room_number: acc.room_number || '1',
+            bot_path: (acc.bot_path || '').trim(),
+            farm_class: (acc.farm_class || '').trim(),
+            solo_class: (acc.solo_class || '').trim(),
+            whitelist: acc.whitelist || [],
+            auto_relogin: true, show_chat: true, mute_spam: true, anti_mod: true,
+            bot_external: !!acc.bot_external,
+            bot_parent_dir: acc.bot_parent_dir || ''
+        };
+    }
+
+    // ---- status -----------------------------------------------------
+    function setEditorDisabled(disabled) {
+        ['f-player', 'f-user', 'f-pass', 'f-server', 'f-room',
+         'f-script', 'f-farm', 'f-solo', 'f-whitelist', 'btn-browse'].forEach(function (id) {
+            var node = el(id);
+            if (node) { node.disabled = disabled; }
         });
     }
 
-    function updateDashboard(status) {
-        if (!status || !status.running) {
-            setBotRunningUIState(false);
-            btnStop.classList.add('hidden');
-            btnStart.classList.remove('hidden');
-            connIndicator.className = 'status-indicator disconnected';
-            connText.textContent = 'Disconnected';
-            
-            valHpProgress.style.width = '0%';
-            valHpValues.textContent = '0 / 0';
-            valMpProgress.style.width = '0%';
-            valMpValues.textContent = '0 / 0';
-            valMap.textContent = '-';
-            valCellPad.textContent = '-';
-            valState.textContent = 'Stopped';
-            valState.className = 'value';
-            
-            valGoldFarmed.textContent = '0';
-            valExpFarmed.textContent = '0';
-            valCmdIndex.textContent = '0';
-            
-            valInventoryCount.textContent = '0';
-            valBankCount.textContent = '0';
-            valGold.textContent = '0';
+    function renderAccountToggle(running) {
+        var btn = el('btn-account-toggle');
+        if (!btn) return;
+        if (running) { btn.textContent = 'STOP'; btn.className = 'btn btn-danger btn-small'; }
+        else { btn.textContent = 'START'; btn.className = 'btn btn-success btn-small'; }
+    }
+
+    function renderEditorStatus() {
+        var a = current() || {};
+        var user = (a.username || '').trim();
+        var badge = el('editor-badge');
+        var sub = el('editor-sub');
+        var st = el('editor-status');
+        var s = runningNames[user] ? runningStatus[user] : null;
+        renderAccountToggle(!!s);
+        setEditorDisabled(!!s);
+        if (!s) {
+            badge.textContent = 'Offline'; badge.style.color = '';
+            sub.textContent = 'not running';
+            st.innerHTML = '<span class="pill">idle</span>';
             return;
         }
-
-        setBotRunningUIState(true);
-        btnStart.classList.add('hidden');
-        btnStop.classList.remove('hidden');
-
-        if (status.is_connected) {
-            connIndicator.className = 'status-indicator connected';
-            connText.textContent = 'Connected';
-        } else {
-            connIndicator.className = 'status-indicator connecting';
-            connText.textContent = 'Connecting...';
-        }
-
-        const hpPercent = status.max_hp > 0 ? (status.hp / status.max_hp) * 100 : 0;
-        valHpProgress.style.width = `${Math.min(100, Math.max(0, hpPercent))}%`;
-        valHpValues.textContent = `${status.hp} / ${status.max_hp}`;
-
-        const mpPercent = status.max_mp > 0 ? (status.mp / status.max_mp) * 100 : 0;
-        valMpProgress.style.width = `${Math.min(100, Math.max(0, mpPercent))}%`;
-        valMpValues.textContent = `${status.mp} / ${status.max_mp}`;
-
-        valMap.textContent = status.cell !== "Unknown" ? `Map / Room ${roomInput.value}` : '-';
-        valCellPad.textContent = `${status.cell} (${status.pad})`;
-
-        if (status.is_dead) {
-            valState.textContent = 'DEAD';
-            valState.className = 'value log-red log-bold';
-        } else if (status.in_combat) {
-            valState.textContent = 'IN COMBAT';
-            valState.className = 'value log-yellow log-bold';
-        } else if (status.is_connected) {
-            valState.textContent = 'FARMING';
-            valState.className = 'value log-green log-bold';
-        } else {
-            valState.textContent = 'CONNECTING';
-            valState.className = 'value text-muted';
-        }
-
-        valGoldFarmed.textContent = status.gold_farmed.toLocaleString();
-        valExpFarmed.textContent = status.exp_farmed.toLocaleString();
-        valCmdIndex.textContent = status.index;
-
-        valInventoryCount.textContent = status.inventory_count;
-        valBankCount.textContent = status.bank_count;
-        valGold.textContent = status.gold.toLocaleString();
+        badge.textContent = 'Online'; badge.style.color = '#34d399';
+        sub.textContent = 'running';
+        var hp = s.max_hp ? Math.round(s.hp / s.max_hp * 100) : 0;
+        st.innerHTML =
+            '<span class="pill">' + esc(s.map || '-') + ' / ' + esc(s.cell || '-') + '</span>' +
+            '<span class="pill">HP ' + hp + '%</span>' +
+            '<span class="pill">MP ' + (s.mp || 0) + '</span>' +
+            (s.is_dead ? '<span class="pill" style="color:#f87171">dead</span>' : '');
     }
-});
 
-// Info bubble click toggle handler
-document.addEventListener("DOMContentLoaded", () => {
-    const titleClick = document.getElementById("app-title-click");
-    const infoBubble = document.getElementById("info-bubble");
-    if (titleClick && infoBubble) {
-        titleClick.addEventListener("click", (e) => {
-            e.stopPropagation();
-            infoBubble.classList.toggle("show");
+    var runningStatus = {};   // username -> status object
+
+    function setStatuses(statuses) {
+        runningNames = {};
+        runningStatus = {};
+        (statuses || []).forEach(function (s) {
+            if (s.running) { runningNames[s.key] = true; runningStatus[s.key] = s; }
         });
-        document.addEventListener("click", () => {
-            infoBubble.classList.remove("show");
-        });
-        infoBubble.addEventListener("click", (e) => {
-            e.stopPropagation();
-        });
+        renderTabs();
+        el('editor-title').textContent = tabLabel(active);
+        renderEditorStatus();
     }
-});
+
+    // ---- log (per tab) ---------------------------------------------
+    var buffers = {};        // key -> [html line, ...]
+    var MAX_LINES = 500;
+
+    function autoScrollOn() {
+        var c = el('chk-auto-scroll');
+        return !c || c.checked;
+    }
+
+    function activeKey() {
+        var a = current();
+        var u = a && (a.username || '').trim();
+        return u || '__system__';
+    }
+
+    function renderLog() {
+        var log = el('log');
+        if (!log) return;
+        var lines = buffers[activeKey()] || [];
+        log.innerHTML = lines.map(function (h) { return '<div>' + h + '</div>'; }).join('');
+        if (autoScrollOn()) { log.scrollTop = log.scrollHeight; }
+    }
+
+    function appendLog(key, html) {
+        // A line belongs to its account tab; anything else (System/unknown)
+        // goes to whichever tab is on screen.
+        var isAccount = accounts.some(function (a) { return (a.username || '').trim() === key; });
+        var target = isAccount ? key : activeKey();
+        var line = '<span class="who">' + esc(key || '') + '</span> ' + html;
+        if (!buffers[target]) { buffers[target] = []; }
+        buffers[target].push(line);
+        while (buffers[target].length > MAX_LINES) { buffers[target].shift(); }
+        if (target === activeKey()) {
+            var log = el('log');
+            if (log) {
+                var d = document.createElement('div');
+                d.innerHTML = line;
+                log.appendChild(d);
+                while (log.childNodes.length > MAX_LINES) { log.removeChild(log.firstChild); }
+                if (autoScrollOn()) { log.scrollTop = log.scrollHeight; }
+            }
+        }
+    }
+
+    window.addSoloLog = function (key, html) { appendLog(key, html); };
+    window.addSlaveLog = function (user, html) { appendLog(user, html); };
+
+    // ---- wire -------------------------------------------------------
+    window.whenApiReady(function (a) {
+        ['f-user', 'f-pass', 'f-room', 'f-farm', 'f-solo', 'f-whitelist'].forEach(function (id) {
+            el(id).addEventListener('input', function () { syncFromEditor(); renderTabs(); });
+        });
+        el('f-server').addEventListener('change', syncFromEditor);
+        el('f-script').addEventListener('change', syncFromEditor);
+        el('f-server').addEventListener('input', syncFromEditor);
+
+        attachPlayersDropdown(el('f-player'), function (u, p) {
+            el('f-user').value = u;
+            el('f-pass').value = p;
+            syncFromEditor();
+            renderTabs();
+        });
+
+        el('btn-browse').onclick = function () {
+            a.select_script().then(function (result) {
+                if (!result) return;
+                el('f-script').value = result.path || '';
+                el('f-script').dataset.external = result.external ? '1' : '';
+                el('f-script').dataset.parent = result.parent_dir || '';
+                syncFromEditor();
+            });
+        };
+
+        el('btn-add').onclick = function () { addAccount(); };
+
+        el('btn-account-toggle').onclick = function () {
+            syncFromEditor();
+            var acc = current() || {};
+            var user = (acc.username || '').trim();
+            if (runningNames[user]) {
+                msg('');
+                a.stop_one(user).then(function (res) {
+                    if (!res || !res.success) { msg((res && res.error) || 'Failed to stop', false); return; }
+                    msg('Stopped ' + user + '.', true);
+                    a.get_statuses().then(setStatuses);
+                });
+            } else {
+                if (!user) { msg('Username is required.', false); return; }
+                msg('');
+                a.save_config({ accounts: accounts.map(function (x) { return accountPayload(x); }) });
+                a.start_one(accountPayload(acc)).then(function (res) {
+                    if (!res || !res.success) { msg((res && res.error) || 'Failed to start', false); return; }
+                    msg('Started ' + user + '.', true);
+                    a.get_statuses().then(setStatuses);
+                });
+            }
+        };
+        el('btn-start').onclick = function () {
+            syncFromEditor();
+            var payload = accounts.map(function (acc) { return accountPayload(acc); });
+            msg('');
+            a.start_bots({ accounts: payload }).then(function (res) {
+                if (!res || !res.success) { msg((res && res.error) || 'Failed to start', false); return; }
+                var extra = (res.errors && res.errors.length) ? (' (' + res.errors.join('; ') + ')') : '';
+                msg('Started ' + (res.started || 0) + ' account(s).' + extra, true);
+                a.get_statuses().then(setStatuses);
+            });
+        };
+        el('btn-stop').onclick = function () {
+            a.stop_bots().then(function () {
+                runningNames = {}; runningStatus = {};
+                renderTabs(); el('editor-title').textContent = tabLabel(active); renderEditorStatus();
+                msg('Stopped.', true);
+            });
+        };
+        var clearBtn = el('btn-clear-logs');
+        if (clearBtn) { clearBtn.onclick = function () { buffers[activeKey()] = []; el('log').innerHTML = ''; }; }
+
+        a.load_config().then(function (config) {
+            var list = (config && config.accounts) || [];
+            accounts = list.length ? list : [accountTemplate()];
+            active = 0;
+            renderTabs();
+            loadEditor();
+        });
+
+        setInterval(function () { a.get_statuses().then(setStatuses); }, 1500);
+
+        var itemsChk = el('chk-items');
+        if (itemsChk) {
+            itemsChk.onchange = function () {
+                var a2 = current();
+                if (a2) { a2._showItems = itemsChk.checked; }
+                updateItemsCard();
+            };
+        }
+        document.querySelectorAll('#items-tabs .items-tab').forEach(function (b) {
+            b.onclick = function () {
+                itemsTab = b.dataset.list || 'inventory';
+                document.querySelectorAll('#items-tabs .items-tab').forEach(function (x) {
+                    x.classList.toggle('active', x === b);
+                });
+                pollItems();
+            };
+        });
+        setInterval(pollItems, 2000);
+    });
+})();

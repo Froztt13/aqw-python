@@ -174,12 +174,21 @@ async def main(cmd: Command):
         print(Fore.CYAN + f"Starting farm for {item_name} (Quest: {quest_id})..." + Fore.RESET)
         await cmd.register_quest(quest_id)
         
-        while cmd.is_still_connected() and cmd.get_quant_item(item_name) < target_qty:
+        qty = cmd.get_quant_item(item_name)
+        while cmd.is_still_connected() and qty < target_qty:
             cmd.farming_logger(item_name, target_qty)
             await do_farm_tasks(cmd, tasks)
             await asyncio.sleep(1)
-        
-        print(Fore.GREEN + f"Target reached: {target_qty}x {item_name}" + Fore.RESET)
+            qty = cmd.get_quant_item(item_name)
+
+        # The loop above also exits when the connection drops, so printing
+        # "Target reached" unconditionally claimed success on a disconnect.
+        if qty >= target_qty:
+            print(Fore.GREEN + f"Target reached: {target_qty}x {item_name}" + Fore.RESET)
+        else:
+            print(Fore.YELLOW
+                  + f"Stopped early at {qty}/{target_qty}x {item_name} (no longer connected)"
+                  + Fore.RESET)
 
     print(Fore.GREEN + "All farming tasks completed!" + Fore.RESET)
 

@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ultra Speaker</title>
+    <link rel="stylesheet" href="/temple/style.css">
+    <link rel="stylesheet" href="/cfg.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="/components.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-text">
+                    <div class="title-row">
+                        <h1>Ultra Speaker</h1>
+                        <span class="version-badge">4-pane</span>
+                    </div>
+                    <p>Four panes, like <code>ultra_speaker_pane.bat</code>. Pick a player and a role per pane.
+                       Each loadout item is searched in the inventory &amp; bank and auto-equipped.
+                       A missing item stops the whole party (or skip &mdash; not recommended). Scroll of Enrage is required (min 100).</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="global-config-group">
+                    <div class="input-inline">
+                        <label for="server">Server</label>
+                        <server-select id="server" value="Alteon"></server-select>
+                    </div>
+                    <div class="input-inline">
+                        <label for="room">Room</label>
+                        <input type="number" id="room" value="9099">
+                    </div>
+                    <div class="input-inline">
+                        <label for="missing-policy">Missing item</label>
+                        <select id="missing-policy">
+                            <option value="stop">Stop (default)</option>
+                            <option value="skip">Skip (not recommended)</option>
+                        </select>
+                    </div>
+                </div>
+                <span id="msg" class="cfg-msg"></span>
+                <button class="btn btn-success" id="btn-start">START</button>
+                <button class="btn btn-danger" id="btn-stop">STOP</button>
+            </div>
+        </header>
+
+        <main class="app-body">
+            <div class="slots-grid" id="slots"></div>
+        </main>
+
+        <footer class="app-console">
+            <div class="console-tabs-bar">
+                <div class="tabs-list"><button class="console-tab active">Log</button></div>
+                <div class="console-actions">
+                    <div class="console-checkbox-wrapper">
+                        <input type="checkbox" id="chk-auto-scroll" checked>
+                        <label for="chk-auto-scroll">Auto-Scroll</label>
+                    </div>
+                    <button class="btn btn-small btn-secondary" id="btn-clear-logs">Clear Logs</button>
+                </div>
+            </div>
+            <div style="display:flex;flex:1;min-height:0;">
+                <div class="console-viewport" id="log"></div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/players_dropdown.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
