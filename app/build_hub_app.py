@@ -163,24 +163,17 @@ class UnifiedThreadRedirector:
             except Exception:
                 pass
         else:
-            # Fallback/default logging based on active page
-            # CRITICAL: Only check get_current_url if window is loaded and ready,
-            # otherwise calling get_current_url() blocks for 20s and deadlocks the GUI thread!
-            if self.combined_api and getattr(self.combined_api, '_window', None):
-                win = self.combined_api._window
-                if hasattr(win, 'events') and hasattr(win.events, 'loaded') and win.events.loaded.is_set():
-                    try:
-                        url = win.get_current_url() or ""
-                        if "/slavery" in url:
-                            self.combined_api._slavery_api.handle_slave_log("System", message)
-                        elif "/temple" in url:
-                            self.combined_api._temple_api.handle_slave_log("System", message)
-                        elif "/eclipse" in url:
-                            self.combined_api._eclipse_api.handle_slave_log("System", message)
-                        elif "/aqw" in url:
-                            self.combined_api._aqw_api.handle_log(message)
-                    except Exception:
-                        pass
+            # Route output from threads that never registered a callback to
+            # whichever menu is currently on screen.  This deliberately avoids
+            # window.get_current_url(): that call blocks (~20 s) and can wedge
+            # or crash the GUI thread when it fires during a stop/teardown.
+            api = getattr(self, 'combined_api', None)
+            if api is None:
+                return
+            try:
+                api.route_system_log(message)
+            except Exception:
+                pass
 
     def flush(self):
         if self.original_stream and hasattr(self.original_stream, 'flush'):
@@ -210,6 +203,87 @@ sys.stdout = unified_redirector_out
 sys.stderr = unified_redirector_err
 
 # --- Thread Classes for Sub-Bots ---
+# Calling evaluate_js once per log line from four bot threads floods WebView2
+# (it wedges / the control can get disposed mid-teardown).  All log lines are
+# queued and flushed in ONE evaluate_js call every ~250 ms instead.
+_JS_LOCK = threading.Lock()
+
+
+def _eval_js(window, script):
+    if window is None:
+        return
+    try:
+        events = getattr(window, "events", None)
+        closed = getattr(events, "closed", None)
+        if closed is not None and hasattr(closed, "is_set") and closed.is_set():
+            return
+    except Exception:
+        pass
+    try:
+        with _JS_LOCK:
+            window.evaluate_js(script)
+    except Exception:
+        pass
+
+
+class _LogFlusher:
+    def __init__(self, interval=0.25, max_batch=300):
+        self._queue = []
+        self._lock = threading.Lock()
+        self._interval = interval
+        self._max_batch = max_batch
+        self._window = None
+        self._thread = None
+
+    def set_window(self, window):
+        self._window = window
+        if self._thread is None:
+            self._thread = threading.Thread(target=self._run, daemon=True,
+                                            name="log-flusher")
+            self._thread.start()
+
+    def push(self, script):
+        with self._lock:
+            self._queue.append(script)
+            if len(self._queue) > 3000:
+                del self._queue[:1000]
+
+    def _run(self):
+        while True:
+            time.sleep(self._interval)
+            if self._window is None:
+                continue
+            with self._lock:
+                if not self._queue:
+                    continue
+                batch = self._queue[-self._max_batch:]
+                self._queue = []
+            _eval_js(self._window, ";".join(batch))
+
+
+_log_flusher = _LogFlusher()
+
+
+def _drain_loop(loop):
+    """Cancel and await pending tasks so closing the loop is clean.
+
+    Without this, closing a loop that still has ``read_server_in_background`` /
+    ``register_quest_task`` pending prints ``Task was destroyed but it is
+    pending!`` and can abort the process.
+    """
+    try:
+        pending = [t for t in asyncio.all_tasks(loop) if not t.done()]
+    except Exception:
+        pending = []
+    for task in pending:
+        task.cancel()
+    if pending:
+        try:
+            loop.run_until_complete(asyncio.gather(*pending, return_exceptions=True))
+        except Exception:
+            pass
+
+
 class BotThread(threading.Thread):
     def __init__(self, bot_instance, bot_path):
         super().__init__()
@@ -228,6 +302,7 @@ class BotThread(threading.Thread):
         except Exception as e:
             print(f"Bot execution stopped or error occurred: {e}")
         finally:
+            _drain_loop(self.loop)
             self.loop.close()
 
 class SlaveBotThread(threading.Thread):
@@ -306,6 +381,7 @@ class SlaveBotThread(threading.Thread):
                 self.taunt_coordinator.unregister_taunter(self.username)
             unified_redirector_out.unregister_thread(thread_id)
             unified_redirector_err.unregister_thread(thread_id)
+            _drain_loop(self.loop)
             self.loop.close()
 
 class TempleBotThread(threading.Thread):
@@ -432,11 +508,230 @@ class EclipseBotThread(threading.Thread):
             unified_redirector_out.unregister_thread(thread_id)
             unified_redirector_err.unregister_thread(thread_id)
 
+class UltraBotThread(threading.Thread):
+    """One pane of an ultra party (daily or speaker) run inside the hub.
+
+    Mirrors what ``ultra_daily_pane.bat`` / ``ultra_speaker_pane.bat`` do per
+    window: build a ``Bot`` for one account, then run the shared ultra runner.
+    The party file sync works because every pane shares one ``AQW_RUN_ID`` set
+    by the API before the threads start.
+    """
+
+    def __init__(self, slot, kind, username, password, server, room_number,
+                 leader, slaves, role, callback, missing_policy="stop"):
+        super().__init__()
+        self.slot = slot
+        self.kind = kind                    # "daily" | "speaker"
+        self.username = username
+        self.password = password
+        self.server = server
+        self.room_number = room_number
+        self.leader = leader
+        self.slaves = slaves or []
+        self.role = role                    # speaker: class name; daily: ""
+        self.callback = callback
+        self.missing_policy = missing_policy
+        self.bot_instance = None
+        self.daemon = True
+
+    def run(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        thread_id = threading.get_ident()
+        unified_redirector_out.register_thread(thread_id, self.username, self.callback)
+        unified_redirector_err.register_thread(thread_id, self.username, self.callback)
+
+        telemetry = None
+        b = Bot(
+            roomNumber=self.room_number,
+            showLog=True,
+            showDebug=False,
+            showChat=True,
+            isScriptable=True,
+            followPlayer=(self.leader or "").lower(),
+            slavesPlayer=self.slaves,
+            soloClass=self.role or None,
+            muteSpamWarning=True,
+        )
+        b.set_login_info(self.username, self.password, self.server)
+        self.bot_instance = b
+
+        try:
+            try:
+                from bot.ultra.telemetry import install_from_env
+                telemetry = install_from_env(b, self.slot, self.username)
+            except Exception as exc:
+                print(f"[ultra slot {self.slot}] telemetry off: {exc}")
+
+            if self.kind == "speaker":
+                from bot.ultra.core_ultra import UltraSpeaker
+                runner = UltraSpeaker(b.command, self.slot)
+            else:
+                from bot.ultra.daily import DailyUltra
+                runner = DailyUltra(b.command, self.slot)
+            runner.missing_policy = self.missing_policy
+
+            async def run_bot(cmd):
+                await runner.run()
+
+            loop.run_until_complete(b.start_bot(run_bot))
+        except Exception as e:
+            print(f"[ultra slot {self.slot}] execution stopped or error occurred: {e}")
+        finally:
+            if telemetry is not None:
+                try:
+                    telemetry.close()
+                except Exception:
+                    pass
+            unified_redirector_out.unregister_thread(thread_id)
+            unified_redirector_err.unregister_thread(thread_id)
+            _drain_loop(loop)
+            loop.close()
+
+class WeeklyDoomThread(threading.Thread):
+    """Runs the Weekly Doom queue for one account.
+
+    Weekly Doom is a queue-mode script (``bot_cmds/weekly_doom.py``), so this
+    builds a non-scriptable ``Bot`` and runs ``start_bot()`` (the command loop).
+    """
+
+    def __init__(self, username, password, server, room_number, callback):
+        super().__init__()
+        self.username = username
+        self.password = password
+        self.server = server
+        self.room_number = room_number
+        self.callback = callback
+        self.bot_instance = None
+        self.daemon = True
+
+    def run(self):
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        thread_id = threading.get_ident()
+        unified_redirector_out.register_thread(thread_id, self.username, self.callback)
+        unified_redirector_err.register_thread(thread_id, self.username, self.callback)
+        try:
+            import commands as botcmd
+            b = Bot(roomNumber=self.room_number, showLog=True, showDebug=True, cmdDelay=500)
+            b.set_login_info(self.username, self.password, self.server)
+            self.bot_instance = b
+            b.add_cmds([
+                botcmd.IsInInvCmd("Epic Item of Digital Awesomeness"),
+                botcmd.MessageCmd(msg="You have \"Epic Item of Digital Awesomeness\" in your inventory!!"),
+                botcmd.IsInBankCmd("Gear of Doom"),
+                botcmd.BankToInvCmd("Gear of Doom"),
+                botcmd.IsInInvCmd("Gear of Doom", 3, operator="<"),
+                botcmd.StopBotCmd(msg="Not enough Gear of Doom."),
+                botcmd.JoinMapCmd("doom"),
+                botcmd.AcceptQuestCmd(3076),
+                botcmd.TurnInQuestCmd(3076),
+                botcmd.SleepCmd(1000),
+                botcmd.StopBotCmd(msg="Bot Finished."),
+            ])
+            loop.run_until_complete(b.start_bot())
+        except Exception as e:
+            print(f"[weekly doom {self.username}] execution stopped: {e}")
+        finally:
+            unified_redirector_out.unregister_thread(thread_id)
+            unified_redirector_err.unregister_thread(thread_id)
+            _drain_loop(loop)
+            try:
+                loop.close()
+            except Exception:
+                pass
+
 # --- Sub-GUI API Implementations (Standalone-Compatible) ---
+class PlayersApi:
+    """Saved player list for the Config Player menu.
+
+    This is the only place the app persists credentials.  The file is a plain
+    list of ``{"user", "pass"}`` objects so it can also be filled in by hand.
+    It starts empty: nothing is seeded from any script or from
+    ``bot/ultra/config.py``.
+    """
+
+    def __init__(self):
+        self._window = None
+        if getattr(sys, 'frozen', False):
+            config_dir = os.path.expanduser("~/.aqw_bot")
+            os.makedirs(config_dir, exist_ok=True)
+            self.config_path = os.path.join(config_dir, "players.json")
+        else:
+            self.config_path = os.path.join(get_project_root(), "players.json")
+
+    def set_window(self, window):
+        self._window = window
+
+    def _read(self):
+        if not os.path.exists(self.config_path):
+            return []
+        try:
+            with open(self.config_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, list):
+                return [p for p in data if isinstance(p, dict)]
+        except Exception as e:
+            print(f"Failed to load players: {e}")
+        return []
+
+    def _write(self, players):
+        try:
+            temp_path = self.config_path + ".tmp"
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(players, f, indent=4)
+            os.replace(temp_path, self.config_path)
+            return {"success": True, "players": players}
+        except Exception as e:
+            print(f"Failed to save players: {e}")
+            return {"success": False, "error": str(e)}
+
+    def list_players(self):
+        return self._read()
+
+    def add_player(self, user, password):
+        user = (user or "").strip()
+        if not user:
+            return {"success": False, "error": "Username is required."}
+        players = self._read()
+        if any(p.get("user", "").lower() == user.lower() for p in players):
+            return {"success": False, "error": f"{user} already exists."}
+        players.append({"user": user, "pass": password or ""})
+        return self._write(players)
+
+    def update_player(self, index, user, password):
+        players = self._read()
+        try:
+            index = int(index)
+        except (TypeError, ValueError):
+            return {"success": False, "error": "Invalid index."}
+        if index < 0 or index >= len(players):
+            return {"success": False, "error": "Player not found."}
+        user = (user or "").strip()
+        if not user:
+            return {"success": False, "error": "Username is required."}
+        if any(p.get("user", "").lower() == user.lower()
+               for i, p in enumerate(players) if i != index):
+            return {"success": False, "error": f"{user} already exists."}
+        players[index] = {"user": user, "pass": password or ""}
+        return self._write(players)
+
+    def delete_player(self, index):
+        players = self._read()
+        try:
+            index = int(index)
+        except (TypeError, ValueError):
+            return {"success": False, "error": "Invalid index."}
+        if index < 0 or index >= len(players):
+            return {"success": False, "error": "Player not found."}
+        players.pop(index)
+        return self._write(players)
+
+
 class AqwSoloApi:
     def __init__(self):
-        self.bot_instance = None
-        self.bot_thread = None
+        #: username -> {"thread", "instance", "config"}; one bot per account.
+        self.bots = {}
         self._window = None
         if getattr(sys, 'frozen', False):
             config_dir = os.path.expanduser("~/.aqw_bot")
@@ -450,11 +745,21 @@ class AqwSoloApi:
 
     def handle_log(self, message):
         html_msg = ansi_to_html(message)
-        if self._window:
-            self._window.evaluate_js(f"if(window.addLog) window.addLog({json.dumps(html_msg)});")
+        _log_flusher.push(
+            f"if(window.addSlaveLog) window.addSlaveLog('System', {json.dumps(html_msg)}, 'aqw');"
+        )
 
-    def load_config(self):
-        default_config = {
+    def handle_account_log(self, key, message):
+        """Route one line to a single account's log panel in the solo menu."""
+        html_msg = ansi_to_html(message)
+        _log_flusher.push(
+            f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(key)}, "
+            f"{json.dumps(html_msg)}, 'aqw');"
+        )
+
+    @staticmethod
+    def _default_account():
+        return {
             "username": "",
             "password": "",
             "server": "Artix",
@@ -472,16 +777,29 @@ class AqwSoloApi:
             "auto_relogin": True,
             "show_chat": True,
             "mute_spam": True,
-            "anti_mod": True
+            "anti_mod": True,
+            "bot_external": False,
+            "bot_parent_dir": ""
         }
+
+    def load_config(self):
+        accounts = [self._default_account()]
         if os.path.exists(self.config_path):
             try:
                 with open(self.config_path, "r") as f:
                     user_config = json.load(f)
-                    default_config.update(user_config)
+                if isinstance(user_config, dict) and isinstance(user_config.get("accounts"), list):
+                    accounts = user_config["accounts"] or [self._default_account()]
+                elif isinstance(user_config, dict):
+                    # Migrate the old single-account layout into the first row.
+                    acc = self._default_account()
+                    for key in acc:
+                        if key in user_config:
+                            acc[key] = user_config[key]
+                    accounts = [acc]
             except Exception as e:
                 print(f"Failed to load config: {e}")
-        return default_config
+        return {"accounts": accounts}
 
     def save_config(self, config):
         try:
@@ -534,111 +852,175 @@ class AqwSoloApi:
             return self._resolve_module_path(result[0])
         return None
 
-    def start_bot(self, config):
-        if self.bot_thread and self.bot_thread.is_alive():
-            return {"success": False, "error": "Bot is already running."}
-
-        self.save_config(config)
-
-        whitelist = config.get("whitelist", [])
+    def _build_bot_and_thread(self, acc):
+        whitelist = acc.get("whitelist", [])
         if isinstance(whitelist, str):
             whitelist = [item.strip() for item in whitelist.split(",") if item.strip()]
 
-        if config.get("bot_external") and config.get("bot_parent_dir"):
-            ext_path = config.get("bot_parent_dir")
+        if acc.get("bot_external") and acc.get("bot_parent_dir"):
+            ext_path = acc.get("bot_parent_dir")
             if ext_path not in sys.path:
                 sys.path.insert(0, ext_path)
 
-        try:
-            self.bot_instance = Bot(
-                roomNumber=int(config.get("room_number", 1)),
-                itemsDropWhiteList=whitelist,
-                showLog=True,
-                showDebug=False,
-                showChat=config.get("show_chat", True),
-                isScriptable=True,
-                followPlayer="",
-                slavesPlayer=[],
-                farmClass=config.get("farm_class") or None,
-                soloClass=config.get("solo_class") or None,
-                autoRelogin=config.get("auto_relogin", True),
-                muteSpamWarning=config.get("mute_spam", True),
-                antiMod=config.get("anti_mod", True)
-            )
-            self.bot_instance.set_login_info(
-                config.get("username"),
-                config.get("password"),
-                config.get("server", "Artix")
-            )
+        bot = Bot(
+            roomNumber=int(acc.get("room_number", 1) or 1),
+            itemsDropWhiteList=whitelist,
+            showLog=True,
+            showDebug=False,
+            showChat=acc.get("show_chat", True),
+            isScriptable=True,
+            followPlayer="",
+            slavesPlayer=[],
+            farmClass=acc.get("farm_class") or None,
+            soloClass=acc.get("solo_class") or None,
+            autoRelogin=acc.get("auto_relogin", True),
+            muteSpamWarning=acc.get("mute_spam", True),
+            antiMod=acc.get("anti_mod", True)
+        )
+        bot.set_login_info(acc.get("username"), acc.get("password"), acc.get("server", "Artix"))
+        return bot, BotThread(bot, acc.get("bot_path"))
 
-            self.bot_thread = BotThread(self.bot_instance, config.get("bot_path"))
-            self.bot_thread.start()
+    def start_bots(self, config):
+        """Start one bot per account, all in parallel."""
+        self.save_config(config)
+        accounts = config.get("accounts", [])
+        started = 0
+        errors = []
+        for acc in accounts:
+            username = (acc.get("username") or "").strip()
+            if not username or not acc.get("bot_path"):
+                continue
+            key = username
+            entry = self.bots.get(key)
+            if entry and entry["thread"].is_alive():
+                continue
+            try:
+                bot, thread = self._build_bot_and_thread(acc)
+                thread.start()
+                tid = thread.ident
+                if tid:
+                    unified_redirector_out.register_thread(
+                        tid, key, lambda name, msg, k=key: self.handle_account_log(k, msg))
+                    unified_redirector_err.register_thread(
+                        tid, key, lambda name, msg, k=key: self.handle_account_log(k, msg))
+                self.bots[key] = {"thread": thread, "instance": bot, "config": acc}
+                started += 1
+            except Exception as e:
+                errors.append(f"{username}: {e}")
+        if started == 0 and not errors:
+            return {"success": False, "error": "Fill at least one account (username + script)."}
+        return {"success": True, "started": started, "errors": errors}
+
+    def start_one(self, acc):
+        """Start a single account (the per-tab START button)."""
+        username = (acc.get("username") or "").strip()
+        if not username:
+            return {"success": False, "error": "Username is required."}
+        if not acc.get("bot_path"):
+            return {"success": False, "error": "Pick a script first."}
+        entry = self.bots.get(username)
+        if entry and entry["thread"].is_alive():
+            return {"success": False, "error": f"{username} is already running."}
+        try:
+            bot, thread = self._build_bot_and_thread(acc)
+            thread.start()
+            tid = thread.ident
+            if tid:
+                unified_redirector_out.register_thread(
+                    tid, username, lambda name, msg, k=username: self.handle_account_log(k, msg))
+                unified_redirector_err.register_thread(
+                    tid, username, lambda name, msg, k=username: self.handle_account_log(k, msg))
+            self.bots[username] = {"thread": thread, "instance": bot, "config": acc}
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
 
-    def stop_bot(self):
-        if not self.bot_thread or not self.bot_thread.is_alive():
-            return {"success": False, "error": "Bot is not running."}
-        
+    def stop_one(self, key):
+        """Stop a single account (the per-tab STOP button)."""
+        entry = self.bots.pop(key, None)
+        if not entry:
+            return {"success": False, "error": f"{key} is not running."}
         try:
-            print("Stopping AQW Bot client...")
-            if self.bot_instance:
-                self.bot_instance.stop_bot(user_triggered=True)
+            tid = entry["thread"].ident
+            if tid:
+                unified_redirector_out.unregister_thread(tid)
+                unified_redirector_err.unregister_thread(tid)
+            instance = entry.get("instance")
+            if instance:
+                instance.stop_bot(user_triggered=True)
             return {"success": True}
         except Exception as e:
             return {"success": False, "error": str(e)}
+
+    def stop_bots(self):
+        entries = list(self.bots.items())
+        self.bots = {}
+        for key, entry in entries:
+            try:
+                tid = entry["thread"].ident
+                if tid:
+                    unified_redirector_out.unregister_thread(tid)
+                    unified_redirector_err.unregister_thread(tid)
+                instance = entry.get("instance")
+                if instance:
+                    instance.stop_bot(user_triggered=True)
+            except Exception as e:
+                print(f"Failed to stop {key}: {e}")
+        return {"success": True}
+
+    def _account_status(self, entry):
+        thread = entry["thread"]
+        instance = entry.get("instance")
+        if not (thread.is_alive() and instance):
+            return {"running": False, "is_connected": False}
+        b = instance
+        p = b.player
+        from datetime import datetime
+        now = datetime.now()
+        cooldowns = {}
+        if p and hasattr(p, "SKILLS"):
+            for i in range(6):
+                if i < len(p.SKILLS):
+                    skill_data = p.SKILLS[i]
+                    next_use = skill_data.get("nextUse")
+                    cooldowns[i] = (round((next_use - now).total_seconds(), 1)
+                                    if next_use and next_use > now else 0.0)
+                else:
+                    cooldowns[i] = 0.0
+        try:
+            return {
+                "running": True,
+                "is_connected": b.is_client_connected,
+                "username": p.USER if p else "-",
+                "hp": p.CURRENT_HP if p else 0,
+                "max_hp": p.MAX_HP if p else 0,
+                "mp": p.MANA if p else 0,
+                "max_mp": p.MAX_MP if p else 0,
+                "is_dead": p.ISDEAD if p else False,
+                "map": getattr(b, "strMapName", "") or "-",
+                "cell": p.CELL if p else "-",
+                "pad": p.PAD if p else "-",
+                "cooldowns": cooldowns,
+            }
+        except Exception as e:
+            return {"running": True, "is_connected": False, "error": str(e)}
+
+    def get_statuses(self):
+        result = []
+        for key, entry in self.bots.items():
+            status = self._account_status(entry)
+            status["key"] = key
+            result.append(status)
+        return result
 
     def get_status(self):
-        running = self.bot_thread is not None and self.bot_thread.is_alive()
-        if running and self.bot_instance:
-            b = self.bot_instance
-            p = b.player
-            
-            # Form skill cooldowns
-            cooldowns = {}
-            from datetime import datetime
-            now = datetime.now()
-            if p and hasattr(p, "SKILLS"):
-                for i in range(0, 6):
-                    if i < len(p.SKILLS):
-                        skill_data = p.SKILLS[i]
-                        next_use = skill_data.get("nextUse")
-                        if next_use and next_use > now:
-                            cooldowns[i] = round((next_use - now).total_seconds(), 1)
-                        else:
-                            cooldowns[i] = 0.0
-                    else:
-                        cooldowns[i] = 0.0
-            else:
-                cooldowns = {0: 0.0, 1: 0.0, 2: 0.0, 3: 0.0, 4: 0.0, 5: 0.0}
-
-            try:
-                return {
-                    "running": running,
-                    "is_connected": b.is_client_connected,
-                    "username": p.USERNAME if p else "-",
-                    "hp": p.CURRENT_HP if p else 0,
-                    "max_hp": p.MAX_HP if p else 0,
-                    "mp": p.MANA if p else 0,
-                    "max_mp": p.MAX_MP if p else 0,
-                    "is_dead": p.ISDEAD if p else False,
-                    "map": b.strMapName or "-",
-                    "cell": p.CELL if p else "-",
-                    "pad": p.PAD if p else "-",
-                    "cooldowns": cooldowns
-                }
-            except Exception as e:
-                return {
-                    "running": running,
-                    "is_connected": False,
-                    "error": str(e)
-                }
-        else:
-            return {
-                "running": running,
-                "is_connected": False
-            }
+        accounts = self.get_statuses()
+        running = [a for a in accounts if a.get("running")]
+        base = {"running": bool(running), "accounts": accounts}
+        if running:
+            # Keep the old single-account dashboard fields at the top level.
+            base.update({k: v for k, v in running[0].items() if k != "accounts"})
+        return base
 
 class SlaveryApi:
     def __init__(self):
@@ -1543,13 +1925,468 @@ class EclipseApi:
         }
 
 # --- Combined API class ---
+def _spec_name(spec):
+    """Enhancement-spec -> display name ('Valiance', 'Awe Blast', ...)."""
+    if spec is None:
+        return ""
+    return getattr(spec, "name", spec)
+
+
+class UltraApi:
+    """Shared plumbing for the Ultra Daily / Ultra Speaker menus.
+
+    Four slots = four panes, exactly like the ``.bat`` launchers.  All four run
+    as threads in this process, so they share one ``AQW_RUN_ID`` and the party
+    coordination in ``bot/ultra/party.py`` works across them.
+    """
+
+    kind = ""
+    DEFAULT_SERVER = "Alteon"
+    SLOT_IDS = ("slot1", "slot2", "slot3", "slot4")
+
+    def __init__(self, config_name):
+        self.active_threads = {}
+        self._window = None
+        self.start_time = None
+        #: Config of the running party, kept so the watchdog can relogin.
+        self._party_config = None
+        #: Set when the user presses STOP so the watchdog does NOT relogin.
+        self._manual_stop = False
+        self._watchdog = None
+        #: Bumped every start; a stale watchdog exits when it no longer matches.
+        self._party_gen = 0
+        if getattr(sys, 'frozen', False):
+            config_dir = os.path.expanduser("~/.aqw_bot")
+            os.makedirs(config_dir, exist_ok=True)
+            self.config_path = os.path.join(config_dir, config_name)
+        else:
+            self.config_path = os.path.join(get_project_root(), config_name)
+
+    def set_window(self, window):
+        self._window = window
+
+    # ------------------------------------------------------------------
+    # party watchdog: one pane stops -> stop all -> wait -> relogin
+    # ------------------------------------------------------------------
+
+    def _start_watchdog(self):
+        self._party_gen += 1
+        gen = self._party_gen
+        self._watchdog = threading.Thread(
+            target=self._watch_party, args=(gen,), daemon=True,
+            name=f"{self.tab_id()}-watchdog")
+        self._watchdog.start()
+
+    def _watch_party(self, gen):
+        """Stop the whole party when any pane stops, then relogin after 10 s.
+
+        'Any stop condition' counts: a pane finishing normally, erroring, the
+        server dropping it, or a thread ending.  A user STOP sets
+        ``_manual_stop`` so this does not fight the button and does not relogin.
+        A ``gen`` mismatch means a newer party has started, so this watchdog
+        retires instead of watching the wrong run.
+        """
+        seen_connected = set()
+        while gen == self._party_gen and not self._manual_stop:
+            threads = list(self.active_threads.items())
+            if not threads:
+                return
+            for s_id, t in threads:
+                b = getattr(t, "bot_instance", None)
+                if b is not None and getattr(b, "is_client_connected", False):
+                    seen_connected.add(s_id)
+            stopped = []
+            for s_id, t in threads:
+                b = getattr(t, "bot_instance", None)
+                if not t.is_alive():
+                    stopped.append(s_id)
+                elif s_id in seen_connected and b is not None and \
+                        not getattr(b, "is_client_connected", True):
+                    stopped.append(s_id)
+            if stopped:
+                finished = False
+                aborted = None
+                try:
+                    from bot.ultra import party as ultra_party
+                    if ultra_party.enabled():
+                        finished = ultra_party.all_done(f"ultra_{self.kind}")
+                        aborted = ultra_party.any_abort(f"ultra_{self.kind}")
+                except Exception:
+                    pass
+                print(f"[{self.tab_id()}] {sorted(stopped)} stopped -> stopping whole party")
+                self.stop_party()             # not user-triggered
+                if aborted and not self._manual_stop:
+                    print(f"[{self.tab_id()}] preflight abort: {aborted} (no relogin)")
+                    return
+                if finished and not self._manual_stop:
+                    print(f"[{self.tab_id()}] all panes finished (no relogin)")
+                    return
+                if gen != self._party_gen or self._manual_stop:
+                    return
+                print(f"[{self.tab_id()}] waiting 10s before relogin...")
+                time.sleep(10)
+                if gen != self._party_gen or self._manual_stop:
+                    return
+                if self._party_config:
+                    print(f"[{self.tab_id()}] relogin")
+                    self.start_party(self._party_config)   # bumps gen, new watchdog
+                return
+            time.sleep(1.0)
+
+    def handle_log(self, username, message):
+        html_msg = ansi_to_html(message)
+        _log_flusher.push(
+            f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username or 'System')}, "
+            f"{json.dumps(html_msg)}, {json.dumps(self.tab_id())});"
+        )
+
+    def tab_id(self):
+        """Hub iframe id for this menu. ``kind`` is 'daily'/'speaker', the tab is
+        'ultra_daily'/'ultra_speaker' -- forwarding with the bare kind looked for
+        an ``iframe-daily`` that does not exist, so logs were dropped."""
+        return f"ultra_{self.kind}"
+
+    def config_key(self):
+        return self.kind
+
+    def _default_role(self, slot):
+        return ""
+
+    def _default_slots(self):
+        return {
+            f"slot{i}": {"username": "", "password": "", "role": self._default_role(i)}
+            for i in range(1, 5)
+        }
+
+    def load_config(self):
+        default_config = {
+            "server": self.DEFAULT_SERVER,
+            "room_number": 9099,
+            "missing_policy": "stop",
+            "slots": self._default_slots(),
+        }
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r") as f:
+                    user_config = json.load(f)
+                if isinstance(user_config, dict):
+                    if isinstance(user_config.get("slots"), dict):
+                        for key, val in user_config["slots"].items():
+                            if key in default_config["slots"] and isinstance(val, dict):
+                                default_config["slots"][key].update(val)
+                        user_config = {k: v for k, v in user_config.items() if k != "slots"}
+                    default_config.update(user_config)
+            except Exception as e:
+                print(f"Failed to load {self.kind} config: {e}")
+        return default_config
+
+    def save_config(self, config):
+        try:
+            temp_path = self.config_path + ".tmp"
+            with open(temp_path, "w") as f:
+                json.dump(config, f, indent=4)
+            os.replace(temp_path, self.config_path)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def reset_config(self):
+        if os.path.exists(self.config_path):
+            try:
+                os.remove(self.config_path)
+            except Exception:
+                pass
+        return self.load_config()
+
+    def start_party(self, config):
+        if any(t.is_alive() for t in self.active_threads.values()):
+            return {"success": False, "error": "Party is already running!"}
+        self.save_config(config)
+
+        slots = config.get("slots", {})
+        server = config.get("server", self.DEFAULT_SERVER)
+        room_number = int(config.get("room_number", 9099) or 9099)
+
+        for s_id in self.SLOT_IDS:
+            slot = slots.get(s_id, {})
+            if not slot.get("username") or not slot.get("password"):
+                return {"success": False, "error": "Fill username and password for all 4 slots."}
+            if self.kind == "speaker" and not slot.get("role"):
+                return {"success": False, "error": "Pick a role for all 4 slots."}
+
+        # One run id for the whole party, set before the threads start, so the
+        # in-process panes share capture_logs/ultra/<run>/party like the .bat.
+        os.environ.setdefault("AQW_TELEMETRY", "1")
+        if not os.environ.get("AQW_RUN_ID"):
+            os.environ["AQW_RUN_ID"] = time.strftime("%Y%m%d_%H%M%S")
+
+        # Fresh "done" markers so a previous run cannot look finished already.
+        try:
+            from bot.ultra import party as ultra_party
+            if ultra_party.enabled():
+                ultra_party.clear_done(f"ultra_{self.kind}")
+                ultra_party.clear_abort(f"ultra_{self.kind}")
+        except Exception:
+            pass
+
+        leader = slots["slot1"]["username"]
+        slaves = [slots[s]["username"] for s in ("slot2", "slot3", "slot4")]
+
+        self.active_threads = {}
+        self.start_time = time.time()
+        for i, s_id in enumerate(self.SLOT_IDS, start=1):
+            slot = slots[s_id]
+            self.active_threads[s_id] = UltraBotThread(
+                slot=i,
+                kind=self.kind,
+                username=slot["username"],
+                password=slot["password"],
+                server=server,
+                room_number=room_number,
+                leader=leader,
+                slaves=slaves,
+                role=(slot.get("role") or "") if self.kind == "speaker" else "",
+                callback=(lambda name, msg, k=self.kind: self.handle_log(name, msg)),
+                missing_policy=config.get("missing_policy", "stop"),
+            )
+        for thread in self.active_threads.values():
+            thread.start()
+        self._party_config = config
+        self._manual_stop = False
+        self._start_watchdog()
+        return {"success": True}
+
+    def stop_party(self, user_triggered=False):
+        if user_triggered:
+            self._manual_stop = True
+        threads = list(self.active_threads.values())
+        self.active_threads = {}
+        self.start_time = None
+        for thread in threads:
+            try:
+                if thread.bot_instance:
+                    thread.bot_instance.stop_bot()
+            except Exception as e:
+                print(f"Failed to stop ultra pane: {e}")
+        return {"success": True}
+
+    def get_status(self):
+        slots = {}
+        for s_id, thread in list(self.active_threads.items()):
+            slots[s_id] = self._slot_status(thread)
+        return {
+            "running": any(v.get("running") for v in slots.values()),
+            "slots": slots,
+        }
+
+    @staticmethod
+    def _slot_status(thread):
+        b = thread.bot_instance
+        if not (thread.is_alive() and b):
+            return {"running": False, "username": thread.username, "role": thread.role}
+        p = b.player
+        try:
+            return {
+                "running": True,
+                "is_connected": b.is_client_connected,
+                "username": thread.username,
+                "role": thread.role,
+                "hp": p.CURRENT_HP,
+                "max_hp": p.MAX_HP,
+                "mp": p.MANA,
+                "max_mp": p.MAX_MP,
+                "is_dead": p.ISDEAD,
+                "map": getattr(b, "strMapName", "") or "-",
+                "cell": p.CELL,
+                "pad": p.PAD,
+            }
+        except Exception as e:
+            return {"running": True, "username": thread.username, "role": thread.role, "error": str(e)}
+
+
+class UltraDailyApi(UltraApi):
+    kind = "daily"
+    #: The four bosses DailyUltra actually runs (bot/ultra/daily.py).
+    BOSSES = ("tyndarius", "engineer", "ezrajal", "warden")
+
+    def __init__(self):
+        super().__init__("ultra_daily_config.json")
+
+    def _default_role(self, slot):
+        return str(slot)  # daily "role" is just the loadout slot (1-4)
+
+    def get_slots(self):
+        """Per loadout slot, the class + enhancements each boss will equip."""
+        from bot.ultra import config as ultra_config
+        out = {}
+        for slot in (1, 2, 3, 4):
+            per_boss = {}
+            for boss in self.BOSSES:
+                loadout = ultra_config.LOADOUTS.get(boss, {}).get(slot)
+                if loadout:
+                    per_boss[boss] = {
+                        "cls": loadout.cls,
+                        "weapon": _spec_name(loadout.weapon),
+                        "helm": _spec_name(loadout.helm),
+                        "cape": _spec_name(loadout.cape),
+                        "scroll": loadout.scroll or "",
+                    }
+            out[str(slot)] = per_boss
+        return out
+
+
+class UltraSpeakerApi(UltraApi):
+    kind = "speaker"
+    #: Must match bot.ultra.config.SOLO_ROLES order -- pane n wears role n.
+    SOLO_ROLES = ("Legion Revenant", "ArchPaladin", "Lord Of Order", "Verus DoomKnight")
+
+    def __init__(self):
+        super().__init__("ultra_speaker_config.json")
+
+    def _default_role(self, slot):
+        return self.SOLO_ROLES[slot - 1] if 1 <= slot <= len(self.SOLO_ROLES) else ""
+
+    def get_roles(self):
+        """Each role with the class + enhancements SOLO_LOADOUTS pairs with it."""
+        from bot.ultra import config as ultra_config
+        out = []
+        for role in self.SOLO_ROLES:
+            loadout = ultra_config.SOLO_LOADOUTS.get(role.lower())
+            out.append({
+                "role": role,
+                "cls": loadout.cls if loadout else "",
+                "weapon": _spec_name(loadout.weapon) if loadout else "",
+                "helm": _spec_name(loadout.helm) if loadout else "",
+                "cape": _spec_name(loadout.cape) if loadout else "",
+                "scroll": (loadout.scroll if loadout else "") or "",
+            })
+        return out
+
+
+class WeeklyDoomApi:
+    """Weekly Doom menu: one manual account, or several picked from players.json.
+
+    Each selected account runs the same command queue (``bot_cmds/weekly_doom.py``)
+    in its own thread, concurrently.
+    """
+
+    def __init__(self):
+        self.active_threads = {}
+        self._window = None
+        if getattr(sys, 'frozen', False):
+            config_dir = os.path.expanduser("~/.aqw_bot")
+            os.makedirs(config_dir, exist_ok=True)
+            self.config_path = os.path.join(config_dir, "weekly_doom_config.json")
+        else:
+            self.config_path = os.path.join(get_project_root(), "weekly_doom_config.json")
+
+    def set_window(self, window):
+        self._window = window
+
+    def handle_log(self, username, message):
+        html_msg = ansi_to_html(message)
+        _log_flusher.push(
+            f"if(window.addSlaveLog) window.addSlaveLog({json.dumps(username or 'System')}, "
+            f"{json.dumps(html_msg)}, 'weekly_doom');"
+        )
+
+    def load_config(self):
+        default_config = {"server": "Swordhaven (EU)", "room_number": 9099}
+        if os.path.exists(self.config_path):
+            try:
+                with open(self.config_path, "r") as f:
+                    user_config = json.load(f)
+                if isinstance(user_config, dict):
+                    default_config.update(user_config)
+            except Exception as e:
+                print(f"Failed to load weekly doom config: {e}")
+        return default_config
+
+    def save_config(self, config):
+        try:
+            temp_path = self.config_path + ".tmp"
+            with open(temp_path, "w") as f:
+                json.dump(config, f, indent=4)
+            os.replace(temp_path, self.config_path)
+            return {"success": True}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+
+    def start_bots(self, config):
+        self.save_config({"server": config.get("server", "Swordhaven (EU)"),
+                          "room_number": config.get("room_number", 9099)})
+        server = config.get("server", "Swordhaven (EU)")
+        room_number = int(config.get("room_number", 9099) or 9099)
+        started, errors = 0, []
+        for acc in config.get("accounts", []):
+            username = (acc.get("username") or "").strip()
+            if not username or not acc.get("password"):
+                continue
+            existing = self.active_threads.get(username)
+            if existing and existing.is_alive():
+                continue
+            try:
+                thread = WeeklyDoomThread(
+                    username, acc.get("password", ""), server, room_number,
+                    lambda name, msg: self.handle_log(name, msg))
+                thread.start()
+                self.active_threads[username] = thread
+                started += 1
+            except Exception as e:
+                errors.append(f"{username}: {e}")
+        if started == 0 and not errors:
+            return {"success": False, "error": "Pick at least one account (username + password)."}
+        return {"success": True, "started": started, "errors": errors}
+
+    def stop_bots(self):
+        threads = list(self.active_threads.values())
+        self.active_threads = {}
+        for thread in threads:
+            try:
+                if thread.bot_instance:
+                    thread.bot_instance.stop_bot()
+            except Exception as e:
+                print(f"Failed to stop weekly doom: {e}")
+        return {"success": True}
+
+    def get_statuses(self):
+        out = []
+        for username, thread in list(self.active_threads.items()):
+            running = thread.is_alive()
+            status = {"username": username, "running": running}
+            if running and thread.bot_instance:
+                b = thread.bot_instance
+                p = b.player
+                try:
+                    status.update({
+                        "is_connected": b.is_client_connected,
+                        "map": getattr(b, "strMapName", "") or "-",
+                        "cell": p.CELL, "pad": p.PAD,
+                        "hp": p.CURRENT_HP, "max_hp": p.MAX_HP,
+                        "mp": p.MANA, "max_mp": p.MAX_MP,
+                        "is_dead": p.ISDEAD,
+                    })
+                except Exception as e:
+                    status["error"] = str(e)
+            out.append(status)
+        return out
+
+
 class CombinedApi:
-    def __init__(self, aqw_api, slavery_api, temple_api, eclipse_api):
+    def __init__(self, aqw_api, slavery_api, temple_api, eclipse_api,
+                 players_api=None, ultra_daily_api=None, ultra_speaker_api=None,
+                 weekly_doom_api=None):
         self._aqw_api = aqw_api
         self._slavery_api = slavery_api
         self._temple_api = temple_api
         self._eclipse_api = eclipse_api
+        self._players_api = players_api
+        self._ultra_daily_api = ultra_daily_api
+        self._ultra_speaker_api = ultra_speaker_api
+        self._weekly_doom_api = weekly_doom_api
         self._window = None
+        #: Which menu is on screen; used to route unregistered-thread logs.
+        self._active_tab = "dashboard"
         
         try:
             import psutil
@@ -1590,10 +2427,117 @@ class CombinedApi:
 
     def set_window(self, window):
         self._window = window
+        _log_flusher.set_window(window)
         self._aqw_api.set_window(window)
         self._slavery_api.set_window(window)
         self._temple_api.set_window(window)
         self._eclipse_api.set_window(window)
+        if self._players_api:
+            self._players_api.set_window(window)
+        if self._ultra_daily_api:
+            self._ultra_daily_api.set_window(window)
+        if self._ultra_speaker_api:
+            self._ultra_speaker_api.set_window(window)
+        if self._weekly_doom_api:
+            self._weekly_doom_api.set_window(window)
+
+    def set_active_tab(self, tab):
+        """Remember which menu is on screen, for unregistered-thread log routing."""
+        self._active_tab = tab or "dashboard"
+        return {"success": True}
+
+    def route_system_log(self, message):
+        """Forward a log line from an unregistered thread to the active menu."""
+        tab = getattr(self, "_active_tab", "dashboard")
+        try:
+            if tab == "slavery":
+                self._slavery_api.handle_slave_log("System", message)
+            elif tab == "temple":
+                self._temple_api.handle_slave_log("System", message)
+            elif tab == "eclipse":
+                self._eclipse_api.handle_slave_log("System", message)
+            elif tab == "aqw":
+                self._aqw_api.handle_log(message)
+            elif tab == "weekly_doom" and self._weekly_doom_api:
+                self._weekly_doom_api.handle_log("System", message)
+            elif tab == "ultra_daily" and self._ultra_daily_api:
+                self._ultra_daily_api.handle_log("System", message)
+            elif tab == "ultra_speaker" and self._ultra_speaker_api:
+                self._ultra_speaker_api.handle_log("System", message)
+        except Exception:
+            pass
+
+    # --- Config Player (shared player list) ---
+    def players_list(self):
+        return self._players_api.list_players() if self._players_api else []
+
+    def players_add(self, user, password):
+        return self._players_api.add_player(user, password)
+
+    def players_update(self, index, user, password):
+        return self._players_api.update_player(index, user, password)
+
+    def players_delete(self, index):
+        return self._players_api.delete_player(index)
+
+    # --- NAMESPACED API FOR ULTRA DAILY / SPEAKER ---
+    def ultra_daily_load_config(self):
+        return self._ultra_daily_api.load_config()
+
+    def ultra_daily_save_config(self, config):
+        return self._ultra_daily_api.save_config(config)
+
+    def ultra_daily_reset_config(self):
+        return self._ultra_daily_api.reset_config()
+
+    def ultra_daily_get_status(self):
+        return self._ultra_daily_api.get_status()
+
+    def ultra_daily_get_slots(self):
+        return self._ultra_daily_api.get_slots()
+
+    def ultra_daily_start_party(self, config):
+        return self._ultra_daily_api.start_party(config)
+
+    def ultra_daily_stop_party(self):
+        return self._ultra_daily_api.stop_party(user_triggered=True)
+
+    def ultra_speaker_load_config(self):
+        return self._ultra_speaker_api.load_config()
+
+    def ultra_speaker_get_roles(self):
+        return self._ultra_speaker_api.get_roles()
+
+    def ultra_speaker_save_config(self, config):
+        return self._ultra_speaker_api.save_config(config)
+
+    def ultra_speaker_reset_config(self):
+        return self._ultra_speaker_api.reset_config()
+
+    def ultra_speaker_get_status(self):
+        return self._ultra_speaker_api.get_status()
+
+    def ultra_speaker_start_party(self, config):
+        return self._ultra_speaker_api.start_party(config)
+
+    def ultra_speaker_stop_party(self):
+        return self._ultra_speaker_api.stop_party(user_triggered=True)
+
+    # --- NAMESPACED API FOR WEEKLY DOOM ---
+    def weekly_doom_load_config(self):
+        return self._weekly_doom_api.load_config()
+
+    def weekly_doom_save_config(self, config):
+        return self._weekly_doom_api.save_config(config)
+
+    def weekly_doom_start_bots(self, config):
+        return self._weekly_doom_api.start_bots(config)
+
+    def weekly_doom_stop_bots(self):
+        return self._weekly_doom_api.stop_bots()
+
+    def weekly_doom_get_statuses(self):
+        return self._weekly_doom_api.get_statuses()
 
     # --- NAMESPACED API FOR AQW BOT (IFRAME) ---
     def aqw_load_config(self):
@@ -1605,25 +2549,23 @@ class CombinedApi:
     def aqw_get_status(self):
         return self._aqw_api.get_status()
 
+    def aqw_get_statuses(self):
+        return self._aqw_api.get_statuses()
+
     def aqw_select_script(self):
         return self._aqw_api.select_script()
 
-    def aqw_start_bot(self, config):
-        res = self._aqw_api.start_bot(config)
-        if res.get("success") and self._aqw_api.bot_thread:
-            thread_id = self._aqw_api.bot_thread.ident
-            if thread_id:
-                unified_redirector_out.register_thread(thread_id, "AQW", lambda name, msg: self._aqw_api.handle_log(msg))
-                unified_redirector_err.register_thread(thread_id, "AQW", lambda name, msg: self._aqw_api.handle_log(msg))
-        return res
+    def aqw_start_bots(self, config):
+        return self._aqw_api.start_bots(config)
 
-    def aqw_stop_bot(self):
-        if self._aqw_api.bot_thread:
-            thread_id = self._aqw_api.bot_thread.ident
-            if thread_id:
-                unified_redirector_out.unregister_thread(thread_id)
-                unified_redirector_err.unregister_thread(thread_id)
-        return self._aqw_api.stop_bot()
+    def aqw_start_one(self, acc):
+        return self._aqw_api.start_one(acc)
+
+    def aqw_stop_one(self, key):
+        return self._aqw_api.stop_one(key)
+
+    def aqw_stop_bots(self):
+        return self._aqw_api.stop_bots()
 
     # --- NAMESPACED API FOR SLAVERY BOT (IFRAME) ---
     def slavery_load_config(self):
@@ -1705,7 +2647,7 @@ class CombinedApi:
 
     def stop_all(self):
         try:
-            self.aqw_stop_bot()
+            self.aqw_stop_bots()
         except Exception:
             pass
         try:
@@ -1720,16 +2662,30 @@ class CombinedApi:
             self.eclipse_stop_party()
         except Exception:
             pass
+        try:
+            if self._ultra_daily_api:
+                self._ultra_daily_api.stop_party(user_triggered=True)
+        except Exception:
+            pass
+        try:
+            if self._ultra_speaker_api:
+                self._ultra_speaker_api.stop_party(user_triggered=True)
+        except Exception:
+            pass
+        try:
+            if self._weekly_doom_api:
+                self._weekly_doom_api.stop_bots()
+        except Exception:
+            pass
 
     # --- Dashboard Hub Status ---
     def get_hub_status(self):
-        # 1. AQW Bot
-        aqw_status = {"running": False}
-        if self._aqw_api.bot_thread and self._aqw_api.bot_thread.is_alive():
-            try:
-                aqw_status = self._aqw_api.get_status()
-            except Exception:
-                aqw_status = {"running": True}
+        # 1. AQW Bot (multi-account)
+        aqw_status = {"running": False, "accounts": []}
+        try:
+            aqw_status = self._aqw_api.get_status()
+        except Exception:
+            aqw_status = {"running": False, "accounts": []}
         
         # 2. Slavery Bot
         slavery_status = {"running": False}
@@ -1788,11 +2744,27 @@ class CombinedApi:
             except Exception:
                 pass
 
+        ultra_daily_status = {"running": False}
+        try:
+            if self._ultra_daily_api:
+                ultra_daily_status = self._ultra_daily_api.get_status()
+        except Exception:
+            ultra_daily_status = {"running": False}
+
+        ultra_speaker_status = {"running": False}
+        try:
+            if self._ultra_speaker_api:
+                ultra_speaker_status = self._ultra_speaker_api.get_status()
+        except Exception:
+            ultra_speaker_status = {"running": False}
+
         return {
             "aqw": aqw_status,
             "slavery": slavery_status,
             "temple": temple_status,
             "eclipse": eclipse_status,
+            "ultra_daily": ultra_daily_status,
+            "ultra_speaker": ultra_speaker_status,
             "system_stats": {
                 "cpu": cpu_pct,
                 "memory": mem_mb
@@ -1824,9 +2796,13 @@ def serve_injected_html(filepath, bot_type):
                             load_config: () => topApi.aqw_load_config(),
                             save_config: (cfg) => topApi.aqw_save_config(cfg),
                             get_status: () => topApi.aqw_get_status(),
+                            get_statuses: () => topApi.aqw_get_statuses(),
                             select_script: () => topApi.aqw_select_script(),
-                            start_bot: (cfg) => topApi.aqw_start_bot(cfg),
-                            stop_bot: () => topApi.aqw_stop_bot()
+                            start_bots: (cfg) => topApi.aqw_start_bots(cfg),
+                            start_one: (acc) => topApi.aqw_start_one(acc),
+                            stop_one: (k) => topApi.aqw_stop_one(k),
+                            stop_bots: () => topApi.aqw_stop_bots(),
+                            list_players: () => topApi.players_list()
                         }
                     };
                 }
@@ -1848,7 +2824,8 @@ def serve_injected_html(filepath, bot_type):
                             stop_slaves: () => topApi.stop_slaves(),
                             toggle_pause_slaves: (p) => topApi.toggle_pause_slaves(p),
                             update_slave_taunter: (u, t) => topApi.update_slave_taunter(u, t),
-                            get_version: () => topApi.get_version()
+                            get_version: () => topApi.get_version(),
+                            list_players: () => topApi.players_list()
                         }
                     };
                 }
@@ -1868,7 +2845,8 @@ def serve_injected_html(filepath, bot_type):
                             get_status: () => topApi.temple_get_status(),
                             reset_config: () => topApi.temple_reset_config(),
                             start_party: (cfg) => topApi.temple_start_party(cfg),
-                            stop_party: () => topApi.temple_stop_party()
+                            stop_party: () => topApi.temple_stop_party(),
+                            list_players: () => topApi.players_list()
                         }
                     };
                 }
@@ -1890,7 +2868,8 @@ def serve_injected_html(filepath, bot_type):
                             start_party: (cfg) => topApi.eclipse_start_party(cfg),
                             stop_party: () => topApi.eclipse_stop_party(),
                             toggle_pause: (p) => topApi.eclipse_toggle_pause(p),
-                            validate_password: (pwd) => topApi.validate_password(pwd)
+                            validate_password: (pwd) => topApi.validate_password(pwd),
+                            list_players: () => topApi.players_list()
                         }
                     };
                 }
@@ -1898,6 +2877,90 @@ def serve_injected_html(filepath, bot_type):
             </script>
             """
             
+        elif bot_type == "players":
+            bridge_js = """
+            <script>
+            (function() {
+                if (window.parent && window.parent.pywebview) {
+                    const topApi = window.parent.pywebview.api;
+                    window.pywebview = {
+                        api: {
+                            list_players: () => topApi.players_list(),
+                            add_player: (u, p) => topApi.players_add(u, p),
+                            update_player: (i, u, p) => topApi.players_update(i, u, p),
+                            delete_player: (i) => topApi.players_delete(i)
+                        }
+                    };
+                }
+            })();
+            </script>
+            """
+        elif bot_type == "ultra_daily":
+            bridge_js = """
+            <script>
+            (function() {
+                if (window.parent && window.parent.pywebview) {
+                    const topApi = window.parent.pywebview.api;
+                    window.pywebview = {
+                        api: {
+                            load_config: () => topApi.ultra_daily_load_config(),
+                            save_config: (cfg) => topApi.ultra_daily_save_config(cfg),
+                            reset_config: () => topApi.ultra_daily_reset_config(),
+                            get_status: () => topApi.ultra_daily_get_status(),
+                            start_party: (cfg) => topApi.ultra_daily_start_party(cfg),
+                            stop_party: () => topApi.ultra_daily_stop_party(),
+                            get_slots: () => topApi.ultra_daily_get_slots(),
+                            list_players: () => topApi.players_list()
+                        }
+                    };
+                }
+            })();
+            </script>
+            """
+        elif bot_type == "ultra_speaker":
+            bridge_js = """
+            <script>
+            (function() {
+                if (window.parent && window.parent.pywebview) {
+                    const topApi = window.parent.pywebview.api;
+                    window.pywebview = {
+                        api: {
+                            load_config: () => topApi.ultra_speaker_load_config(),
+                            save_config: (cfg) => topApi.ultra_speaker_save_config(cfg),
+                            reset_config: () => topApi.ultra_speaker_reset_config(),
+                            get_status: () => topApi.ultra_speaker_get_status(),
+                            get_roles: () => topApi.ultra_speaker_get_roles(),
+                            start_party: (cfg) => topApi.ultra_speaker_start_party(cfg),
+                            stop_party: () => topApi.ultra_speaker_stop_party(),
+                            list_players: () => topApi.players_list()
+                        }
+                    };
+                }
+            })();
+            </script>
+            """
+
+        elif bot_type == "weekly_doom":
+            bridge_js = """
+            <script>
+            (function() {
+                if (window.parent && window.parent.pywebview) {
+                    const topApi = window.parent.pywebview.api;
+                    window.pywebview = {
+                        api: {
+                            load_config: () => topApi.weekly_doom_load_config(),
+                            save_config: (cfg) => topApi.weekly_doom_save_config(cfg),
+                            start_bots: (cfg) => topApi.weekly_doom_start_bots(cfg),
+                            stop_bots: () => topApi.weekly_doom_stop_bots(),
+                            get_statuses: () => topApi.weekly_doom_get_statuses(),
+                            list_players: () => topApi.players_list()
+                        }
+                    };
+                }
+            })();
+            </script>
+            """
+
         if "<head>" in html_content:
             html_content = html_content.replace("<head>", f"<head>\n{bridge_js}")
         else:
@@ -1908,7 +2971,7 @@ def serve_injected_html(filepath, bot_type):
         print(f"Failed to inject HTML for {filepath}: {e}")
         return static_file(os.path.basename(filepath), root=os.path.dirname(filepath))
 
-def start_local_server(web_dashboard_dir, web_dir, web_slavery_dir, web_temple_dir, web_eclipse_dir):
+def start_local_server(web_dashboard_dir, sub_apps):
     app = Bottle()
 
     # Dashboard routes
@@ -1929,49 +2992,33 @@ def start_local_server(web_dashboard_dir, web_dir, web_slavery_dir, web_temple_d
     def serve_dashboard_components():
         return static_file('components.js', root=web_dashboard_dir)
 
+    @app.route('/players_dropdown.js')
+    def serve_players_dropdown():
+        return static_file('players_dropdown.js', root=web_dashboard_dir)
+
+    @app.route('/cfg.css')
+    def serve_cfg_css():
+        return static_file('cfg.css', root=web_dashboard_dir)
+
     @app.route(r'/<filename:re:[^/]+\.(png|jpg|jpeg|gif|ico|svg)>')
     def serve_dashboard_images(filename):
         return static_file(filename, root=web_dashboard_dir)
 
-    # AQW Bot routes
-    @app.route('/aqw')
-    @app.route('/aqw/')
-    def serve_aqw_index():
-        return serve_injected_html(os.path.join(web_dir, 'index.html'), 'aqw')
+    # Every sub-app (aqw, slavery, temple, eclipse, players, ultra_daily,
+    # ultra_speaker) is served at /<name>/ with the parent bridge injected.
+    def _register(name, root):
+        def index_view(**_):
+            return serve_injected_html(os.path.join(root, 'index.html'), name)
 
-    @app.route('/aqw/<path:path>')
-    def serve_aqw_files(path):
-        return static_file(path, root=web_dir)
+        def files_view(path):
+            return static_file(path, root=root)
 
-    # Slavery Bot routes
-    @app.route('/slavery')
-    @app.route('/slavery/')
-    def serve_slavery_index():
-        return serve_injected_html(os.path.join(web_slavery_dir, 'index.html'), 'slavery')
+        app.route(f'/{name}', callback=index_view)
+        app.route(f'/{name}/', callback=index_view)
+        app.route(f'/{name}/<path:path>', callback=files_view)
 
-    @app.route('/slavery/<path:path>')
-    def serve_slavery_files(path):
-        return static_file(path, root=web_slavery_dir)
-
-    # Temple Bot routes
-    @app.route('/temple')
-    @app.route('/temple/')
-    def serve_temple_index():
-        return serve_injected_html(os.path.join(web_temple_dir, 'index.html'), 'temple')
-
-    @app.route('/temple/<path:path>')
-    def serve_temple_files(path):
-        return static_file(path, root=web_temple_dir)
-
-    # Eclipse Bot routes
-    @app.route('/eclipse')
-    @app.route('/eclipse/')
-    def serve_eclipse_index():
-        return serve_injected_html(os.path.join(web_eclipse_dir, 'index.html'), 'eclipse')
-
-    @app.route('/eclipse/<path:path>')
-    def serve_eclipse_files(path):
-        return static_file(path, root=web_eclipse_dir)
+    for _name, _root in sub_apps.items():
+        _register(_name, _root)
 
     port = find_free_port()
     t = threading.Thread(target=lambda: app.run(host='127.0.0.1', port=port, quiet=True))
@@ -2054,8 +3101,14 @@ def run_gui():
     slavery_api = SlaveryApi()
     temple_api = TempleApi()
     eclipse_api = EclipseApi()
+    players_api = PlayersApi()
+    ultra_daily_api = UltraDailyApi()
+    ultra_speaker_api = UltraSpeakerApi()
+    weekly_doom_api = WeeklyDoomApi()
 
-    combined_api = CombinedApi(aqw_api, slavery_api, temple_api, eclipse_api)
+    combined_api = CombinedApi(aqw_api, slavery_api, temple_api, eclipse_api,
+                               players_api, ultra_daily_api, ultra_speaker_api,
+                               weekly_doom_api)
     
     unified_redirector_out.combined_api = combined_api
     unified_redirector_err.combined_api = combined_api
@@ -2066,13 +3119,14 @@ def run_gui():
     else:
         web_dashboard_dir = os.path.join(project_root, 'app', 'web_dashboard')
 
-    web_dir = os.path.join(web_dashboard_dir, 'aqw')
-    web_slavery_dir = os.path.join(web_dashboard_dir, 'slavery')
-    web_temple_dir = os.path.join(web_dashboard_dir, 'temple')
-    web_eclipse_dir = os.path.join(web_dashboard_dir, 'eclipse')
+    sub_apps = {
+        name: os.path.join(web_dashboard_dir, name)
+        for name in ('aqw', 'slavery', 'temple', 'eclipse',
+                     'players', 'ultra_daily', 'ultra_speaker', 'weekly_doom')
+    }
 
     print(f"Loading GUI assets from: {web_dashboard_dir}")
-    url = start_local_server(web_dashboard_dir, web_dir, web_slavery_dir, web_temple_dir, web_eclipse_dir)
+    url = start_local_server(web_dashboard_dir, sub_apps)
     print(f"Combined Bot Hub server running at: {url}")
 
     window = webview.create_window(

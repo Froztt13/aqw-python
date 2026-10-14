@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Config Player</title>
+    <link rel="stylesheet" href="/style.css">
+    <link rel="stylesheet" href="/cfg.css">
+</head>
+<body class="cfg-page">
+    <div class="cfg-wrap">
+        <header class="cfg-head">
+            <h1>Config Player</h1>
+            <p>Saved logins. Pick them from the dropdown in any bot menu, or type manually there.</p>
+        </header>
+
+        <section class="cfg-card">
+            <h2>Add player</h2>
+            <div class="cfg-row">
+                <input id="new-user" type="text" placeholder="Username" autocomplete="off">
+                <input id="new-pass" type="password" placeholder="Password" autocomplete="off">
+                <button id="btn-add" class="cfg-btn primary">Add</button>
+            </div>
+            <div id="msg" class="cfg-msg"></div>
+        </section>
+
+        <section class="cfg-card">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:12px">
+                <h2 style="margin:0">Saved players</h2>
+                <button id="btn-refresh" class="cfg-btn ghost small">Refresh</button>
+            </div>
+            <table class="cfg-table">
+                <thead>
+                    <tr><th style="width:40px">#</th><th>Username</th><th>Password</th><th style="width:170px"></th></tr>
+                </thead>
+                <tbody id="rows"></tbody>
+            </table>
+            <p id="empty" class="cfg-empty">No players yet.</p>
+        </section>
+    </div>
+    <script src="/players_dropdown.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>

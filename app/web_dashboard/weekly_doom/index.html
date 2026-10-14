@@ -1,0 +1,113 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Weekly Doom</title>
+    <link rel="stylesheet" href="/temple/style.css">
+    <link rel="stylesheet" href="/cfg.css">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+    <script src="/components.js"></script>
+</head>
+<body>
+    <div class="app-container">
+        <header class="app-header">
+            <div class="brand">
+                <div class="brand-text">
+                    <div class="title-row">
+                        <h1>Weekly Doom</h1>
+                        <span class="version-badge">Gear of Doom</span>
+                    </div>
+                    <p>Run one account manually, or tick several saved players to run them together.</p>
+                </div>
+            </div>
+            <div class="header-controls">
+                <div class="global-config-group">
+                    <div class="input-inline">
+                        <label for="server">Server</label>
+                        <server-select id="server" value="Swordhaven (EU)"></server-select>
+                    </div>
+                    <div class="input-inline">
+                        <label for="room">Room</label>
+                        <input type="number" id="room" value="9099">
+                    </div>
+                </div>
+                <span id="msg" class="cfg-msg"></span>
+                <button class="btn btn-danger" id="btn-stop">STOP ALL</button>
+            </div>
+        </header>
+
+        <main class="app-body">
+            <div class="slots-grid">
+                <div class="slot-card sun-theme">
+                    <div class="slot-header" style="display:flex;justify-content:space-between;align-items:center">
+                        <div class="slot-title-group" style="display:flex;align-items:center;gap:10px">
+                            <div class="slot-icon-box" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(245,158,11,.15);border:1px solid rgba(245,158,11,.3)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:#f59e0b"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"></path><circle cx="12" cy="7" r="4"></circle></svg>
+                            </div>
+                            <div style="display:flex;flex-direction:column">
+                                <span style="font-size:.88rem;font-weight:700;line-height:1.2">Manual</span>
+                                <span style="font-size:.68rem;color:var(--text-secondary,#94a3b8);font-weight:500">one account</span>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="slot-body">
+                        <div class="slot-inputs-container" style="display:flex;flex-direction:column;gap:10px">
+                            <div class="form-group"><label>Player</label><select id="manual-player"></select></div>
+                            <div class="form-group"><label>Username</label><input type="text" id="manual-user" placeholder="Username" autocomplete="off"></div>
+                            <div class="form-group"><label>Password</label><div class="password-wrapper"><input type="password" id="manual-pass" placeholder="Password" autocomplete="off"></div></div>
+                            <div style="display:flex;justify-content:flex-end">
+                                <button class="btn btn-success btn-small" id="btn-start-manual">Start</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="slot-card moon-theme">
+                    <div class="slot-header" style="display:flex;justify-content:space-between;align-items:center">
+                        <div class="slot-title-group" style="display:flex;align-items:center;gap:10px">
+                            <div class="slot-icon-box" style="display:flex;align-items:center;justify-content:center;width:28px;height:28px;border-radius:8px;background:rgba(168,85,247,.15);border:1px solid rgba(168,85,247,.3)">
+                                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="width:14px;height:14px;color:#c084fc"><path d="M9 11l3 3L22 4"></path><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path></svg>
+                            </div>
+                            <div style="display:flex;flex-direction:column">
+                                <span style="font-size:.88rem;font-weight:700;line-height:1.2">From Config Player</span>
+                                <span style="font-size:.68rem;color:var(--text-secondary,#94a3b8);font-weight:500">pick several</span>
+                            </div>
+                        </div>
+                        <button class="btn btn-secondary btn-small" id="btn-refresh">Refresh</button>
+                    </div>
+                    <div class="slot-body">
+                        <div class="slot-inputs-container" style="display:flex;flex-direction:column;gap:10px">
+                            <div id="player-checks" style="display:flex;flex-direction:column;gap:6px;max-height:260px;overflow-y:auto"></div>
+                            <p id="checks-empty" class="cfg-empty">No saved players. Add some in Config Player.</p>
+                            <div style="display:flex;justify-content:flex-end">
+                                <button class="btn btn-success btn-small" id="btn-start-selected">Start selected</button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="slot-card" style="grid-column:1/-1">
+                <div class="slot-header"><span style="font-weight:700">Running accounts</span></div>
+                <div class="slot-body"><div id="status-list" class="slot-status"><span class="pill">idle</span></div></div>
+            </div>
+        </main>
+
+        <footer class="app-console">
+            <div class="console-tabs-bar">
+                <div class="tabs-list"><button class="console-tab active">Log</button></div>
+                <div class="console-actions">
+                    <button class="btn btn-small btn-secondary" id="btn-clear-logs">Clear Logs</button>
+                </div>
+            </div>
+            <div style="display:flex;flex:1;min-height:0;">
+                <div class="console-viewport" id="log"></div>
+            </div>
+        </footer>
+    </div>
+
+    <script src="/players_dropdown.js"></script>
+    <script src="main.js"></script>
+</body>
+</html>
