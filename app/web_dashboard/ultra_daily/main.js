@@ -143,7 +143,8 @@
         line.innerHTML = '<span class="who">' + esc(user || '') + '</span> ' + html;
         log.appendChild(line);
         while (log.childNodes.length > 500) { log.removeChild(log.firstChild); }
-        log.scrollTop = log.scrollHeight;
+        var c = document.getElementById('chk-auto-scroll');
+        if (!c || c.checked) { log.scrollTop = log.scrollHeight; }
     };
     window.addSlaveLog = function (user, html) { window.addUltraLog('', '', user, html); };
 
