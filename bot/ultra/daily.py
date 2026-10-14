@@ -21,7 +21,9 @@ from __future__ import annotations
 
 import asyncio
 import os
+import time
 
+from bot.ultra import party
 from bot.ultra.config import ACCOUNTS, SERVER
 from bot.ultra.telemetry import install_from_env
 from bot.ultra.ultra_ezrajal import UltraEzrajal
@@ -46,6 +48,10 @@ class DailyUltra:
         self.index_class = index_class
         #: Set when a step's boss aborts; :meth:`run` stops the sequence there.
         self.aborted = False
+        #: "stop" (default) or "skip" when a required item is missing.
+        self.missing_policy = "stop"
+        #: Required Scroll of Enrage stock, checked once at party start.
+        self.MIN_SCROLL_QTY = 100
 
     # ------------------------------------------------------------------
     # the four steps
@@ -77,9 +83,28 @@ class DailyUltra:
         the flag has to be copied up to this runner for :meth:`run` to see it.
         """
         boss = boss_cls(self.cmd, self.index_class)
+        boss.missing_policy = self.missing_policy
         await boss.run()
         if boss.aborted:
             self.aborted = True
+
+    async def _ensure_scroll_stock(self) -> bool:
+        """Once-per-party guard: require ``MIN_SCROLL_QTY`` Scroll of Enrage."""
+        qty = 0
+        try:
+            item = self.cmd.bot.player.get_item_inventory("Scroll of Enrage")
+            qty = int(item.qty) if item else 0
+        except Exception:
+            qty = 0
+        if qty >= self.MIN_SCROLL_QTY:
+            return True
+        message = (f"ultra_daily: Scroll of Enrage x{qty} < {self.MIN_SCROLL_QTY} "
+                   f"(need >= {self.MIN_SCROLL_QTY})")
+        if party.enabled():
+            party.mark_abort("ultra_daily", self.index_class, message)
+        print(f"[ultra] {message}")
+        self.cmd.stop_bot(message)
+        return False
 
     # ------------------------------------------------------------------
     # the run
@@ -92,11 +117,23 @@ class DailyUltra:
         the flag **and** calls ``stop_bot`` -- so all that is left here is
         declining to start the next one.
         """
+        if not await self._ensure_scroll_stock():
+            return
         for step in (self.step_tyndarius, self.step_engineer,
                      self.step_ezrajal, self.step_warden):
             await step()
             if self.aborted:
                 return
+        # Stop only once every pane has finished its quests.  A pane that
+        # finishes early waits here rather than dropping out.
+        if party.enabled():
+            party.mark_done("ultra_daily", self.index_class)
+            deadline = time.time() + 300
+            while self.cmd.is_still_connected() and time.time() < deadline:
+                if party.all_done("ultra_daily", party.PARTY_SLOTS):
+                    print("[ultra] ultra_daily: all panes finished")
+                    break
+                await self.cmd.sleep(1000)
         self.cmd.stop_bot("finished daily ultra")
 
 

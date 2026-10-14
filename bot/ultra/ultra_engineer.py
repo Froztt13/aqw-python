@@ -34,6 +34,7 @@ class UltraEngineer(CoreUltra):
     BOSS = "engineer"
     QUEST = 8154
     MAP = "ultraengineer"
+    BOSS_CELL = "r2"
 
     async def run(self) -> None:
         """Equip, accept the quest, fight, turn in, go rest."""

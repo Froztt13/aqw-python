@@ -39,6 +39,7 @@ class UltraWarden(CoreUltra):
     BOSS = "warden"
     QUEST = 8153
     MAP = "ultrawarden"
+    BOSS_CELL = "r2"
 
     #: Warden's finisher HP gate.
     FINISHER_HP = 600_000

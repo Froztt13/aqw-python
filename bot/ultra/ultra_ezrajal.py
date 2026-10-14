@@ -40,6 +40,7 @@ class UltraEzrajal(CoreUltra):
     BOSS = "ezrajal"
     QUEST = 8152
     MAP = "ultraezrajal"
+    BOSS_CELL = "r2"
 
     async def run(self) -> None:
         """Equip, accept the quest, fight, turn in, go rest."""

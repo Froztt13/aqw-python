@@ -95,3 +95,106 @@ def barrier(name: str, key: str, size: int = 4, timeout: int = 60) -> bool:
             pass
         time.sleep(0.2)
     return False
+
+
+# A wipe kills every pane within seconds.  Deaths further apart than this are
+# separate solo deaths, not one wipe.
+WIPE_SPAN_S = 20.0
+
+
+def _safe_key(key) -> str:
+    return "".join(c for c in str(key) if c.isalnum() or c in "-_") or "x"
+
+
+def report_death(name: str, key) -> float:
+    """Record that ``key`` just died; returns the death timestamp.
+
+    ``key`` is any per-pane id -- a slot number, or the account name where the
+    launcher does not pass one (Ultra Speaker).  Stored per key so the panes can
+    tell a full-party wipe (all die together) from one pane going down alone.
+    """
+    now = time.time()
+    try:
+        (_dir() / f"{name}.{_safe_key(key)}.dead").write_text(str(now), encoding="utf-8")
+    except Exception:
+        pass
+    return now
+
+
+def clear_death(name: str, key) -> None:
+    """Drop one pane's death marker once its fate is settled."""
+    try:
+        (_dir() / f"{name}.{_safe_key(key)}.dead").unlink()
+    except Exception:
+        pass
+
+
+def death_times(name: str, keys=PARTY_SLOTS) -> dict:
+    """``{key: death_epoch}`` for every pane key that currently has a marker."""
+    found: dict = {}
+    for key in keys:
+        try:
+            found[key] = float(
+                (_dir() / f"{name}.{_safe_key(key)}.dead").read_text(encoding="utf-8")
+            )
+        except Exception:
+            continue
+    return found
+
+
+# --- finished / "all quests done" markers -------------------------------
+# A pane writes one of these when it has turned in all its quests.  The party
+# stops only once all four exist; if one is missing the run keeps going.
+
+def mark_done(name: str, key) -> None:
+    try:
+        (_dir() / f"{name}.{_safe_key(key)}.done").write_text(str(time.time()),
+                                                              encoding="utf-8")
+    except Exception:
+        pass
+
+
+def clear_done(name: str, keys=PARTY_SLOTS) -> None:
+    for key in keys:
+        try:
+            (_dir() / f"{name}.{_safe_key(key)}.done").unlink()
+        except Exception:
+            pass
+
+
+def all_done(name: str, keys=PARTY_SLOTS) -> bool:
+    """True only when every pane has a done marker."""
+    for key in keys:
+        if not (_dir() / f"{name}.{_safe_key(key)}.done").exists():
+            return False
+    return True
+
+
+def mark_abort(name: str, key, reason: str) -> None:
+    """Record a preflight failure (e.g. too few Scrolls) so the app does not
+    relogin into the same failure."""
+    try:
+        (_dir() / f"{name}.{_safe_key(key)}.abort").write_text(str(reason),
+                                                               encoding="utf-8")
+    except Exception:
+        pass
+
+
+def clear_abort(name: str, keys=PARTY_SLOTS) -> None:
+    for key in keys:
+        try:
+            (_dir() / f"{name}.{_safe_key(key)}.abort").unlink()
+        except Exception:
+            pass
+
+
+def any_abort(name: str, keys=PARTY_SLOTS):
+    """Return the first abort reason found, or ``None``."""
+    for key in keys:
+        try:
+            path = _dir() / f"{name}.{_safe_key(key)}.abort"
+            if path.exists():
+                return path.read_text(encoding="utf-8")
+        except Exception:
+            continue
+    return None

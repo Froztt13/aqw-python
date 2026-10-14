@@ -64,7 +64,7 @@ if __name__ == "__main__":
     telemetry = install_from_env(b, input_int, selected_slave.username)
 
     async def run_bot(cmd: Command) -> None:
-        await UltraSpeaker(cmd).run()
+        await UltraSpeaker(cmd, input_int).run()
 
     try:
         asyncio.run(b.start_bot(run_bot))

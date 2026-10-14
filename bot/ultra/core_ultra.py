@@ -66,6 +66,17 @@ class CoreUltra:
     #: attack; class-level so an instance starts at the documented default.
     counter_attack = False
 
+    #: Cell/pad the fight happens in.  Used to re-engage after a wipe; bosses
+    #: not fought in "Boss" override these.
+    BOSS_CELL = "Boss"
+    BOSS_PAD = "Left"
+
+    #: Required Scroll of Enrage stock, checked once when the party starts.
+    MIN_SCROLL_QTY = 100
+    #: What to do when a required item is missing: "stop" (default, stops the
+    #: whole party) or "skip" (continue without it -- not recommended).
+    missing_policy = "stop"
+
     def __init__(self, cmd: Command, index_class: int) -> None:
         self.cmd = cmd
         #: Launcher slot 1-4, straight from ``input("Select bot [1-4]")``.
@@ -101,6 +112,41 @@ class CoreUltra:
         self.log.event("ABORT", message=message)
         self.aborted = True
         self.cmd.stop_bot(message)
+
+    def _missing(self, message: str) -> bool:
+        """Handle a missing required item.
+
+        Default policy stops the bot (the whole party follows).  The opt-in
+        "skip" policy logs it and continues without that piece, which is not
+        recommended but lets a party run under-geared.
+        """
+        if self.missing_policy == "skip":
+            print(Fore.YELLOW + f"[ultra] MISSING (skip): {message}" + Fore.RESET)
+            self.log.event("MISSING", message=message, policy="skip")
+            return True
+        self._abort(message)
+        return False
+
+    def _scroll_qty(self) -> int:
+        try:
+            item = self.cmd.bot.player.get_item_inventory("Scroll of Enrage")
+            return int(item.qty) if item else 0
+        except Exception:
+            return 0
+
+    async def ensure_scroll_stock(self, name: str) -> bool:
+        """Once-per-party guard: require >= :attr:`MIN_SCROLL_QTY` Scroll of Enrage."""
+        if self.aborted:
+            return False
+        qty = self._scroll_qty()
+        if qty >= self.MIN_SCROLL_QTY:
+            return True
+        message = (f"{name}: Scroll of Enrage x{qty} < {self.MIN_SCROLL_QTY} "
+                   f"(need >= {self.MIN_SCROLL_QTY})")
+        if party.enabled():
+            party.mark_abort(name, self.index_class, message)
+        self._abort(message)
+        return False
 
     def _tele(self, kind: str, **fields) -> None:
         """Forward an event to the optional telemetry writer, if one is attached."""
@@ -170,11 +216,11 @@ class CoreUltra:
         # 1. class -- the one piece of gear named by item.
         self.log.event("STEP", part="class", name=loadout.cls)
         if not await self.cmd.equip_item(loadout.cls):
-            self._abort(
+            if not self._missing(
                 f"{boss} slot {self.index_class}: class {loadout.cls!r} is in "
                 f"neither inventory nor bank"
-            )
-            return None
+            ):
+                return None
 
         # 2. gear -- by enhancement name, slot pinned by the config field.
         for field_name in ("weapon", "helm", "cape"):
@@ -196,21 +242,21 @@ class CoreUltra:
             ):
                 detail = ", ".join(f"{k}={v}" for k, v in kwargs.items())
                 detail = f" ({detail})" if detail else ""
-                self._abort(
+                if not self._missing(
                     f"{boss} slot {self.index_class}: no item in inventory "
                     f"carries the {field_name} enhancement {name!r}{detail}"
-                )
-                return None
+                ):
+                    return None
 
         # 3. scroll last.
         if loadout.scroll:
             self.log.event("STEP", part="scroll", name=loadout.scroll)
         if loadout.scroll and not await self.cmd.equip_scroll(loadout.scroll):
-            self._abort(
+            if not self._missing(
                 f"{boss} slot {self.index_class}: scroll {loadout.scroll!r} "
                 f"is not in inventory"
-            )
-            return None
+            ):
+                return None
 
         self.log.event("EQUIPPED", cls=loadout.cls, weapon=loadout.weapon,
                        helm=loadout.helm, cape=loadout.cape,
@@ -536,16 +582,80 @@ class CoreUltra:
         return False
 
     async def restart_pull(self, quest: int) -> None:
-        """After a party wipe: re-accept the quest and re-enter together."""
+        """After a party wipe: regroup at ``Enter`` together, then re-pull.
+
+        The regroup is the safety net the Speaker has too: everyone meets at
+        the entrance (and waits for the others) before buffing and re-engaging,
+        so a wipe never leaves a straggler pulling alone.
+        """
         await self.cmd.accept_quest(quest)
         map_name = getattr(self, "MAP", "")
         if map_name:
             await self.join_and_wait(map_name)      # includes the barrier
+        await self.regroup_at_enter()
+        await self.precast_buffs()
+        await self.cmd.jump_cell(self.BOSS_CELL, self.BOSS_PAD)
+
+    def _party_members(self) -> list:
+        """The party's account names (self + followed + slaves), de-duplicated."""
+        names: list = []
+        for name in (self.cmd.bot.player.USER,
+                     self.cmd.get_followed_player(),
+                     *self.cmd.get_slaves()):
+            if name and name.lower() not in names:
+                names.append(name.lower())
+        return names
+
+    async def regroup_at_enter(self, cell: str = "Enter", timeout: int = 120) -> None:
+        """Gather every pane at ``Enter`` before pulling again (best effort).
+
+        Stops waiting on timeout or disconnect so a missing pane cannot wedge
+        the run -- the caller re-engages regardless.
+        """
+        await self.cmd.jump_cell(cell, "Spawn")
+        if not party.enabled():
+            return
+        members = self._party_members()
+        me = (self.cmd.bot.player.USER or "").lower()
+        deadline = time.time() + timeout
+        while self.cmd.is_still_connected() and time.time() < deadline:
+            missing = []
+            for name in members:
+                if name == me:
+                    here = (self.cmd.bot.player.CELL or "").lower() == cell.lower()
+                else:
+                    here = self.cmd.is_player_in_cell(name, cell)
+                if not here:
+                    missing.append(name)
+            if not missing:
+                print(f"[ultra] regroup: all panes at {cell}")
+                return
+            await self.cmd.sleep(1000)
+        print(f"[ultra] regroup: timed out waiting at {cell}")
 
     async def wait_for_boss(self) -> None:
         """Wait until a monster is alive in the cell again (boss respawned)."""
         while self.cmd.is_still_connected() and not self.cmd.is_monster_alive("*"):
             await self.cmd.sleep(1000)
+
+    async def wait_party_complete(self, name: str, *, timeout: int = 300) -> bool:
+        """Mark this pane finished, then wait until every pane is finished.
+
+        The party stops only once all four panes have turned in their quests.
+        A pane that finishes early waits here instead of dropping its
+        connection, so a slower pane is never left fighting alone.  Returns
+        True when all panes reported done, False on timeout/disconnect.
+        """
+        if not party.enabled():
+            return True
+        party.mark_done(name, self.index_class)
+        deadline = time.time() + timeout
+        while self.cmd.is_still_connected() and time.time() < deadline:
+            if party.all_done(name, self.PARTY_SLOTS):
+                print(f"[ultra] {name}: all panes finished")
+                return True
+            await self.cmd.sleep(1000)
+        return False
 
     async def finish(self, quest: int, *, spawn: bool = True,
                      unsubscribe: bool = False) -> None:
@@ -663,6 +773,8 @@ class UltraSpeaker(CoreUltra):
             self._abort("speaker: Bot(soloClass=...) is unset, so there is no "
                         "class to equip")
             return
+        if not await self.ensure_scroll_stock("ultra_speaker"):
+            return
         if await self.apply_solo_loadout(solo) is None:
             return
 
@@ -690,7 +802,16 @@ class UltraSpeaker(CoreUltra):
         start_time = time.time()
 
         seen_alive = False
+        deaths_seen = self.cmd.bot.deaths
         while self.cmd.is_still_connected():
+            # A wipe takes the whole party down and resets the boss; regroup at
+            # Enter before reading boss state again.
+            if self.cmd.bot.deaths > deaths_seen:
+                deaths_seen = self.cmd.bot.deaths
+                if await self._recover_from_death(quest=9173):
+                    seen_alive = False
+                    skill_index = 0
+                continue
             mons_hp = self.cmd.get_monster_hp("The First Speaker")
             if mons_hp == 0 or (mons_hp < 0 and seen_alive):
                 # The fight is over at exactly 0 HP, or when the boss vanishes
@@ -774,6 +895,14 @@ class UltraSpeaker(CoreUltra):
         seconds = int(elapsed_time % 60)
         print(f"Elapsed time: {minutes} minutes, {seconds} seconds")
 
+        # Finish the quest, then wait for the whole party before anyone leaves.
+        try:
+            if self.cmd.can_turnin_quest(9173):
+                await self.cmd.turn_in_quest(9173)
+        except Exception:
+            pass
+        await self.wait_party_complete("ultra_speaker")
+
         self.cmd.bot.unsubscribe(self.message_handler)
         await self.cmd.join_map("battleon", self.private_room)
         self.log.event("FINISH", quest=9173)
@@ -781,6 +910,131 @@ class UltraSpeaker(CoreUltra):
         self.log.close()
         print("finished ultra speaker")
         await self.cmd.sleep(100000)
+
+    # ------------------------------------------------------------------
+    # wipe recovery
+    # ------------------------------------------------------------------
+
+    def _party_members(self) -> list:
+        """The party's account names (self + followed + slaves), de-duplicated."""
+        names: list = []
+        for name in (self.cmd.bot.player.USER,
+                     self.cmd.get_followed_player(),
+                     *self.cmd.get_slaves()):
+            if name and name.lower() not in names:
+                names.append(name.lower())
+        return names
+
+    async def _recover_from_death(self, quest: int) -> bool:
+        """React to this pane's death.
+
+        Mark our death at once, wait out the respawn, then decide: if all four
+        panes died inside the wipe window it was a party wipe, so regroup at
+        ``Enter``; otherwise it was a solo death and we fall straight back into
+        the fight.
+
+        Crucially this never *waits* for the other panes.  Blocking on them
+        would idle a pane for the whole window after every lone death, and with
+        deaths this common that alone collapses the fight.
+        """
+        my_key = self._death_key()
+        my_death = party.report_death("speaker", my_key) if (party.enabled() and my_key) else None
+
+        # The async death handler resurrects us after ~11 s.
+        while self.cmd.is_still_connected() and not self.cmd.is_player_alive():
+            await self.cmd.sleep(500)
+
+        if my_death is None or not self._is_full_party_wipe(my_death):
+            if my_death is not None:
+                party.clear_death("speaker", my_key)
+            return False
+
+        print("[ultra] speaker: party wipe -- regrouping at Enter")
+        self._tele("wipe", boss="speaker", slot=self.index_class)
+        self.log.event("WIPE", slot=self.index_class)
+        await self._regroup_and_rebuff(quest)
+        return True
+
+    def _death_key(self) -> str:
+        """This pane's death-marker key: the account name.
+
+        The Speaker launcher never passes a slot number (``UltraSpeaker(cmd)``
+        leaves ``index_class`` at its default of 1), so keying by account is the
+        only way the four panes end up with distinct markers.
+        """
+        return (self.cmd.bot.player.USER or "").lower()
+
+    def _is_full_party_wipe(self, my_death: float) -> bool:
+        """True when all four panes died inside one :data:`party.WIPE_SPAN_S`.
+
+        A single point-in-time check (no polling): by the time we have respawned
+        every pane that wiped with us has already written its marker, and one
+        that is still fighting never will -- so the answer is already on disk.
+        """
+        members = self._party_members()
+        times = party.death_times("speaker", members)
+        if len(times) != len(members):
+            return False
+        return max(times.values()) - min(times.values()) <= party.WIPE_SPAN_S
+
+    async def _regroup_and_rebuff(self, quest: int) -> None:
+        """After a wipe: meet every pane at Enter, reset the fight, re-pull."""
+        await self.cmd.jump_cell("Enter", "Spawn")
+        await self._wait_all_at_enter()
+
+        # Every pane made it here, so all four confirmed the wipe: the shared
+        # death markers are spent and the next death starts a fresh window.
+        party.clear_death("speaker", self._death_key())
+
+        # The boss reset to a fresh phase, so the telegraph counter and every
+        # pending taunt / zone / heal assignment are stale.
+        self.speaker_counter = 0
+        self.force_taunt = False
+        self.taunter_class = None
+        self.zone_class = ""
+        self.what_zone = ""
+        self.in_zone = False
+        self.force_heal = False
+        self.force_skill = False
+        self.skill_to_heal = -1
+        self.skill_to_force = 1
+
+        if self.cmd.quest_not_in_progress(quest):
+            await self.cmd.accept_quest(quest)
+
+        print("[ultra] speaker: all panes at Enter -- buffing and re-pulling")
+        await self.precast_buffs(buff_only=True, gap_ms=1000)
+        await self.cmd.jump_cell("Boss", "Left")
+
+    async def _wait_all_at_enter(self) -> None:
+        """Block until all four panes stand in ``Enter`` (no timeout).
+
+        Prints who is still missing every 10 s, so a pane that never arrives is
+        visible rather than silently stalling the run.
+        """
+        members = self._party_members()
+        me = (self.cmd.bot.player.USER or "").lower()
+        last_print = 0.0
+        while self.cmd.is_still_connected():
+            missing = []
+            for name in members:
+                if name == me:
+                    # Our own cell lives in player.CELL, which jump_cell()
+                    # updates at once; the player_in_area entry for self often
+                    # stays on the old cell and would stall this wait forever.
+                    here = (self.cmd.bot.player.CELL or "").lower() == "enter"
+                else:
+                    here = self.cmd.is_player_in_cell(name, "Enter")
+                if not here:
+                    missing.append(name)
+            if not missing:
+                print("[ultra] speaker: all panes are at Enter")
+                return
+            now = time.time()
+            if now - last_print >= 10:
+                print(f"[ultra] speaker: waiting at Enter for {missing}")
+                last_print = now
+            await self.cmd.sleep(1000)
 
     async def apply_solo_loadout(self, class_name: str) -> Optional[Loadout]:
         """Equip the class plus the gear ``config.SOLO_LOADOUTS`` pairs with it.
@@ -803,9 +1057,9 @@ class UltraSpeaker(CoreUltra):
                        scroll=loadout.scroll, prio=loadout.monster_prio)
 
         if not await self.cmd.equip_item(loadout.cls):
-            self._abort(f"speaker: class {loadout.cls!r} is in neither "
-                        f"inventory nor bank")
-            return None
+            if not self._missing(f"speaker: class {loadout.cls!r} is in neither "
+                                 f"inventory nor bank"):
+                return None
 
         for field_name in ("weapon", "helm", "cape"):
             spec = getattr(loadout, field_name)
@@ -821,13 +1075,13 @@ class UltraSpeaker(CoreUltra):
             if not await self.cmd.equip_enhancement(
                 name, config.GEAR_SLOTS[field_name], **kwargs
             ):
-                self._abort(f"speaker: {field_name} enhancement {name!r} "
-                            f"is not in inventory")
-                return None
+                if not self._missing(f"speaker: {field_name} enhancement {name!r} "
+                                     f"is not in inventory"):
+                    return None
 
         if loadout.scroll and not await self.cmd.equip_scroll(loadout.scroll):
-            self._abort(f"speaker: scroll {loadout.scroll!r} is not in inventory")
-            return None
+            if not self._missing(f"speaker: scroll {loadout.scroll!r} is not in inventory"):
+                return None
 
         self.log.event("EQUIPPED", cls=loadout.cls, weapon=loadout.weapon,
                        helm=loadout.helm, cape=loadout.cape,
