@@ -91,6 +91,8 @@
         el('editor-title').textContent = tabLabel(active);
         renderEditorStatus();
         renderLog();
+        el('chk-items').checked = !!a._showItems;
+        updateItemsCard();
     }
 
     function syncFromEditor() {
@@ -106,6 +108,97 @@
         a.farm_class = el('f-farm').value;
         a.solo_class = el('f-solo').value;
         a.whitelist = el('f-whitelist').value.split(',').map(function (s) { return s.trim(); }).filter(Boolean);
+    }
+
+    // ---- items explorer (inventory / bank / temp) -------------------
+    var itemsTab = 'inventory';
+    var itemsData = { inventory: [], bank: [], temp: [] };
+    var itemsSig = '';
+
+    function itemsKey() {
+        var a = current();
+        return a && (a.username || '').trim();
+    }
+
+    function updateItemsCard() {
+        var a = current() || {};
+        var card = el('items-card');
+        if (!card) return;
+        var show = !!a._showItems;
+        card.style.display = show ? '' : 'none';
+        if (show) {
+            el('items-owner').textContent = itemsKey() || '(no username)';
+            pollItems();
+        }
+    }
+
+    function pollItems() {
+        var card = el('items-card');
+        if (!card || card.style.display === 'none') return;
+        var key = itemsKey();
+        if (!key) { itemsData = { inventory: [], bank: [], temp: [] }; renderItems(); return; }
+        api().get_items(key).then(function (data) {
+            itemsData = data || { inventory: [], bank: [], temp: [] };
+            renderItems();
+        }).catch(function () {});
+    }
+
+    function renderItems() {
+        var box = el('items-groups');
+        if (!box) return;
+        var items = (itemsData && itemsData[itemsTab]) || [];
+
+        // Nothing changed -> don't rebuild (no flicker, no scroll jump).
+        var sig = itemsTab + '\u0000' + JSON.stringify(itemsData);
+        if (sig === itemsSig && box.childNodes.length) { return; }
+
+        // Keep the reader's place: remember each group body's scroll and the page.
+        var page = document.querySelector('.app-body') || document.scrollingElement;
+        var pageTop = page ? page.scrollTop : 0;
+        var keep = {};
+        box.querySelectorAll('.item-group').forEach(function (g) {
+            var t = g.querySelector('.item-group-title');
+            var b = g.querySelector('.item-group-body');
+            if (t && b) { keep[t.dataset.slot || ''] = b.scrollTop; }
+        });
+
+        itemsSig = sig;
+        if (!items.length) {
+            box.innerHTML = '<p class="cfg-empty">No items.</p>';
+        } else {
+            var groups = {};
+            items.forEach(function (it) {
+                var slot = it.slot || 'Misc';
+                if (!groups[slot]) { groups[slot] = []; }
+                groups[slot].push(it);
+            });
+            box.innerHTML = Object.keys(groups).sort().map(function (slot) {
+                var rows = groups[slot].map(function (it) {
+                    var meta = [];
+                    if (it.level) { meta.push('Lv' + it.level); }
+                    if (it.dps) { meta.push('DPS ' + it.dps); }
+                    if (it.rarity) { meta.push('R' + it.rarity); }
+                    if (it.enh) { meta.push('Enh: ' + it.enh); }
+                    if (it.equipped) { meta.push('equipped'); }
+                    return '<div class="item-row">' +
+                        '<span class="qty">' + (it.qty || 1) + 'x</span>' +
+                        '<span class="nm">' + esc(it.name) + '</span>' +
+                        (meta.length ? '<span class="meta">' + esc(meta.join(' \u00b7 ')) + '</span>' : '') +
+                        '</div>';
+                }).join('');
+                return '<div class="item-group"><div class="item-group-title" data-slot="' + esc(slot) + '">' + esc(slot) +
+                    ' <span class="k">(' + groups[slot].length + ')</span></div>' +
+                    '<div class="item-group-body">' + rows + '</div></div>';
+            }).join('');
+            box.querySelectorAll('.item-group').forEach(function (g) {
+                var t = g.querySelector('.item-group-title');
+                var b = g.querySelector('.item-group-body');
+                if (t && b && keep[t.dataset.slot || ''] != null) {
+                    b.scrollTop = keep[t.dataset.slot || ''];
+                }
+            });
+        }
+        if (page) { page.scrollTop = pageTop; }
     }
 
     // ---- accounts ---------------------------------------------------
@@ -198,6 +291,11 @@
     var buffers = {};        // key -> [html line, ...]
     var MAX_LINES = 500;
 
+    function autoScrollOn() {
+        var c = el('chk-auto-scroll');
+        return !c || c.checked;
+    }
+
     function activeKey() {
         var a = current();
         var u = a && (a.username || '').trim();
@@ -209,7 +307,7 @@
         if (!log) return;
         var lines = buffers[activeKey()] || [];
         log.innerHTML = lines.map(function (h) { return '<div>' + h + '</div>'; }).join('');
-        log.scrollTop = log.scrollHeight;
+        if (autoScrollOn()) { log.scrollTop = log.scrollHeight; }
     }
 
     function appendLog(key, html) {
@@ -228,7 +326,7 @@
                 d.innerHTML = line;
                 log.appendChild(d);
                 while (log.childNodes.length > MAX_LINES) { log.removeChild(log.firstChild); }
-                log.scrollTop = log.scrollHeight;
+                if (autoScrollOn()) { log.scrollTop = log.scrollHeight; }
             }
         }
     }
@@ -316,5 +414,24 @@
         });
 
         setInterval(function () { a.get_statuses().then(setStatuses); }, 1500);
+
+        var itemsChk = el('chk-items');
+        if (itemsChk) {
+            itemsChk.onchange = function () {
+                var a2 = current();
+                if (a2) { a2._showItems = itemsChk.checked; }
+                updateItemsCard();
+            };
+        }
+        document.querySelectorAll('#items-tabs .items-tab').forEach(function (b) {
+            b.onclick = function () {
+                itemsTab = b.dataset.list || 'inventory';
+                document.querySelectorAll('#items-tabs .items-tab').forEach(function (x) {
+                    x.classList.toggle('active', x === b);
+                });
+                pollItems();
+            };
+        });
+        setInterval(pollItems, 2000);
     });
 })();

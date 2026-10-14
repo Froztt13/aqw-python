@@ -29,9 +29,9 @@
             </div>
         </header>
 
-        <main class="app-body">
-            <div class="aqw-tabs" id="account-tabs"></div>
+        <div class="aqw-tabs" id="account-tabs"></div>
 
+        <main class="app-body">
             <div class="slot-card">
                 <div class="slot-header" style="display:flex;justify-content:space-between;align-items:center">
                     <div class="slot-title-group" style="display:flex;align-items:center;gap:10px">
@@ -66,6 +66,25 @@
                         <div class="full"><label>Whitelist (comma separated)</label><input id="f-whitelist" type="text"></div>
                     </div>
                     <div class="slot-status" id="editor-status" style="margin-top:10px"><span class="pill">idle</span></div>
+                    <label class="chk-label" style="display:flex;align-items:center;gap:8px;margin-top:10px;cursor:pointer;padding:7px 10px;border-radius:8px;background:rgba(255,255,255,.03);border:1px solid rgba(255,255,255,.06)">
+                        <input type="checkbox" id="chk-items" style="accent-color:var(--primary-color,#a855f7);cursor:pointer">
+                        <span style="font-size:.8rem;color:#e2e8f0">Show item, bank, temp item</span>
+                    </label>
+                </div>
+            </div>
+
+            <div class="slot-card" id="items-card" style="display:none">
+                <div class="slot-header" style="display:flex;justify-content:space-between;align-items:center">
+                    <span style="font-weight:700">Items</span>
+                    <span id="items-owner" style="font-size:.72rem;color:var(--text-muted,#64748B)"></span>
+                </div>
+                <div class="slot-body">
+                    <div class="items-tabs" id="items-tabs">
+                        <button class="items-tab active" data-list="inventory">Inventory</button>
+                        <button class="items-tab" data-list="bank">Bank</button>
+                        <button class="items-tab" data-list="temp">Temp item</button>
+                    </div>
+                    <div class="items-groups" id="items-groups"><p class="cfg-empty">No items.</p></div>
                 </div>
             </div>
         </main>
@@ -74,6 +93,10 @@
             <div class="console-tabs-bar">
                 <div class="tabs-list"><button class="console-tab active">Log</button></div>
                 <div class="console-actions">
+                    <div class="console-checkbox-wrapper">
+                        <input type="checkbox" id="chk-auto-scroll" checked>
+                        <label for="chk-auto-scroll">Auto-Scroll</label>
+                    </div>
                     <button class="btn btn-small btn-secondary" id="btn-clear-logs">Clear Logs</button>
                 </div>
             </div>

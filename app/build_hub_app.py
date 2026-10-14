@@ -1022,6 +1022,43 @@ class AqwSoloApi:
             base.update({k: v for k, v in running[0].items() if k != "accounts"})
         return base
 
+    def get_items(self, key):
+        """Inventory / bank / temp items for one account (realtime snapshot)."""
+        entry = self.bots.get(key)
+        if not entry or not entry.get("instance"):
+            return {"running": False, "inventory": [], "bank": [], "temp": []}
+        player = entry["instance"].player
+
+        def dump(items):
+            out = []
+            for item in items or []:
+                try:
+                    out.append({
+                        "name": item.s_name or item.item_name,
+                        "id": item.item_id,
+                        "slot": item.slot,
+                        "qty": item.qty_now or item.qty,
+                        "level": item.level,
+                        "dps": item.dps,
+                        "rarity": item.rarity,
+                        "enh": item.enhancement_name or "",
+                        "equipped": bool(item.is_equipped),
+                    })
+                except Exception:
+                    continue
+            return out
+
+        try:
+            return {
+                "running": entry["thread"].is_alive(),
+                "inventory": dump(getattr(player, "INVENTORY", [])),
+                "bank": dump(getattr(player, "BANK", [])),
+                "temp": dump(getattr(player, "TEMPINVENTORY", [])),
+            }
+        except Exception as e:
+            return {"running": False, "error": str(e),
+                    "inventory": [], "bank": [], "temp": []}
+
 class SlaveryApi:
     def __init__(self):
         self._window = None
@@ -2552,6 +2589,9 @@ class CombinedApi:
     def aqw_get_statuses(self):
         return self._aqw_api.get_statuses()
 
+    def aqw_get_items(self, key):
+        return self._aqw_api.get_items(key)
+
     def aqw_select_script(self):
         return self._aqw_api.select_script()
 
@@ -2797,6 +2837,7 @@ def serve_injected_html(filepath, bot_type):
                             save_config: (cfg) => topApi.aqw_save_config(cfg),
                             get_status: () => topApi.aqw_get_status(),
                             get_statuses: () => topApi.aqw_get_statuses(),
+                            get_items: (k) => topApi.aqw_get_items(k),
                             select_script: () => topApi.aqw_select_script(),
                             start_bots: (cfg) => topApi.aqw_start_bots(cfg),
                             start_one: (acc) => topApi.aqw_start_one(acc),

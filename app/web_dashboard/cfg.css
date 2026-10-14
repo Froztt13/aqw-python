@@ -181,3 +181,51 @@ body.cfg-page {
     color: #cbd5e1;
 }
 .logs .who { color: var(--primary-color, #a855f7); font-weight: 600; }
+
+/* AQW Solo: item/bank/temp explorer */
+.items-tabs { display: flex; gap: 6px; margin-bottom: 10px; flex-wrap: wrap; }
+.items-tab {
+    background: rgba(148, 163, 184, .08);
+    border: 1px solid rgba(148, 163, 184, .18);
+    border-radius: 8px;
+    color: var(--text-secondary, #94A3B8);
+    font-size: .78rem; font-weight: 600;
+    padding: 6px 12px; cursor: pointer;
+}
+.items-tab.active {
+    background: var(--bg-card, rgba(18, 20, 32, .7));
+    border-color: var(--primary-color, #a855f7);
+    color: var(--text-primary, #F8FAFC);
+}
+.items-groups { display: flex; flex-wrap: wrap; gap: 12px; }
+.item-group {
+    flex: 1 1 320px; min-width: 260px;
+    background: rgba(9, 10, 16, .45);
+    border: 1px solid rgba(148, 163, 184, .15);
+    border-radius: 10px; padding: 10px;
+}
+.item-group-title {
+    font-size: .75rem; font-weight: 700; color: var(--text-primary, #F8FAFC);
+    margin-bottom: 6px; text-transform: uppercase; letter-spacing: .04em;
+}
+.item-group-title .k { color: var(--text-muted, #64748B); font-weight: 500; }
+.item-group-body { max-height: 220px; overflow-y: auto; }
+.item-row {
+    display: flex; align-items: baseline; gap: 8px;
+    padding: 4px 2px; border-bottom: 1px solid rgba(148, 163, 184, .08);
+    font-size: .78rem;
+}
+.item-row:last-child { border-bottom: none; }
+.item-row .qty { color: var(--primary-color, #a855f7); font-weight: 600; min-width: 36px; }
+.item-row .nm { color: var(--text-primary, #F8FAFC); }
+.item-row .meta { color: var(--text-muted, #64748B); font-size: .7rem; margin-left: auto; text-align: right; }
+
+/* Solo: account tabs live outside the scroll area, right under the header,
+   so they never scroll and nothing shows through. */
+#account-tabs {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 10px 24px;
+    background-color: var(--bg-secondary, #0f0b21);
+    border-bottom: 1px solid var(--border-color, rgba(255, 255, 255, .08));
+}
