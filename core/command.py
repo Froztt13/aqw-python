@@ -741,7 +741,17 @@ class Command:
                       f"enhancement ({names}{more}); equipping the first. Pass "
                       f"slot= or name the item directly to choose." + Fore.RESET)
 
-        await self.equip_item(items[0].item_name)
+        chosen = items[0]
+        label = records[0].name if len(records) == 1 else str(enhancement)
+        slot_label = (enh.SLOT_LABELS.get(wanted_slot, wanted_slot)
+                      if wanted_slot else "any slot")
+        tier = f" level {level}" if level is not None else ""
+        print(Fore.CYAN +
+              f"[equip_enhancement] equipping {chosen.item_name!r} for "
+              f"enhancement {label}{tier} in {slot_label} "
+              f"(EnhID {chosen.enh_id})" + Fore.RESET)
+
+        await self.equip_item(chosen.item_name)
         return True
 
     def add_drop(self, itemName: Union[str, List[str]]) -> None:
@@ -1124,8 +1134,10 @@ class Command:
         Returns:
             None: The coroutine finishes once the skill has been used.
         """
-        while not self.bot.player.canUseSkill(int(index)):
+        while self.is_still_connected() and not self.bot.player.canUseSkill(int(index)):
             await self.sleep(100)
+        if not self.is_still_connected():
+            return
         await self.use_skill(index, target_monsters)
 
     def check_is_skill_safe(self, skill: int) -> bool:

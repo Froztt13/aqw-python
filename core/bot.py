@@ -161,7 +161,7 @@ class Bot:
                         self.run_register_quest_task()
                         self.is_register_quest_task_running = True
                     
-                    await botMain(self.command)
+                    await botMain(self._resolve_script_arg(botMain))
                     self.stop_bot()
                 if self.auto_relogin:
                     print("Relogin from start bot")
@@ -169,6 +169,29 @@ class Bot:
             else:
                 await self.run_commands()
         return
+
+    def _resolve_script_arg(self, botMain):
+        """Pass the object the script's ``main`` expects.
+
+        Two conventions coexist in ``bot/``: the current ``main(cmd)`` (a
+        ``Command``) and the legacy ``main(bot: Bot)`` that wraps it again with
+        ``Command(bot)``.  The harness always sent the ``Command``, so the
+        legacy scripts raised ``'Command' object has no attribute 'player'``
+        (they treat the argument as a ``Bot``).  Tell them apart by the first
+        parameter's name/annotation.
+        """
+        try:
+            params = list(inspect.signature(botMain).parameters.values())
+        except (TypeError, ValueError):
+            return self.command
+        if not params:
+            return self.command
+        first = params[0]
+        annotation = first.annotation
+        ann_name = annotation if isinstance(annotation, str) else getattr(annotation, "__name__", "")
+        if first.name == "bot" or ann_name == "Bot":
+            return self
+        return self.command
             
     def run_register_quest_task(self):
         asyncio.create_task(register_quest_task(self))  
@@ -217,7 +240,10 @@ class Bot:
         try:
             print("Restarting bot in 35 secs...")
             await asyncio.sleep(35)
-            if self.isScriptable and async_bot and self.auto_relogin:
+            if not self.auto_relogin:
+                print("Relogin cancelled (bot stopped).")
+                return
+            if self.isScriptable and async_bot:
                 await self.start_bot(async_bot)
             else:
                 await self.start_bot()
