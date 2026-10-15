@@ -95,6 +95,7 @@ async def kill_quest(
             return
         
         await attack_script(cmd, monster_name, hunt)
+        await cmd.sleep(200)
 
 async def quest_item_req(cmd: Command, map_name: str, item_name: str, qty: int = 1, monster: str = "*", is_temp: bool = True):    
     if cmd.is_not_in_map(map_name):

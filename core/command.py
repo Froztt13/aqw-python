@@ -216,13 +216,18 @@ class Command:
 
         Returns:
             bool: True when the server indicates prior completion."""
+        if hasattr(self.bot, "one_time_questid") and int(quest_id) in self.bot.one_time_questid:
+            return True
+
         self.is_completed_before_var = None
         await self.turn_in_quest(quest_id)
         start_time = time.time()
         while(self.is_still_connected()):
+            if hasattr(self.bot, "one_time_questid") and int(quest_id) in self.bot.one_time_questid:
+                self.is_completed_before_var = None
+                return True
             if self.is_completed_before_var is not None:
                 output = self.is_completed_before_var
-                # print(f"{quest_id} is {self.is_green_quest_var}")
                 self.is_completed_before_var = None
                 return output
             if time.time() - start_time > timeout_sec:
@@ -781,19 +786,47 @@ class Command:
                 self.bot.items_drop_whitelist.append(item)
 
     @check_alive
-    async def get_map_item(self, map_item_id: int, qty: int = 1) -> None:
-        """Collect a map item multiple times.
+    async def get_map_item(self, map_item_id: int, qty: int = 1, item_name: Optional[str] = None) -> None:
+        """Collect a map item until target quantity is reached.
 
         Args:
             map_item_id (int): Map item identifier to pick up.
-            qty (int): Number of pickup attempts.
-
-        Returns:
-            None: Sends the pickup packet for each requested iteration.
+            qty (int): Target quantity to collect.
+            item_name (str, optional): Expected temp item name to verify quantity.
         """
-        for _ in range(qty):
+        if item_name:
+            attempts = 0
+            while self.is_still_connected() and not self.is_in_inventory(item_name, qty, isTemp=True) and attempts < qty * 3 + 6:
+                self.bot.write_message(f"%xt%zm%getMapItem%{self.bot.areaId}%{map_item_id}%")
+                await asyncio.sleep(1.2)
+                attempts += 1
+            return
+
+        initial_counts = {item.item_id: item.qty for item in self.bot.player.TEMPINVENTORY}
+        detected_item_name = None
+        attempts = 0
+        max_attempts = qty * 3 + 6
+
+        while self.is_still_connected() and attempts < max_attempts:
+            if detected_item_name and self.is_in_inventory(detected_item_name, qty, isTemp=True):
+                break
+
             self.bot.write_message(f"%xt%zm%getMapItem%{self.bot.areaId}%{map_item_id}%")
-            await asyncio.sleep(1)
+            await asyncio.sleep(1.2)
+            attempts += 1
+
+            if not detected_item_name:
+                for item in self.bot.player.TEMPINVENTORY:
+                    old_qty = initial_counts.get(item.item_id, 0)
+                    if item.qty > old_qty:
+                        detected_item_name = item.item_name
+                        break
+
+            if detected_item_name and self.is_in_inventory(detected_item_name, qty, isTemp=True):
+                break
+
+            if attempts >= qty and not detected_item_name:
+                break
 
     @check_alive
     async def load_shop(self, shop_id: int) -> None:
@@ -1009,7 +1042,7 @@ class Command:
         Returns:
             None: Executes a jump command and waits briefly for sync.
         """
-        if self.bot.player.CELL.lower() != cell.lower() or self.bot.player.PAD.lower() != pad.lower():
+        if str(self.bot.player.CELL or "").lower() != str(cell or "").lower() or str(self.bot.player.PAD or "").lower() != str(pad or "").lower():
             self.bot.jump_cell(cell, pad)
             #print(f"jump cell: {cell} {pad}")
             await asyncio.sleep(1)
@@ -1023,7 +1056,7 @@ class Command:
         Returns:
             bool: True when the active cell does not match ``cell``.
         """
-        return self.bot.player.CELL.lower() != cell.lower()
+        return str(self.bot.player.CELL or "").lower() != str(cell or "").lower()
 
     @check_alive
     async def walk_to(self, X: int, Y: int, speed: int = 8) -> None:
@@ -1100,38 +1133,85 @@ class Command:
         """Jump to the cell that currently hosts the requested monster.
 
         Args:
-            monsterName (str): Display name or ``id.X`` identifier for the monster.
+            monsterName (str): Display name, comma-separated names, or ``id.X`` identifier for the monster.
             byMostMonster (bool): Prefer the cell with the highest monster population when True.
             byAliveMonster (bool): Prefer a cell that still has the monster alive when True.
 
         Returns:
             None: The coroutine adjusts player position and exits.
         """
-        if monsterName.startswith('id.'):
-            monsterName = monsterName.split('.')[1]
-        for monster in self.bot.monsters:
-            if (monster.mon_name.lower() == monsterName.lower() or monster.mon_map_id == monsterName )\
-                    and monster.is_alive \
-                    and self.bot.player.CELL == monster.frame:
+        # Wait briefly if map transfer is in progress or monster definitions haven't loaded yet
+        for _ in range(15):
+            if not self.bot.is_joining_map and self.bot.monsters:
+                break
+            await asyncio.sleep(0.2)
+
+        if not self.bot.monsters:
+            return
+
+        targets = [t.strip().lower() for t in str(monsterName or "*").split(',') if t.strip()]
+        if not targets:
+            targets = ["*"]
+
+        def _is_match(mon: Monster) -> bool:
+            if not mon.frame:
+                return False
+            if "*" in targets:
+                return True
+            m_name = (mon.mon_name or "").lower()
+            m_id = str(mon.mon_map_id)
+            for t in targets:
+                if t.startswith("id.") and t.split(".")[1] == m_id:
+                    return True
+                if t == m_id or t == m_name:
+                    return True
+            return False
+
+        matching_monsters = [m for m in self.bot.monsters if _is_match(m)]
+        if not matching_monsters:
+            return
+
+        player_cell = str(self.bot.player.CELL or "").lower()
+        current_cell_monsters = [m for m in matching_monsters if str(m.frame or "").lower() == player_cell]
+        current_cell_alive = [m for m in current_cell_monsters if m.is_alive and m.current_hp > 0]
+
+        # Case 1: If searching for alive monsters and an alive monster is already in our cell, stay.
+        if byAliveMonster and current_cell_alive:
+            return
+
+        # Case 2: If alive monster preferred and there are alive monsters in other cells, pick the best one.
+        target_cell = None
+        if byAliveMonster:
+            alive_other = [m for m in matching_monsters if m.is_alive and m.current_hp > 0 and str(m.frame or "").lower() != player_cell]
+            if alive_other:
+                cell_counts = {}
+                for m in alive_other:
+                    cell_counts[m.frame] = cell_counts.get(m.frame, 0) + 1
+                target_cell = max(cell_counts, key=cell_counts.get)
+
+        # Case 3: If target_cell not determined yet (or not byAliveMonster):
+        if not target_cell:
+            if current_cell_monsters and not byMostMonster:
                 return
 
-        # Hunt monster in other cell
-        if byMostMonster or byAliveMonster:
-            cell = self.bot.find_best_cell(monsterName, byMostMonster, byAliveMonster)
-            if cell:
-                if cell == self.bot.player.CELL:
+            cell_counts = {}
+            for m in matching_monsters:
+                cell_counts[m.frame] = cell_counts.get(m.frame, 0) + 1
+
+            if cell_counts:
+                best_cell = max(cell_counts, key=cell_counts.get)
+                if str(best_cell).lower() == player_cell:
                     return
-                self.bot.jump_cell(cell, "Left")
-                await asyncio.sleep(1)
-                return
-        for monster in self.bot.monsters:
-            if (monster.mon_name.lower() == monsterName.lower() or monster.mon_map_id == monsterName )\
-                    and monster.is_alive \
-                    and self.bot.player.CELL != monster.frame:
-                # TODO need to handle the rigth pad
-                self.bot.jump_cell(monster.frame, "Left")
-                await asyncio.sleep(1)
-                return
+                target_cell = best_cell
+
+        if not target_cell:
+            return
+
+        if str(target_cell).lower() == player_cell:
+            return
+
+        self.bot.jump_cell(target_cell, "Left")
+        await asyncio.sleep(1)
 
     @check_alive
     async def wait_use_skill(self, index: int, target_monsters: str = "*") -> None:
@@ -1620,7 +1700,7 @@ class Command:
         if data.get('bSuccess', 0) == 1:
             if quest_id is not None and int(quest_id) == self.quest_to_check:
                 self.is_green_quest_var = True
-                self.is_completed_before_var = False
+                self.is_completed_before_var = True
             return
         if quest_id is None or int(quest_id) != self.quest_to_check:
             return
@@ -1633,3 +1713,5 @@ class Command:
         if "One Time Quest Only" in ccqr_msg:
             self.is_green_quest_var = False
             self.is_completed_before_var = True
+            if hasattr(self.bot, "one_time_questid") and int(quest_id) not in self.bot.one_time_questid:
+                self.bot.one_time_questid.append(int(quest_id))
