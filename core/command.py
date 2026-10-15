@@ -190,43 +190,53 @@ class Command:
         return self.bot.can_turn_in_quest(questId)
 
     @check_alive
-    async def is_green_quest(self, quest_id: int) -> bool:
+    async def is_green_quest(self, quest_id: int, timeout_sec: float = 3.0) -> bool:
         """Check whether a quest is marked green (ready to turn in).
 
         Args:
             quest_id (int): Identifier of the quest to inspect.
+            timeout_sec (float): Maximum wait time for server response in seconds.
 
         Returns:
             bool: True when the server reports the quest as green."""
+        self.is_green_quest_var = None
         await self.turn_in_quest(quest_id)
+        start_time = time.time()
         while(self.is_still_connected()):
             if self.is_green_quest_var is not None:
                 output = self.is_green_quest_var
                 # print(f"{quest_id} is {self.is_green_quest_var}")
                 self.is_green_quest_var = None
                 return output
-            else:
-                await self.sleep(100)
+            if time.time() - start_time > timeout_sec:
+                self.is_green_quest_var = None
+                return False
+            await self.sleep(100)
         return False
 
     @check_alive
-    async def is_completed_before(self, quest_id: int) -> bool:
+    async def is_completed_before(self, quest_id: int, timeout_sec: float = 3.0) -> bool:
         """Determine whether the quest has been completed previously.
 
         Args:
             quest_id (int): Identifier of the quest to inspect.
+            timeout_sec (float): Maximum wait time for server response in seconds.
 
         Returns:
             bool: True when the server indicates prior completion."""
+        self.is_completed_before_var = None
         await self.turn_in_quest(quest_id)
+        start_time = time.time()
         while(self.is_still_connected()):
             if self.is_completed_before_var is not None:
                 output = self.is_completed_before_var
                 # print(f"{quest_id} is {self.is_green_quest_var}")
                 self.is_completed_before_var = None
                 return output
-            else:
-                await self.sleep(100)
+            if time.time() - start_time > timeout_sec:
+                self.is_completed_before_var = None
+                return False
+            await self.sleep(100)
         return False
 
     @check_alive
@@ -1253,13 +1263,18 @@ class Command:
         quest_id = data.get('QuestID')
         ccqr_msg = data.get('msg', '')
         if data.get('bSuccess', 0) == 1:
+            if quest_id is not None and int(quest_id) == self.quest_to_check:
+                self.is_green_quest_var = True
+                self.is_completed_before_var = False
             return
         if quest_id is None or int(quest_id) != self.quest_to_check:
             return
         if "Missing Turn In Item" in ccqr_msg:
             self.is_green_quest_var = True
+            self.is_completed_before_var = False
         if "Missing Quest Progress" in ccqr_msg:
             self.is_green_quest_var = False
+            self.is_completed_before_var = False
         if "One Time Quest Only" in ccqr_msg:
             self.is_green_quest_var = False
             self.is_completed_before_var = True
