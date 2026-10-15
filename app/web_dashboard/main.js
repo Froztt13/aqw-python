@@ -67,6 +67,22 @@ document.addEventListener('DOMContentLoaded', () => {
         eclipse: {
             title: "Maid Eclipse Client",
             subtitle: "Advanced 4-player coordination bot specifically built for defeating the Eclipse Shrine"
+        },
+        ultra_daily: {
+            title: "Ultra Daily",
+            subtitle: "Four-pane daily ultra party (Tyndarius, Engineer, Ezrajal, Warden)"
+        },
+        ultra_speaker: {
+            title: "Ultra Speaker",
+            subtitle: "Four-pane Ultra Speaker party with per-pane role selection"
+        },
+        players: {
+            title: "Config Player",
+            subtitle: "Saved usernames and passwords shared by every bot menu"
+        },
+        weekly_doom: {
+            title: "Weekly Doom",
+            subtitle: "Turn in the Gear of Doom quest for one or many accounts"
         }
     };
 
@@ -96,7 +112,12 @@ document.addEventListener('DOMContentLoaded', () => {
             pageSubtitle.textContent = tabDetails[tabId].subtitle;
         }
 
-        // 4. Lazy Load Iframes on-demand with per-feature Loading UI
+        // 4. Tell the backend which menu is active (for unregistered-thread logs)
+        if (window.pywebview && window.pywebview.api && window.pywebview.api.set_active_tab) {
+            try { window.pywebview.api.set_active_tab(tabId); } catch (e) { /* ignore */ }
+        }
+
+        // 5. Lazy Load Iframes on-demand with per-feature Loading UI
         if (tabId !== 'dashboard') {
             const iframe = document.getElementById(`iframe-${tabId}`);
             const loader = document.getElementById(`loader-${tabId}`);
@@ -519,6 +540,25 @@ document.addEventListener('DOMContentLoaded', () => {
             }
         } catch (e) {
             console.error("Error forwarding addLog:", e);
+        }
+    };
+
+    // Generic forwarder for the ultra and multi-account solo menus, whose pages
+    // expose addUltraLog(tab, key, user, html) / addSoloLog(user, html).
+    window.forwardBotLog = function(tabId, user, htmlMsg) {
+        const iframe = document.getElementById(`iframe-${tabId}`);
+        if (!iframe || !iframe.contentWindow) return;
+        try {
+            const w = iframe.contentWindow;
+            if (w.addUltraLog) {
+                w.addUltraLog(tabId, tabId, user, htmlMsg);
+            } else if (w.addSoloLog) {
+                w.addSoloLog(user, htmlMsg);
+            } else if (w.addSlaveLog) {
+                w.addSlaveLog(user, htmlMsg);
+            }
+        } catch (e) {
+            console.error("Error forwarding forwardBotLog:", e);
         }
     };
 });

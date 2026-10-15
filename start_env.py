@@ -43,26 +43,26 @@ if len(usernames) != len(passwords) or len(usernames) != len(servers) or len(use
     print("Error: The number of usernames, passwords, servers, and bot paths must be equal!")
     exit(1)
 
-# Whitelist of items for the bot
-items_white_list = [
-    "Astral Ephemerite Essence",
-    "Belrot the Fiend Essence",
-    "Black Knight Essence",
-    "Tiger Leech Essence",
-    "Carnax Essence",
-    "Chaos Vordred Essence",
-    "Dai Tengu Essence",
-    "Unending Avatar Essence",
-    "Void Dragon Essence",
-    "Creature Creation Essence",
-    "Void Aura"
-]
+# # Whitelist of items for the bot
+# items_white_list = [
+#     "Astral Ephemerite Essence",
+#     "Belrot the Fiend Essence",
+#     "Black Knight Essence",
+#     "Tiger Leech Essence",
+#     "Carnax Essence",
+#     "Chaos Vordred Essence",
+#     "Dai Tengu Essence",
+#     "Unending Avatar Essence",
+#     "Void Dragon Essence",
+#     "Creature Creation Essence",
+#     "Void Aura"
+# ]
 
 # Bot setup function
 def create_bot(username, password, server, room_number):
     bot = Bot(
         roomNumber=room_number,
-        itemsDropWhiteList=items_white_list,
+        # itemsDropWhiteList=items_white_list,
         showLog=True,
         showDebug=False,
         showChat=True,

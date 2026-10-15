@@ -10,7 +10,7 @@ class InvToBankCmd(BaseCommand):
         self.itemNames = itemNames
     
     async def execute(self, bot: Bot, cmd: Command):
-        cmd.inv_to_bank(self.itemNames)
+        await cmd.inv_to_bank(self.itemNames)
         
     def to_string(self):
         return f"Inv to bank: {self.itemNames}"

@@ -1,6 +1,7 @@
 import requests
 from typing import List, Optional
 import random
+import time
 from datetime import datetime, timedelta
 from .utils import checkOperator
 from colorama import Fore
@@ -10,6 +11,7 @@ from model.inventory import ItemInventory, ItemType
 from model.aura import Aura
 from model.faction import Faction
 from model.monster import Monster
+from model.stats import MAX_COOLDOWN_REDUCTION, PlayerStats
 
 class Player:    
     # Player intState
@@ -28,6 +30,11 @@ class Player:
         self.PAD: str = ""
         self.CDREDUCTION = 0
         self.ManaCost = 1.0
+        # Full `stu` stat block.  CDREDUCTION/ManaCost above are kept in sync
+        # from it so existing readers keep working; prefer STATS for new code
+        # (STATS.cooldown_reduction applies the verified 0.5 cap -- the raw
+        # $tha can reach 0.8444 and would recast ~2.8x too early).
+        self.STATS = PlayerStats()
         self.LOGINUSERID = 0
         self.INVENTORY: List[ItemInventory] = []
         self.TEMPINVENTORY: List[ItemInventory] = []
@@ -62,7 +69,16 @@ class Player:
         }
 
         print(f'Login {Fore.BLUE + self.USER.upper() + Fore.RESET}...')
-        response = requests.post(url, json=data)
+        response = None
+        for attempt in range(3):
+            try:
+                response = requests.post(url, json=data, timeout=15)
+                break
+            except requests.exceptions.RequestException as error:
+                if attempt == 2:
+                    print(f"Login request failed after 3 tries: {error}")
+                    return None
+                time.sleep(2 * (attempt + 1))
         response_json = response.json()
         # print(json.dumps(response_json))
         if response_json.get("login", None):
@@ -95,9 +111,21 @@ class Player:
             'X-Requested-With': 'ShockwaveFlash/32.0.0.371'
         }
 
-        response = requests.request("POST", url, headers=headers, data=data)
-        for item in response.json():
-            self.BANK.append(ItemInventory(item))
+        # The bank POST is the request that resets (10054) on a busy login.  One
+        # reset used to leave BANK empty for the whole session, which then looks
+        # like "class not in bank" to equip_item.  Retry a couple of times.
+        for attempt in range(3):
+            try:
+                response = requests.request("POST", url, headers=headers,
+                                            data=data, timeout=15)
+                for item in response.json():
+                    self.BANK.append(ItemInventory(item))
+                return True
+            except (requests.exceptions.RequestException, ValueError) as error:
+                if attempt == 2:
+                    print(f"loadBank failed after 3 tries: {error}")
+                    return False
+                time.sleep(2 * (attempt + 1))
     
     def getServerInfo(self, serverName):
         for server in self.SERVERS:
@@ -108,33 +136,77 @@ class Player:
     def canUseSkill(self, skillNumber: int):
         if skillNumber >= len(self.SKILLS):
             return False
-        skills = self.SKILLS[skillNumber]
-        
-        # Mana check 
-        current_mana = self.MANA
-        skillCost = skills["mp"]*self.ManaCost
-        if current_mana < skillCost:
-            # print(f"skill:{skillNumber} cost:{skillCost} current_mp:{current_mana}")
+        skill = self.SKILLS[skillNumber]
+
+        # Mana check. `mana` is signed: the auto-attack reports -15 because it
+        # *returns* mana, so `MANA < -15` is never true and it stays castable.
+        # The accessor also tolerates the scroll slot, which omits `mp`.
+        skillCost = skill.mana * self.ManaCost
+        if self.MANA < skillCost:
+            # print(f"skill:{skillNumber} cost:{skillCost} current_mp:{self.MANA}")
             return False
-        
-        # Cooldown check 
-        if skills["nextUse"] > datetime.now():
+
+        # Cooldown check. `nextUse` is armed by updateNextUse; a slot the
+        # server has just replaced via sAct starts ready rather than blocking.
+        deadline = skill.next_use
+        if deadline is not None and deadline > datetime.now():
             return False
-        
+
         return True
 
-    def updateNextUse(self, skillNumber: int) -> None:
+    def updateNextUse(self, skillNumber: int, start_delay_ms: int = 200) -> None:
+        """Arm this slot's cooldown.
+
+        Args:
+            skillNumber (int): Skill slot that was just cast.
+            start_delay_ms (int): Latency allowance. The server starts its own
+                cooldown when the packet *arrives*, not when we send it, so the
+                local timer has to start that much later -- otherwise we recast
+                early and the server answers "Please slow down. Last action was
+                too soon!". Keeping this as an explicit argument (rather than a
+                side effect of sleeping before the call) makes the compensation
+                visible and lets the caller stop blocking its loop to apply it.
+
+        Returns:
+            None: mutates ``SKILLS[skillNumber]["nextUse"]`` in place.
+        """
         skill = self.SKILLS[skillNumber]
-        
-        # set maximum CDR to 50%
-        cdr = min(self.CDREDUCTION, 0.5)
-        cd = skill["cd"]
-        effective_cd = cd * (1 - cdr)
-        
-        resultNextUse = (datetime.now() + timedelta(milliseconds=effective_cd))
-        skill["nextUse"] = resultNextUse
-        
-        # print(f"skill:{skillNumber} cd:{cd} cdr:{cdr * 100:.2f}% => result:{effective_cd:.2f}ms")
+
+        # Cap the cooldown reduction the server actually honours.  Raw $tha
+        # reaches 0.8444 but observed recasts only ever match a 50% reduction --
+        # verified slot-by-slot in tools/verify_cdr_cap.py (obs min 3202 ms vs
+        # 3200 ms predicted at 0.5, versus 1134 ms if uncapped).  Using the raw
+        # value would recast ~2.8x early and draw "too soon" rejections.
+        cdr = min(self.CDREDUCTION, MAX_COOLDOWN_REDUCTION)
+        effective_cd = skill.effective_cooldown_ms(cdr)
+
+        resultNextUse = (datetime.now()
+                         + timedelta(milliseconds=effective_cd + start_delay_ms))
+        skill.next_use = resultNextUse
+
+        # print(f"skill:{skillNumber} cd:{skill.cooldown_ms} cdr:{cdr * 100:.2f}% => result:{effective_cd:.2f}ms")
+
+    def effective_cd_ms(self, skillNumber: int) -> float:
+        """Cooldown this slot actually runs for, in milliseconds."""
+        if skillNumber >= len(self.SKILLS):
+            return float("inf")
+        return self.SKILLS[skillNumber].effective_cooldown_ms(self.CDREDUCTION)
+
+    def skill_ready_in_ms(self, skillNumber: int) -> float:
+        """Milliseconds until this slot can be cast again.
+
+        Returns ``0.0`` when it is ready now and ``float("inf")`` when the slot
+        does not exist, so callers can ``min()``/``max()`` across a skill list
+        without bounds checks. Mana starvation reads as a short wait rather than
+        "ready" so the scheduler retries after regeneration instead of spinning.
+        """
+        if skillNumber >= len(self.SKILLS):
+            return float("inf")
+        skill = self.SKILLS[skillNumber]
+        if self.MANA < skill.mana * self.ManaCost:
+            # Mana regeneration is not modelled; retry shortly rather than spin.
+            return 250.0
+        return skill.ready_in_ms()
 
     def get_equipped_item(self, item_type: ItemType) -> Optional[ItemInventory]:
         for item in self.INVENTORY:
@@ -160,11 +232,65 @@ class Player:
                 return item
         return None
 
-    def get_item_inventory_by_enhance_id(self, enh_id: int) -> Optional[ItemInventory]:
-        for item in self.INVENTORY:
-            if item.enh_pattern_id == enh_id:
-                return item
+    def get_item_inventory_by_enhance_id(self, enh_id: int,
+                                         slot: Optional[str] = None
+                                         ) -> Optional[ItemInventory]:
+        """First inventory item carrying a given enhancement.
+
+        Args:
+            enh_id: Either an ``EnhID`` (the enhancement's unique id, e.g.
+                70752 = Valiance R7) or, for backwards compatibility, an
+                ``EnhPatternID``.  Prefer ``EnhID``: a pattern can cover
+                several enhancements (pattern 10 covers seven weapon ones),
+                so a pattern-only target is inherently ambiguous and can be
+                narrowed with ``slot``.
+            slot (str): Optional equipment slot filter -- ``"Weapon"``,
+                ``"he"``, ``"ba"``, or a readable name like ``"cape"``.
+                Without it the first match in inventory order wins, which may
+                be a helm when you meant the weapon.
+
+        Returns:
+            ItemInventory | None: the match, or ``None`` if nothing has it.
+        """
+        for item in self.get_items_by_enhancement(enh_id, slot=slot):
+            return item
         return None
+
+    def get_items_by_enhancement(self, enh_id,
+                                 slot: Optional[str] = None) -> List[ItemInventory]:
+        """Every inventory item carrying enhancement ``enh_id``.
+
+        ``enh_id`` may be an ``EnhID``, a pattern id, or an enhancement name.
+        Matching prefers the item's unique ``enh_id`` and only falls back to
+        ``enh_pattern_id`` when the item reports no id -- see
+        :func:`model.enhancement.item_matches`.
+        """
+        from model import enhancement as _enh
+        matches: List[ItemInventory] = []
+        try:
+            for item in self.INVENTORY:
+                if _enh.item_matches(item, enh_id, slot=slot):
+                    matches.append(item)
+        except ValueError as exc:          # unknown slot string
+            raise ValueError(str(exc)) from exc
+        return matches
+
+    def items_by_enhancement_name(self, name: str,
+                                  slot: Optional[str] = None) -> List[ItemInventory]:
+        """Every inventory item carrying the enhancement called ``name``.
+
+        Example::
+
+            player.items_by_enhancement_name("Valiance")          # must be a weapon
+            player.items_by_enhancement_name("Forge", slot="ba")  # cape only
+        """
+        return self.get_items_by_enhancement(name, slot=slot)
+
+    def inventory_by_slot(self, slot: str) -> List[ItemInventory]:
+        """Every inventory item that belongs in equipment slot ``slot``."""
+        from model import enhancement as _enh
+        code = _enh.slot_code(slot)
+        return [item for item in self.INVENTORY if item.s_es == code]
     
     def get_item_temp_inventory_by_id(self, itemId):
         for item in self.TEMPINVENTORY:

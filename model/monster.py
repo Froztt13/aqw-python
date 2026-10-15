@@ -2,11 +2,19 @@ from core.utils import normalize
 from model.aura import Aura
 
 class Monster:
-    _mon_name: str = None
+    # Backing field for the mon_name property. It is only set once bot.py has
+    # matched strMonName against mon_id (core/bot.py:370), which can happen
+    # after this object is constructed and used for targeting.
+    _mon_name: str | None = None
 
     @property
     def mon_name(self) -> str:
-        return self._mon_name
+        # Never None: every targeting site does `mon.mon_name.lower()` to build
+        # a candidate list, and a monster whose definition has not been matched
+        # yet would raise AttributeError on None. Returning "" makes it simply
+        # not match, and keeps `mon.mon_name or fallback` falsy as callers
+        # (mobile_bridge, build_hub_app) already expect.
+        return self._mon_name or ""
 
     @mon_name.setter
     def mon_name(self, value: str):
@@ -19,7 +27,9 @@ class Monster:
         self.is_alive: bool = int(json_data['intState']) > 0
         self.current_hp: int = json_data['intHP']
         self.max_hp: int = json_data['intHPMax']
-        self.tes: str = str(json_data.get('tes', None))
+        # Was str(json_data.get('tes', None)), which stores the literal string
+        # "None" whenever the field is absent.
+        self.tes: str = json_data.get('tes') or ""
         self.frame: str = None
         self.AURAS: list[Aura] = []
 

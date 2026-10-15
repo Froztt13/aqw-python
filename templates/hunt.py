@@ -2,6 +2,11 @@ from core.bot import Bot
 import commands as cmd
 from core.command import Command
 
+# The standard rotation. Order only matters for the paths that replay it
+# literally (the chrono branch and the non-async command list); the scheduler in
+# Command.use_next_skill collapses the duplicate slot on entry.
+DEFAULT_SKILL_LIST: list[int] = [0, 1, 2, 0, 3, 4]
+
 async def hunt_item(
         cmd: Command,
         item_name: str, 
@@ -14,7 +19,7 @@ async def hunt_item(
         most_monster: bool = False,
         farming_logger: bool = False,
         hunt: bool = False,
-        skill_list: list[int] = [0,1,2,0,3,4],
+        skill_list: list[int] = DEFAULT_SKILL_LIST,
         is_temp: bool = False,
     ):
     if cmd.is_in_bank(item_name):
@@ -50,13 +55,18 @@ async def hunt_item(
         playerclass = cmd.get_equipped_class()
         playerclass = playerclass.item_name if playerclass else ""
         if "chrono shadow" in playerclass.lower():
+            # Chrono rotations are order-sensitive, so keep the fixed sequence.
             await cmd.wait_use_skill(skill_list[skill_index])
+            skill_index += 1
+            if skill_index >= len(skill_list):
+                skill_index = 0
+            await cmd.sleep(100)
         else:
-            await cmd.use_skill(skill_list[skill_index], monster_name, hunt)
-        skill_index += 1
-        if skill_index >= len(skill_list):
-            skill_index = 0
-        await cmd.sleep(100)
+            # Readiness scheduler: casts whichever listed slot is ready and
+            # sleeps internally until the next one comes up. The old round-robin
+            # plus a blind sleep(100) after every attempt wasted 1096 attempts
+            # and 110 s of the baseline run (SKILL_ANALYSIS.md 3.1/3.2).
+            await cmd.use_next_skill(skill_list, monster_name, hunt)
     return
 
 async def kill_quest(
@@ -98,12 +108,13 @@ async def quest_item_req(cmd: Command, map_name: str, item_name: str, qty: int =
 
         
 async def attack_script(cmd: Command, monster_name: str = "*", hunt: bool = False):
-    await cmd.use_skill(0, monster_name, hunt=hunt)
-    await cmd.use_skill(1, monster_name, hunt=hunt)
-    await cmd.use_skill(2, monster_name, hunt=hunt)
-    await cmd.use_skill(0, monster_name, hunt=hunt)
-    await cmd.use_skill(3, monster_name, hunt=hunt)
-    await cmd.use_skill(4, monster_name, hunt=hunt)
+    """One scheduler tick: cast whichever listed skill is ready.
+
+    Callers already loop on this, so it deliberately performs a single cast
+    instead of replaying the whole fixed rotation each pass -- replaying it
+    meant every pass re-attempted skills that were still on cooldown.
+    """
+    await cmd.use_next_skill(DEFAULT_SKILL_LIST, monster_name, hunt)
 
 
 def hunt_item_cmds(
@@ -187,14 +198,7 @@ def hunt_monster_quest_temp_item(
     ]
     
 def attack(monster_name = "*"):
-    return [
-        cmd.UseSkillCmd(0, monster_name),
-        cmd.UseSkillCmd(1, monster_name),
-        cmd.UseSkillCmd(2, monster_name),
-        cmd.UseSkillCmd(0, monster_name),
-        cmd.UseSkillCmd(3, monster_name),
-        cmd.UseSkillCmd(4, monster_name),
-    ]
+    return [cmd.UseSkillCmd(slot, monster_name) for slot in DEFAULT_SKILL_LIST]
 
 def attack_len():
     return len(attack())

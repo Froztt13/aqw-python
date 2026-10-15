@@ -43,8 +43,8 @@ async def main(bot: Bot):
                 elif class_name == "legion revenant":
                     await cmd.use_skill(3)
 
-        await cmd.use_skill(5, scroll_id=12917)
-        await cmd.use_skill(skill_list[skill_index], "The First Speaker", scroll_id=12917)
+        await cmd.use_skill(5)
+        await cmd.use_skill(skill_list[skill_index], "The First Speaker")
         skill_index += 1
         if skill_index >= len(skill_list):
             skill_index = 0
