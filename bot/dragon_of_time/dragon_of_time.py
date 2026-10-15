@@ -118,10 +118,10 @@ def log_error(msg: str):
 
 
 async def check_and_transfer_bank(cmd: Command, items: list[str]):
-    """Mengecek item di bank dan memindahkannya ke inventory jika ditemukan."""
+    """Check items in bank and move them to inventory if found."""
     for item in items:
         if cmd.is_in_bank(item):
-            log_info(f"Mengambil '{item}' dari Bank ke Inventory...")
+            log_info(f"Moving '{item}' from Bank to Inventory...")
             await cmd.bank_to_inv(item)
             await cmd.sleep(300)
 
@@ -129,12 +129,12 @@ async def check_and_transfer_bank(cmd: Command, items: list[str]):
 # =========================================================================
 # QUEST 1: Acquiring Ancient Secrets (Quest 7716)
 # =========================================================================
-async def quest_1_ancient_secrets(cmd: Command):
+async def quest_1_ancient_secrets(cmd: Command, check_green: bool = False):
     quest_id = 7716
     log_info("=== [Quest 1/9] Acquiring Ancient Secrets (7716) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7716 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -154,7 +154,7 @@ async def quest_1_ancient_secrets(cmd: Command):
 
     # 1. Lost Hieroglyphic x30 (/mummies)
     if not cmd.is_in_inventory("Lost Hieroglyphic", 30):
-        log_info("Farming Lost Hieroglyphic x30 di /mummies...")
+        log_info("Farming Lost Hieroglyphic x30 at /mummies...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -168,9 +168,9 @@ async def quest_1_ancient_secrets(cmd: Command):
             farming_logger=True
         )
 
-    # 2. Myths of Lore x1 (Shop 651 di /librarium)
+    # 2. Myths of Lore x1 (Shop 651 at /librarium)
     if not cmd.is_in_inventory("Myths of Lore"):
-        log_info("Membeli Myths of Lore dari /librarium (Shop 651)...")
+        log_info("Buying Myths of Lore from /librarium (Shop 651)...")
         if cmd.is_not_in_map("librarium"):
             await cmd.join_map("librarium")
             await cmd.sleep(1000)
@@ -180,7 +180,7 @@ async def quest_1_ancient_secrets(cmd: Command):
 
     # 3. Historia Page x100 (/timelibrary)
     if not cmd.is_in_inventory("Historia Page", 100):
-        log_info("Farming Historia Page x100 di /timelibrary...")
+        log_info("Farming Historia Page x100 at /timelibrary...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -196,7 +196,7 @@ async def quest_1_ancient_secrets(cmd: Command):
 
     # 4. Frost King's Story x1 (/kingcoal)
     if not cmd.is_in_inventory("Frost King's Story"):
-        log_info("Farming Frost King's Story di /kingcoal...")
+        log_info("Farming Frost King's Story at /kingcoal...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -210,7 +210,7 @@ async def quest_1_ancient_secrets(cmd: Command):
 
     # 5. Your Own Memories x1 (/baconcatyou)
     if not cmd.is_in_inventory("Your Own Memories"):
-        log_info("Farming Your Own Memories di /baconcatyou...")
+        log_info("Farming Your Own Memories at /baconcatyou...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -226,18 +226,18 @@ async def quest_1_ancient_secrets(cmd: Command):
 
     print('try to completing quest...')
     await cmd.ensure_turn_in_quest(quest_id)
-    log_success("Quest 7716 Selesai!")
+    log_success("Quest 7716 Completed!")
 
 
 # =========================================================================
 # QUEST 2: Time to Train Yourself (Quest 7717)
 # =========================================================================
-async def quest_2_train_yourself(cmd: Command):
+async def quest_2_train_yourself(cmd: Command, check_green: bool = False):
     quest_id = 7717
     log_info("=== [Quest 2/9] Time to Train Yourself (7717) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7717 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -258,7 +258,7 @@ async def quest_2_train_yourself(cmd: Command):
 
     # 1. Desoloth's Destructive Aura (/dragonchallenge)
     if not cmd.is_in_inventory("Desoloth's Destructive Aura"):
-        log_info("Farming Desoloth's Destructive Aura di /dragonchallenge...")
+        log_info("Farming Desoloth's Destructive Aura at /dragonchallenge...")
         await hunt_item(
             cmd=cmd,
             item_name="Desoloth's Destructive Aura",
@@ -270,7 +270,7 @@ async def quest_2_train_yourself(cmd: Command):
 
     # 2. Nythera's Patience (/blindingsnow)
     if not cmd.is_in_inventory("Nythera's Patience"):
-        log_info("Farming Nythera's Patience di /blindingsnow...")
+        log_info("Farming Nythera's Patience at /blindingsnow...")
         await hunt_item(
             cmd=cmd,
             item_name="Nythera's Patience",
@@ -282,7 +282,7 @@ async def quest_2_train_yourself(cmd: Command):
 
     # 3. Goregold's Luck (/greed)
     if not cmd.is_in_inventory("Goregold's Luck"):
-        log_info("Farming Goregold's Luck di /greed...")
+        log_info("Farming Goregold's Luck at /greed...")
         await hunt_item(
             cmd=cmd,
             item_name="Goregold's Luck",
@@ -294,7 +294,7 @@ async def quest_2_train_yourself(cmd: Command):
 
     # 4. Victorious's Dignity (/darkplane)
     if not cmd.is_in_inventory("Victorious's Dignity"):
-        log_info("Farming Victorious's Dignity di /darkplane...")
+        log_info("Farming Victorious's Dignity at /darkplane...")
         await hunt_item(
             cmd=cmd,
             item_name="Victorious's Dignity",
@@ -306,7 +306,7 @@ async def quest_2_train_yourself(cmd: Command):
 
     # 5. Trigoras's Tenacity x3 (/trigoras)
     if not cmd.is_in_inventory("Trigoras's Tenacity", 3):
-        log_info("Farming Trigoras's Tenacity x3 di /trigoras...")
+        log_info("Farming Trigoras's Tenacity x3 at /trigoras...")
         await hunt_item(
             cmd=cmd,
             item_name="Trigoras's Tenacity",
@@ -317,18 +317,18 @@ async def quest_2_train_yourself(cmd: Command):
         )
 
     await cmd.ensure_turn_in_quest(quest_id)
-    log_success("Quest 7717 Selesai!")
+    log_success("Quest 7717 Completed!")
 
 
 # =========================================================================
 # QUEST 3: Do You Have the Time? (Quest 7718)
 # =========================================================================
-async def quest_3_do_you_have_the_time(cmd: Command):
+async def quest_3_do_you_have_the_time(cmd: Command, check_green: bool = False):
     quest_id = 7718
     log_info("=== [Quest 3/9] Do You Have the Time? (7718) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7718 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -345,17 +345,17 @@ async def quest_3_do_you_have_the_time(cmd: Command):
     solo_class = cmd.get_solo_class()
     farm_class = cmd.get_farm_class()
 
-    # Cek Golden Blade of Fate & Pink Blade of Destruction
+    # Check Golden Blade of Fate & Pink Blade of Destruction
     if not cmd.is_in_inventory("Golden Blade of Fate"):
-        log_warning("Item 'Golden Blade of Fate' belum ada di inventory/bank. Pastikan Anda telah menyelesaikan questline Golden Blade of Fate.")
+        log_warning("Item 'Golden Blade of Fate' not found in inventory/bank. Please ensure you have completed the Golden Blade of Fate questline.")
     if not cmd.is_in_inventory("Pink Blade of Destruction"):
-        log_warning("Item 'Pink Blade of Destruction' belum ada di inventory/bank. Pastikan Anda telah menyelesaikannya di /doomwood (Quest 7650).")
+        log_warning("Item 'Pink Blade of Destruction' not found in inventory/bank. Please ensure you have completed it at /doomwood (Quest 7650).")
 
     await cmd.ensure_accept_quest(quest_id)
 
     # 1. Cross-Era Stabilizer (/underworld - Laken)
     if not cmd.is_in_inventory("Cross-Era Stabilizer"):
-        log_info("Farming Cross-Era Stabilizer dari Laken di /underworld...")
+        log_info("Farming Cross-Era Stabilizer from Laken at /underworld...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -369,7 +369,7 @@ async def quest_3_do_you_have_the_time(cmd: Command):
 
     # 2. Chronomancer's Codex (/timespace - Chaos Lord Iadoa)
     if not cmd.is_in_inventory("Chronomancer's Codex"):
-        log_info("Farming Dragonoid of Hours di /mqlesson...")
+        log_info("Farming Dragonoid of Hours at /mqlesson...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -380,7 +380,7 @@ async def quest_3_do_you_have_the_time(cmd: Command):
             monster_name="Dragonoid",
             farming_logger=True
         )
-        log_info("Farming Chronomancer's Codex di /timespace...")
+        log_info("Farming Chronomancer's Codex at /timespace...")
         await hunt_item(
             cmd=cmd,
             item_name="Chronomancer's Codex",
@@ -392,7 +392,7 @@ async def quest_3_do_you_have_the_time(cmd: Command):
 
     # 3. Timestream String x100 (/arena)
     if not cmd.is_in_inventory("Timestream String", 100):
-        log_info("Farming Timestream String x100 di /arena...")
+        log_info("Farming Timestream String x100 at /arena...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -406,20 +406,20 @@ async def quest_3_do_you_have_the_time(cmd: Command):
 
     if cmd.is_in_inventory("Golden Blade of Fate") and cmd.is_in_inventory("Pink Blade of Destruction"):
         await cmd.ensure_turn_in_quest(quest_id)
-        log_success("Quest 7718 Selesai!")
+        log_success("Quest 7718 Completed!")
     else:
-        log_warning("Quest 7718 belum bisa di-turn in karena Golden Blade of Fate atau Pink Blade of Destruction belum ada.")
+        log_warning("Quest 7718 cannot be turned in yet because Golden Blade of Fate or Pink Blade of Destruction is missing.")
 
 
 # =========================================================================
 # QUEST 4: Through the Wormhole (Quest 7719)
 # =========================================================================
-async def quest_4_through_the_wormhole(cmd: Command):
+async def quest_4_through_the_wormhole(cmd: Command, check_green: bool = False):
     quest_id = 7719
     log_info("=== [Quest 4/9] Through the Wormhole (7719) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7719 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -438,7 +438,7 @@ async def quest_4_through_the_wormhole(cmd: Command):
 
     # 1. Time Loop Broken (/cathedral - Incarnation of Time)
     if not cmd.is_in_inventory("Time Loop Broken"):
-        log_info("Farming Time Loop Broken di /cathedral...")
+        log_info("Farming Time Loop Broken at /cathedral...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -452,7 +452,7 @@ async def quest_4_through_the_wormhole(cmd: Command):
 
     # 2. Anomaly Silenced x100 (/portalwar)
     if not cmd.is_in_inventory("Anomaly Silenced", 100):
-        log_info("Farming Anomaly Silenced x100 di /portalwar...")
+        log_info("Farming Anomaly Silenced x100 at /portalwar...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -468,7 +468,7 @@ async def quest_4_through_the_wormhole(cmd: Command):
 
     # 3. Chronolord Stopped x50 (/portalmaze)
     if not cmd.is_in_inventory("Chronolord Stopped", 50):
-        log_info("Farming Chronolord Stopped x50 di /portalmaze...")
+        log_info("Farming Chronolord Stopped x50 at /portalmaze...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -482,7 +482,7 @@ async def quest_4_through_the_wormhole(cmd: Command):
 
     # 4. Is This a Wormhole? (/ubear - Cornholio)
     if not cmd.is_in_inventory("Is This a Wormhole?"):
-        log_info("Farming Is This a Wormhole? di /ubear...")
+        log_info("Farming Is This a Wormhole? at /ubear...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -495,18 +495,18 @@ async def quest_4_through_the_wormhole(cmd: Command):
         )
 
     await cmd.ensure_turn_in_quest(quest_id)
-    log_success("Quest 7719 Selesai! (Dragon of Time Armor unlocked)")
+    log_success("Quest 7719 Completed! (Dragon of Time Armor unlocked)")
 
 
 # =========================================================================
 # QUEST 5: Rend (Quest 7720)
 # =========================================================================
-async def quest_5_rend(cmd: Command):
+async def quest_5_rend(cmd: Command, check_green: bool = False):
     quest_id = 7720
     log_info("=== [Quest 5/9] Rend (7720) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7720 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -524,7 +524,7 @@ async def quest_5_rend(cmd: Command):
 
     # 1. Dimensional Dragon Portal x2 (/lairdefend)
     if not cmd.is_in_inventory("Dimensional Dragon Portal", 2):
-        log_info("Farming Dimensional Dragon Portal x2 di /lairdefend...")
+        log_info("Farming Dimensional Dragon Portal x2 at /lairdefend...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -538,7 +538,7 @@ async def quest_5_rend(cmd: Command):
 
     # 2. Brutal Slash Studied x10 (/bosschallenge - Grievous Inbunche)
     if not cmd.is_in_inventory("Brutal Slash Studied", 10):
-        log_info("Farming Brutal Slash Studied x10 di /bosschallenge...")
+        log_info("Farming Brutal Slash Studied x10 at /bosschallenge...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -552,7 +552,7 @@ async def quest_5_rend(cmd: Command):
 
     # 3. Epic Hydra Fang x125 (/hydrachallenge)
     if not cmd.is_in_inventory("Epic Hydra Fang", 125):
-        log_info("Farming Epic Hydra Fang x125 di /hydrachallenge...")
+        log_info("Farming Epic Hydra Fang x125 at /hydrachallenge...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -567,18 +567,18 @@ async def quest_5_rend(cmd: Command):
         )
 
     await cmd.ensure_turn_in_quest(quest_id)
-    log_success("Quest 7720 Selesai!")
+    log_success("Quest 7720 Completed!")
 
 
 # =========================================================================
 # QUEST 6: Confluence of Fates (Quest 7721)
 # =========================================================================
-async def quest_6_confluence_of_fates(cmd: Command):
+async def quest_6_confluence_of_fates(cmd: Command, check_green: bool = False):
     quest_id = 7721
     log_info("=== [Quest 6/9] Confluence of Fates (7721) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7721 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -597,7 +597,7 @@ async def quest_6_confluence_of_fates(cmd: Command):
 
     # 1. Sword of Voids (/ivoliss)
     if not cmd.is_in_inventory("Sword of Voids"):
-        log_info("Farming Sword of Voids di /ivoliss...")
+        log_info("Farming Sword of Voids at /ivoliss...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -616,7 +616,7 @@ async def quest_6_confluence_of_fates(cmd: Command):
 
     # 3. Semiramis Feather (/guardiantree - Quest 6286)
     if not cmd.is_in_inventory("Semiramis Feather"):
-        log_info("Farming Semiramis Feather di /guardiantree (Quest 6286)...")
+        log_info("Farming Semiramis Feather at /guardiantree (Quest 6286)...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await cmd.ensure_accept_quest(6286)
@@ -634,7 +634,7 @@ async def quest_6_confluence_of_fates(cmd: Command):
 
     # 4. Cross-Dimensional Weapons x300 (/aqw3d)
     if not cmd.is_in_inventory("Cross-Dimensional Weapons", 300):
-        log_info("Farming Cross-Dimensional Weapons x300 di /aqw3d...")
+        log_info("Farming Cross-Dimensional Weapons x300 at /aqw3d...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -650,7 +650,7 @@ async def quest_6_confluence_of_fates(cmd: Command):
 
     # 5. Starlight Singularity (/whitehole - Quest 5186)
     if not cmd.is_in_inventory("Starlight Singularity"):
-        log_info("Farming Starlight Singularity di /whitehole (Quest 5186)...")
+        log_info("Farming Starlight Singularity at /whitehole (Quest 5186)...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await cmd.ensure_accept_quest(5186)
@@ -665,9 +665,9 @@ async def quest_6_confluence_of_fates(cmd: Command):
         )
         await cmd.ensure_turn_in_quest(5186)
 
-    # 6. Unidentified 34 (Shop 325 di /collection)
+    # 6. Unidentified 34 (Shop 325 at /collection)
     if not cmd.is_in_inventory("Unidentified 34"):
-        log_info("Membeli Unidentified 34 di /collection (Shop 325)...")
+        log_info("Buying Unidentified 34 at /collection (Shop 325)...")
         if cmd.is_not_in_map("collection"):
             await cmd.join_map("collection")
             await cmd.sleep(1000)
@@ -677,18 +677,18 @@ async def quest_6_confluence_of_fates(cmd: Command):
 
     await cmd.ensure_accept_quest(quest_id)
     await cmd.ensure_turn_in_quest(quest_id)
-    log_success("Quest 7721 Selesai!")
+    log_success("Quest 7721 Completed!")
 
 
 # =========================================================================
 # QUEST 7: Dragon's Will (Quest 7722)
 # =========================================================================
-async def quest_7_dragons_will(cmd: Command):
+async def quest_7_dragons_will(cmd: Command, check_green: bool = False):
     quest_id = 7722
     log_info("=== [Quest 7/9] Dragon's Will (7722) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7722 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -709,7 +709,7 @@ async def quest_7_dragons_will(cmd: Command):
 
     # 1. Unyielding Slime x300 (/moonlab)
     if not cmd.is_in_inventory("Unyielding Slime", 300):
-        log_info("Farming Unyielding Slime x300 di /moonlab...")
+        log_info("Farming Unyielding Slime x300 at /moonlab...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -723,7 +723,7 @@ async def quest_7_dragons_will(cmd: Command):
 
     # 2. Omnipotent Cells x20 (/bosschallenge - Mutated Void Dragon)
     if not cmd.is_in_inventory("Omnipotent Cells", 20):
-        log_info("Farming Omnipotent Cells x20 di /bosschallenge...")
+        log_info("Farming Omnipotent Cells x20 at /bosschallenge...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -737,7 +737,7 @@ async def quest_7_dragons_will(cmd: Command):
 
     # 3. Dragon's Plasma x20 (/underlair - ArchFiend Dragonlord)
     if not cmd.is_in_inventory("Dragon's Plasma", 20):
-        log_info("Farming Dragon's Plasma x20 di /underlair...")
+        log_info("Farming Dragon's Plasma x20 at /underlair...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -751,7 +751,7 @@ async def quest_7_dragons_will(cmd: Command):
 
     # 4. Chaotic Invertebrae x20 (/chaoskraken)
     if not cmd.is_in_inventory("Chaotic Invertebrae", 20):
-        log_info("Farming Chaotic Invertebrae x20 di /chaoskraken...")
+        log_info("Farming Chaotic Invertebrae x20 at /chaoskraken...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -765,7 +765,7 @@ async def quest_7_dragons_will(cmd: Command):
 
     # 5. Cryostatic Essence x20 (/towerofdoom9 - Dread Fang)
     if not cmd.is_in_inventory("Cryostatic Essence", 20):
-        log_info("Farming Cryostatic Essence x20 di /towerofdoom9...")
+        log_info("Farming Cryostatic Essence x20 at /towerofdoom9...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -779,7 +779,7 @@ async def quest_7_dragons_will(cmd: Command):
 
     # 6. Salvaged Chaos Dragon Biomass x20 (/castleroof - Ultra Chaos Dragon)
     if not cmd.is_in_inventory("Salvaged Chaos Dragon Biomass", 20):
-        log_info("Farming Salvaged Chaos Dragon Biomass x20 di /castleroof...")
+        log_info("Farming Salvaged Chaos Dragon Biomass x20 at /castleroof...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -792,18 +792,18 @@ async def quest_7_dragons_will(cmd: Command):
         )
 
     await cmd.ensure_turn_in_quest(quest_id)
-    log_success("Quest 7722 Selesai!")
+    log_success("Quest 7722 Completed!")
 
 
 # =========================================================================
 # QUEST 8: Burning Fates (Quest 7723)
 # =========================================================================
-async def quest_8_burning_fates(cmd: Command):
+async def quest_8_burning_fates(cmd: Command, check_green: bool = False):
     quest_id = 7723
     log_info("=== [Quest 8/9] Burning Fates (7723) ===")
 
-    if await cmd.is_completed_before(quest_id):
-        log_success("Quest 7723 sudah selesai.")
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -822,7 +822,7 @@ async def quest_8_burning_fates(cmd: Command):
 
     # 1. Fire Essence x3000 (/volcano)
     if not cmd.is_in_inventory("Fire Essence", 3000):
-        log_info("Farming Fire Essence x3000 di /volcano...")
+        log_info("Farming Fire Essence x3000 at /volcano...")
         if farm_class:
             await cmd.equip_item(farm_class)
         await hunt_item(
@@ -838,7 +838,7 @@ async def quest_8_burning_fates(cmd: Command):
 
     # 2. Akriloth's Flametongue x100 (/charredplains - Akriloth)
     if not cmd.is_in_inventory("Akriloth's Flametongue", 100):
-        log_info("Farming Akriloth's Flametongue x100 di /charredplains...")
+        log_info("Farming Akriloth's Flametongue x100 at /charredplains...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -852,7 +852,7 @@ async def quest_8_burning_fates(cmd: Command):
 
     # 3. Immortal Embers x50 (/ultraphedra - Ultra Phedra)
     if not cmd.is_in_inventory("Immortal Embers", 50):
-        log_info("Farming Immortal Embers x50 di /ultraphedra...")
+        log_info("Farming Immortal Embers x50 at /ultraphedra...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -866,7 +866,7 @@ async def quest_8_burning_fates(cmd: Command):
 
     # 4. Ashes from the Void Realm x50 (/thevoid - Reaper)
     if not cmd.is_in_inventory("Ashes from the Void Realm", 50):
-        log_info("Farming Ashes from the Void Realm x50 di /thevoid...")
+        log_info("Farming Ashes from the Void Realm x50 at /thevoid...")
         if solo_class:
             await cmd.equip_item(solo_class)
         await hunt_item(
@@ -879,19 +879,23 @@ async def quest_8_burning_fates(cmd: Command):
         )
 
     await cmd.ensure_turn_in_quest(quest_id)
-    log_success("Quest 7723 Selesai!")
+    log_success("Quest 7723 Completed!")
 
 
 # =========================================================================
 # QUEST 9: Hero's Heartbeat (Quest 7724) -> DRAGON OF TIME CLASS!
 # =========================================================================
-async def quest_9_heros_heartbeat(cmd: Command):
+async def quest_9_heros_heartbeat(cmd: Command, check_green: bool = False):
     quest_id = 7724
     log_info("=== [Quest 9/9] Hero's Heartbeat (7724) -> DRAGON OF TIME! ===")
 
     if cmd.is_in_inventory_or_bank(DOT_CLASS_NAME):
         await check_and_transfer_bank(cmd, [DOT_CLASS_NAME])
-        log_success("Class 'Dragon of Time' sudah ada di inventory!")
+        log_success("Class 'Dragon of Time' is already owned in inventory!")
+        return
+
+    if check_green and not await cmd.is_green_quest(quest_id):
+        log_info(f"Quest {quest_id} is not green. Skipping.")
         return
 
     req_items = [
@@ -908,13 +912,13 @@ async def quest_9_heros_heartbeat(cmd: Command):
     if solo_class:
         await cmd.equip_item(solo_class)
 
-    # Cek Blade of Awe
+    # Check Blade of Awe
     if not cmd.is_in_inventory("Blade of Awe"):
-        log_warning("Item 'Blade of Awe' belum ada di inventory. Diperlukan untuk menyelesaikan quest ini.")
+        log_warning("Item 'Blade of Awe' not found in inventory. Required to complete this quest.")
 
-    # Cek Mysterious Egg
+    # Check Mysterious Egg
     if not cmd.is_in_inventory("Mysterious Egg"):
-        log_info("Mengecek Mysterious Egg (Quest 6171)...")
+        log_info("Checking Mysterious Egg (Quest 6171)...")
         egg_keys = [
             "Key of Pride",
             "Key of Gluttony",
@@ -951,7 +955,7 @@ async def quest_9_heros_heartbeat(cmd: Command):
 
     # 1. Conquered Past (/chaoslord)
     if not cmd.is_in_inventory("Conquered Past"):
-        log_info("Farming Conquered Past di /chaoslord...")
+        log_info("Farming Conquered Past at /chaoslord...")
         await hunt_item(
             cmd=cmd,
             item_name="Conquered Past",
@@ -965,7 +969,7 @@ async def quest_9_heros_heartbeat(cmd: Command):
 
     # 2. Slugbutter Trophy x100 (/towerofdoom10 - Slugbutter)
     if not cmd.is_in_inventory("Slugbutter Trophy", 100):
-        log_info("Farming Slugbutter Trophy x100 di /towerofdoom10...")
+        log_info("Farming Slugbutter Trophy x100 at /towerofdoom10...")
         await hunt_item(
             cmd=cmd,
             item_name="Slugbutter Trophy",
@@ -977,7 +981,7 @@ async def quest_9_heros_heartbeat(cmd: Command):
 
     # 3. Icewing's Laurel x30 (/icewing - Warlord Icewing)
     if not cmd.is_in_inventory("Icewing's Laurel", 30):
-        log_info("Farming Icewing's Laurel x30 di /icewing...")
+        log_info("Farming Icewing's Laurel x30 at /icewing...")
         await hunt_item(
             cmd=cmd,
             item_name="Icewing's Laurel",
@@ -995,39 +999,99 @@ async def quest_9_heros_heartbeat(cmd: Command):
         print("  CONGRATULATIONS! CLASS UNLOCKED: DRAGON OF TIME!")
         print("========================================================\n" + Fore.RESET)
     else:
-        log_warning("Quest 7724 telah selesai diproses. Periksa inventory Anda untuk class Dragon of Time.")
+        log_warning("Quest 7724 processing finished. Please check your inventory for Dragon of Time class.")
+
+
+DOT_QUESTS = [
+    (7716, "Acquiring Ancient Secrets", quest_1_ancient_secrets),
+    (7717, "Time to Train Yourself", quest_2_train_yourself),
+    (7718, "Do You Have the Time?", quest_3_do_you_have_the_time),
+    (7719, "Through the Wormhole", quest_4_through_the_wormhole),
+    (7720, "Rend", quest_5_rend),
+    (7721, "Confluence of Fates", quest_6_confluence_of_fates),
+    (7722, "Dragon's Will", quest_7_dragons_will),
+    (7723, "Burning Fates", quest_8_burning_fates),
+    (7724, "Hero's Heartbeat", quest_9_heros_heartbeat),
+]
+
+
+async def find_active_dot_quest_index(cmd: Command) -> int | None:
+    """Check quests from LARGEST ID (7724) down to SMALLEST (7716).
+
+    Because Dragon of Time quests are linear and previously unlocked quests
+    remain green on the server, searching backwards from the largest ID
+    will immediately find the LAST green quest (furthest progress)
+    that is currently active and ready to be completed.
+    """
+    for index in range(len(DOT_QUESTS) - 1, -1, -1):
+        qid, qname, _ = DOT_QUESTS[index]
+        log_info(f"Checking status of Quest {qid} ({qname})...")
+        if await cmd.is_green_quest(qid):
+            log_success(f"Latest green quest found: [{index + 1}/9] {qname} (ID: {qid})")
+            return index
+        await cmd.sleep(200)
+    return None
 
 
 # =========================================================================
 # MAIN ENTRYPOINT
 # =========================================================================
 async def main(cmd: Command):
-    log_info("Memulai Scriptable Bot: Dragon of Time Class...")
+    log_info("Starting Scriptable Bot: Dragon of Time Class...")
 
-    # Cek apakah sudah punya Dragon of Time
+    # Check if Dragon of Time is already owned
     if cmd.is_in_inventory_or_bank(DOT_CLASS_NAME):
         await check_and_transfer_bank(cmd, [DOT_CLASS_NAME])
-        log_success(f"Class '{DOT_CLASS_NAME}' sudah dimiliki di inventory!")
+        log_success(f"Class '{DOT_CLASS_NAME}' is already owned in inventory!")
         return
 
     # Whitelist all drops
     cmd.add_drop(ALL_DOT_DROPS)
 
-    # Jalankan rangkaian Quest 1 - 9 secara berurutan
-    await quest_1_ancient_secrets(cmd)
-    await quest_2_train_yourself(cmd)
-    await quest_3_do_you_have_the_time(cmd)
-    await quest_4_through_the_wormhole(cmd)
-    await quest_5_rend(cmd)
-    await quest_6_confluence_of_fates(cmd)
-    await quest_7_dragons_will(cmd)
-    await quest_8_burning_fates(cmd)
-    await quest_9_heros_heartbeat(cmd)
+    # Detect the latest green quest to determine the starting point
+    log_info("Detecting active green quest...")
+    start_index = await find_active_dot_quest_index(cmd)
+
+    if start_index is None:
+        log_warning("No green quest found on initial check. Retrying in 1s...")
+        await cmd.sleep(1000)
+        start_index = await find_active_dot_quest_index(cmd)
+
+    if start_index is None:
+        if cmd.is_in_inventory_or_bank(DOT_CLASS_NAME):
+            await check_and_transfer_bank(cmd, [DOT_CLASS_NAME])
+            log_success(f"Class '{DOT_CLASS_NAME}' is already owned in inventory!")
+            return
+        log_error("Could not find any active (green) Dragon of Time quest.")
+        log_warning("Make sure the account meets the requirements to start the Dragon of Time questline.")
+        return
+
+    log_success(
+        f"Bot will start from Quest {start_index + 1}/9: "
+        f"{DOT_QUESTS[start_index][1]} (ID: {DOT_QUESTS[start_index][0]})"
+    )
+
+    # Run quests sequentially starting from the latest green quest
+    for index in range(start_index, len(DOT_QUESTS)):
+        qid, qname, quest_func = DOT_QUESTS[index]
+
+        # For subsequent quests after the start quest, verify green status
+        if index > start_index:
+            log_info(f"Verifying status for Quest {qid} ({qname})...")
+            if not await cmd.is_green_quest(qid):
+                log_error(f"Quest {qid} ({qname}) is not green after previous quest. Stopping bot.")
+                return
+
+        log_info(f"\n========================================================")
+        log_info(f"  Running [{index + 1}/9] {qname} (ID: {qid})")
+        log_info(f"========================================================")
+        await quest_func(cmd)
+        await cmd.sleep(1000)
 
     if cmd.is_in_inventory(DOT_CLASS_NAME):
-        log_success("Bot Dragon of Time selesai dengan sukses!")
+        log_success("Dragon of Time bot finished successfully!")
     else:
-        log_warning("Bot telah mengeksekusi semua langkah. Pastikan item pendukung (Golden Blade of Fate, Pink Blade of Destruction, Blade of Awe) sudah dimiliki.")
+        log_warning("Bot has executed all steps. Ensure prerequisite items (Golden Blade of Fate, Pink Blade of Destruction, Blade of Awe) are owned.")
 
 
 if __name__ == "__main__":
